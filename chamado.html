@@ -9,6 +9,7 @@
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="res/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     if (typeof lucide === 'undefined') {
       document.write('<script src="https://unpkg.com/lucide@latest"><\/script>');
@@ -434,6 +435,21 @@
   </footer>
 
   <script>
+    
+    // =========================================================================
+    // CONFIGURAÇÃO SUPABASE CLOUD (REALTIME & POSTGRESQL)
+    // =========================================================================
+    const SUPABASE_URL = 'https://hskxvdcgfgrdofgpdtzm.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhza3h2ZGNnZmdyZG9mZ3BkdHptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1NDEzOTEsImV4cCI6MjExMTExNzM5MX0.PKQaCfnlmxAM7Vuc4s84gjLS_21OeteMkI1WLLR1BEU';
+    let supabaseClient = null;
+    try {
+      if (window.supabase && typeof window.supabase.createClient === 'function') {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      }
+    } catch(e) {
+      console.warn('Supabase init:', e);
+    }
+
     let destinoWebAtual = 'mim';
     let empresaWebAtual = 'Aço Móveis';
     let listaEmpresasWeb = ["Aço Móveis", "JPL"];
@@ -443,7 +459,19 @@
     // INTEGRAÇÃO DINÂMICA: EMPRESAS & SETORES VINCULADOS COM AS CONFIGURAÇÕES
     // =========================================================================
     async function carregarEmpresasWeb(empresaPreferencia = null) {
-      // 1. Prioridade: localStorage da Console Nexus / FSC
+      // 1. Prioridade Máxima: Supabase Cloud
+      if (supabaseClient) {
+        try {
+          const { data, error } = await supabaseClient.from('empresas').select('nome').order('criado_em', { ascending: true });
+          if (data && data.length > 0) {
+            listaEmpresasWeb = data.map(d => d.nome);
+            try { localStorage.setItem('fsc_kintsugi_empresas', JSON.stringify(listaEmpresasWeb)); } catch(e){}
+          }
+        } catch(e) {
+          console.warn('Erro ao carregar empresas do Supabase:', e);
+        }
+      }
+      // 2. Fallback: localStorage da Console Nexus / FSC
       try {
         const salvas = localStorage.getItem('fsc_kintsugi_empresas');
         if (salvas) {
@@ -567,7 +595,19 @@
     }
 
     async function carregarSetoresWeb(setorPreferencia = null) {
-      // 1. Tenta carregar do localStorage
+      // 1. Prioridade Máxima: Supabase Cloud
+      if (supabaseClient) {
+        try {
+          const { data, error } = await supabaseClient.from('setores').select('nome').order('criado_em', { ascending: true });
+          if (data && data.length > 0) {
+            listaSetoresWeb = data.map(d => d.nome.replace('#', '').trim());
+            try { localStorage.setItem('fsc_kintsugi_deptos', JSON.stringify(listaSetoresWeb)); } catch(e){}
+          }
+        } catch(e) {
+          console.warn('Erro ao carregar setores do Supabase:', e);
+        }
+      }
+      // 2. Tenta carregar do localStorage
       try {
         const salvas = localStorage.getItem('fsc_kintsugi_deptos');
         if (salvas) {
@@ -633,6 +673,25 @@
     }
 
     // Interligação em tempo real (Storage Listener & BroadcastChannel entre abas)
+    
+    // Inscrição em Tempo Real (Supabase Realtime)
+    try {
+      if (supabaseClient) {
+        supabaseClient
+          .channel('portal-chamados-realtime')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'empresas' }, () => {
+            carregarEmpresasWeb();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'setores' }, () => {
+            carregarSetoresWeb();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, () => {
+            carregarHistoricoChamados();
+          })
+          .subscribe();
+      }
+    } catch(e) {}
+
     window.addEventListener('storage', (e) => {
       if (e.key === 'fsc_kintsugi_empresas') {
         carregarEmpresasWeb();
@@ -1021,7 +1080,26 @@
         };
       } catch(e) {}
 
-      window.addEventListener('storage', (e) => {
+      
+    // Inscrição em Tempo Real (Supabase Realtime)
+    try {
+      if (supabaseClient) {
+        supabaseClient
+          .channel('portal-chamados-realtime')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'empresas' }, () => {
+            carregarEmpresasWeb();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'setores' }, () => {
+            carregarSetoresWeb();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, () => {
+            carregarHistoricoChamados();
+          })
+          .subscribe();
+      }
+    } catch(e) {}
+
+    window.addEventListener('storage', (e) => {
         if (e.key === 'fsc_kintsugi_chamados') {
           if (chatClienteChamadoAbertoId) {
             let chamados = [];
@@ -1103,7 +1181,30 @@
       if (!window._historicoChamadosLocais) window._historicoChamadosLocais = [];
       window._historicoChamadosLocais.unshift(novoChamado);
 
-      // 1. Grava no localStorage para sincronizar imediatamente com a console
+      // 1. Envia imediatamente para o Supabase Cloud
+      if (supabaseClient) {
+        try {
+          await supabaseClient.from('chamados').insert({
+            id: ticketId,
+            protocolo: ticketId,
+            empresa: empresa,
+            solicitante: solicitante,
+            setor: setor,
+            categoria: categoria,
+            urgencia: urgencia,
+            descricao: desc,
+            status: 'Em Aberto',
+            maquina_nome: ativo,
+            maquina_ip: ip,
+            tecnico: 'Não atribuído',
+            historico: novoChamado.mensagens
+          });
+        } catch(errSup) {
+          console.warn('Erro ao gravar chamado no Supabase:', errSup);
+        }
+      }
+
+      // 2. Grava no localStorage para cache local
       try {
         let lista = [];
         const salvo = localStorage.getItem('fsc_kintsugi_chamados');

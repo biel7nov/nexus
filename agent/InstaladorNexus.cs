@@ -9,6 +9,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Security.Principal;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
@@ -471,9 +472,84 @@ namespace NexusInstaller
             }
         }
 
+        
+        private static List<string> BuscarEmpresasSupabase()
+        {
+            try
+            {
+                ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+                string url = "https://hskxvdcgfgrdofgpdtzm.supabase.co/rest/v1/empresas?select=nome&order=criado_em.asc";
+                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+                req.Method = "GET";
+                req.Headers["apikey"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhza3h2ZGNnZmdyZG9mZ3BkdHptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1NDEzOTEsImV4cCI6MjExMTExNzM5MX0.PKQaCfnlmxAM7Vuc4s84gjLS_21OeteMkI1WLLR1BEU";
+                req.Headers["Authorization"] = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhza3h2ZGNnZmdyZG9mZ3BkdHptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1NDEzOTEsImV4cCI6MjExMTExNzM5MX0.PKQaCfnlmxAM7Vuc4s84gjLS_21OeteMkI1WLLR1BEU";
+                req.Timeout = 2500;
+                using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse())
+                using (StreamReader sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                {
+                    string json = sr.ReadToEnd();
+                    List<string> res = new List<string>();
+                    MatchCollection matches = Regex.Matches(json, @"""nome""\s*:\s*""([^""]+)""");
+                    foreach (Match m in matches)
+                    {
+                        if (m.Success && m.Groups.Count > 1)
+                        {
+                            string n = m.Groups[1].Value.Trim();
+                            if (!string.IsNullOrEmpty(n) && !res.Contains(n)) res.Add(n);
+                        }
+                    }
+                    if (res.Count > 0) return res;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private static List<string> BuscarSetoresSupabase()
+        {
+            try
+            {
+                ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+                string url = "https://hskxvdcgfgrdofgpdtzm.supabase.co/rest/v1/setores?select=nome&order=criado_em.asc";
+                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+                req.Method = "GET";
+                req.Headers["apikey"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhza3h2ZGNnZmdyZG9mZ3BkdHptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1NDEzOTEsImV4cCI6MjExMTExNzM5MX0.PKQaCfnlmxAM7Vuc4s84gjLS_21OeteMkI1WLLR1BEU";
+                req.Headers["Authorization"] = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhza3h2ZGNnZmdyZG9mZ3BkdHptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1NDEzOTEsImV4cCI6MjExMTExNzM5MX0.PKQaCfnlmxAM7Vuc4s84gjLS_21OeteMkI1WLLR1BEU";
+                req.Timeout = 2500;
+                using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse())
+                using (StreamReader sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                {
+                    string json = sr.ReadToEnd();
+                    List<string> res = new List<string>();
+                    MatchCollection matches = Regex.Matches(json, @"""nome""\s*:\s*""([^""]+)""");
+                    foreach (Match m in matches)
+                    {
+                        if (m.Success && m.Groups.Count > 1)
+                        {
+                            string n = m.Groups[1].Value.Replace("#", "").Trim();
+                            if (!string.IsNullOrEmpty(n) && !res.Contains(n)) res.Add(n);
+                        }
+                    }
+                    if (res.Count > 0) return res;
+                }
+            }
+            catch { }
+            return null;
+        }
+
         private static List<string> CarregarEmpresasDisponiveis()
         {
             List<string> empresas = new List<string>();
+            try
+            {
+                List<string> supaEmps = BuscarEmpresasSupabase();
+                if (supaEmps != null && supaEmps.Count > 0)
+                {
+                    SalvarEmpresasJsonLocal(supaEmps);
+                    return supaEmps;
+                }
+            }
+            catch { }
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
 
             // 1. Prioridade Absoluta: Lê diretamente do LocalStorage do navegador (Chrome/Edge/Brave)

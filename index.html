@@ -1091,6 +1091,7 @@
     </style>
   <!-- Lucide Icons (LobeHub UI Icons System) -->
   <script src="res/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     if (typeof lucide === 'undefined') {
       document.write('<script src="https://unpkg.com/lucide@latest"><\/script>');
@@ -5398,6 +5399,7 @@
       inicializarTemaFundo();
       atualizarLinksDeploy();
       carregarDadosLocais();
+      sincronizarComSupabase();
       inicializarNotificacoes();
       popularSelectsSetores();
       sincronizarSessaoAutenticada();
@@ -9635,6 +9637,184 @@
       } catch(e) {}
     }
 
+    
+    // =========================================================================
+    // CONFIGURAÇÃO SUPABASE CLOUD (REALTIME & POSTGRESQL) - NEXUS IT SUITE
+    // =========================================================================
+    const SUPABASE_URL = 'https://hskxvdcgfgrdofgpdtzm.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhza3h2ZGNnZmdyZG9mZ3BkdHptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1NDEzOTEsImV4cCI6MjExMTExNzM5MX0.PKQaCfnlmxAM7Vuc4s84gjLS_21OeteMkI1WLLR1BEU';
+    let supabaseClient = null;
+    try {
+      if (window.supabase && typeof window.supabase.createClient === 'function') {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      }
+    } catch(e) {
+      console.warn('Supabase init:', e);
+    }
+
+    async function sincronizarComSupabase() {
+      if (!supabaseClient) return;
+
+      // 1. Sincroniza Empresas
+      try {
+        const { data: empData, error: empErr } = await supabaseClient.from('empresas').select('nome').order('criado_em', { ascending: true });
+        if (empData && empData.length > 0) {
+          window.listaEmpresasCadastradas = empData.map(e => e.nome);
+          try { localStorage.setItem('fsc_kintsugi_empresas', JSON.stringify(window.listaEmpresasCadastradas)); } catch(e){}
+          renderizarTagsEmpresas();
+          const selGlobal = document.getElementById('select-filtro-empresa-global');
+          if (selGlobal && typeof renderizarSelectFiltroEmpresaGlobal === 'function') {
+            renderizarSelectFiltroEmpresaGlobal();
+          }
+        }
+      } catch(err) {
+        console.warn('Erro ao sincronizar empresas Supabase:', err);
+      }
+
+      // 2. Sincroniza Setores
+      try {
+        const { data: setoData, error: setErr } = await supabaseClient.from('setores').select('nome').order('criado_em', { ascending: true });
+        if (setoData && setoData.length > 0) {
+          listaDepartamentos = setoData.map(s => s.nome.startsWith('#') ? s.nome : '#' + s.nome);
+          try { localStorage.setItem('fsc_kintsugi_deptos', JSON.stringify(listaDepartamentos)); } catch(e){}
+          if (typeof renderizarTagsDeptos === 'function') renderizarTagsDeptos();
+        }
+      } catch(err) {
+        console.warn('Erro ao sincronizar setores Supabase:', err);
+      }
+
+      // 3. Sincroniza Chamados
+      try {
+        const { data: chamData, error: chamErr } = await supabaseClient.from('chamados').select('*').order('criado_em', { ascending: false });
+        if (chamData && chamData.length > 0) {
+          const listaNuvem = chamData.map(ch => ({
+            id: ch.id,
+            titulo: ch.descricao ? (ch.descricao.length > 40 ? ch.descricao.substring(0, 40) + '...' : ch.descricao) : ('Chamado #' + ch.id),
+            descricao: ch.descricao,
+            desc: ch.descricao,
+            empresa: ch.empresa,
+            solicitante: ch.solicitante,
+            setor: ch.setor,
+            categoria: ch.categoria || 'Geral',
+            urgencia: ch.urgencia || 'Média',
+            status: ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : (ch.status === 'Em Espera' ? 'Em Espera' : (ch.status === 'Em Homologação' ? 'Homologacao' : 'Active')))),
+            data: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
+            horario: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
+            responsavel: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
+            tecnico: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
+            ip: ch.maquina_ip || 'auto',
+            ativo: ch.maquina_nome || 'auto',
+            mensagens: Array.isArray(ch.historico) ? ch.historico : []
+          }));
+
+          // Merge preservando chamados locais e atualizando
+          listaNuvem.forEach(nv => {
+            const idx = listaChamados.findIndex(x => String(x.id) === String(nv.id));
+            if (idx >= 0) {
+              listaChamados[idx] = Object.assign({}, listaChamados[idx], nv);
+            } else {
+              listaChamados.unshift(nv);
+            }
+          });
+
+          salvarDadosLocais();
+          renderizarKanban();
+          if (typeof renderizarTabelaChamados === 'function') renderizarTabelaChamados();
+        }
+      } catch(err) {
+        console.warn('Erro ao sincronizar chamados Supabase:', err);
+      }
+
+      // 4. Inscrição em Tempo Real (Realtime Channel)
+      try {
+        supabaseClient.channel('nexus-painel-realtime')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, (payload) => {
+            if (payload.eventType === 'INSERT') {
+              const ch = payload.new;
+              const nv = {
+                id: ch.id,
+                titulo: ch.descricao ? (ch.descricao.length > 40 ? ch.descricao.substring(0, 40) + '...' : ch.descricao) : ('Chamado #' + ch.id),
+                descricao: ch.descricao,
+                desc: ch.descricao,
+                empresa: ch.empresa,
+                solicitante: ch.solicitante,
+                setor: ch.setor,
+                categoria: ch.categoria || 'Geral',
+                urgencia: ch.urgencia || 'Média',
+                status: ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : 'Active')),
+                data: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
+                horario: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
+                responsavel: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
+                tecnico: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
+                ip: ch.maquina_ip || 'auto',
+                ativo: ch.maquina_nome || 'auto',
+                mensagens: Array.isArray(ch.historico) ? ch.historico : []
+              };
+              if (!listaChamados.some(x => String(x.id) === String(nv.id))) {
+                listaChamados.unshift(nv);
+                salvarDadosLocais();
+                renderizarKanban();
+                if (typeof renderizarTabelaChamados === 'function') renderizarTabelaChamados();
+                if (typeof mostrarToast === 'function') {
+                  mostrarToast(`Novo chamado #${nv.id} recebido de ${nv.solicitante} (${nv.empresa})!`, 'info', 'Novo Chamado em Tempo Real');
+                }
+              }
+            } else if (payload.eventType === 'UPDATE') {
+              const ch = payload.new;
+              const idx = listaChamados.findIndex(x => String(x.id) === String(ch.id));
+              if (idx >= 0) {
+                if (ch.status) listaChamados[idx].status = ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : ch.status);
+                if (ch.tecnico) listaChamados[idx].tecnico = ch.tecnico;
+                if (ch.historico) listaChamados[idx].mensagens = ch.historico;
+                salvarDadosLocais();
+                renderizarKanban();
+                if (typeof renderizarTabelaChamados === 'function') renderizarTabelaChamados();
+              }
+            }
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'empresas' }, async () => {
+            const { data } = await supabaseClient.from('empresas').select('nome').order('criado_em', { ascending: true });
+            if (data && data.length > 0) {
+              window.listaEmpresasCadastradas = data.map(d => d.nome);
+              salvarDadosLocais();
+              renderizarTagsEmpresas();
+            }
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'setores' }, async () => {
+            const { data } = await supabaseClient.from('setores').select('nome').order('criado_em', { ascending: true });
+            if (data && data.length > 0) {
+              listaDepartamentos = data.map(d => d.nome.startsWith('#') ? d.nome : '#' + d.nome);
+              salvarDadosLocais();
+              if (typeof renderizarTagsDeptos === 'function') renderizarTagsDeptos();
+            }
+          })
+          .subscribe();
+      } catch(err) {
+        console.warn('Realtime Supabase init:', err);
+      }
+    }
+
+    function sincronizarChamadoNoSupabase(chamado) {
+      if (!supabaseClient || !chamado) return;
+      try {
+        supabaseClient.from('chamados').upsert({
+          id: String(chamado.id),
+          protocolo: String(chamado.id),
+          empresa: chamado.empresa || 'Aço Móveis',
+          solicitante: chamado.solicitante || 'Colaborador',
+          setor: chamado.setor || 'TI',
+          categoria: chamado.categoria || 'Geral',
+          urgencia: chamado.urgencia || 'Média',
+          descricao: chamado.descricao || chamado.desc || '',
+          status: chamado.status === 'Resolvido' ? 'Finalizados' : (chamado.status === 'Triagem' ? 'Em Triagem' : (chamado.status === 'Homologacao' ? 'Em Homologação' : chamado.status)),
+          maquina_nome: chamado.ativo || 'auto',
+          maquina_ip: chamado.ip || 'auto',
+          tecnico: chamado.responsavel || chamado.tecnico || 'Não atribuído',
+          historico: chamado.mensagens || []
+        }).then(() => {}).catch(err => console.warn('Erro ao atualizar chamado no Supabase:', err));
+      } catch(e) {}
+    }
+
     function salvarDadosLocais() {
       localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(listaChamados));
       localStorage.setItem('fsc_kintsugi_licencas', JSON.stringify(listaLicencas));
@@ -11489,6 +11669,9 @@
       }
 
       window.listaEmpresasCadastradas.push(valor);
+      if (supabaseClient) {
+        supabaseClient.from('empresas').insert({ nome: valor }).catch(console.warn);
+      }
       salvarDadosLocais();
       sincronizarEmpresasNoDisco();
       renderizarTagsEmpresas();

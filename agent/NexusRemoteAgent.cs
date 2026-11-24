@@ -599,14 +599,18 @@ namespace NexusRemoteAgent
                     try { File.WriteAllText(configPath, sessionToken, Encoding.UTF8); } catch { }
                 }
 
-                // Auto-registro do ativo no servidor central via rede
+                // Auto-registro do ativo e telemetria contínua via Supabase Cloud
                 ThreadPool.QueueUserWorkItem(_ => {
-                    try
+                    while (true)
                     {
-                        Thread.Sleep(1500);
-                        RegistrarAtivoNoServidorRemoto();
+                        try
+                        {
+                            EnviarTelemetriaSupabase();
+                            RegistrarAtivoNoServidorRemoto();
+                        }
+                        catch { }
+                        Thread.Sleep(30000);
                     }
-                    catch { }
                 });
 
                 // Qualidade 45 para velocidade máxima e latência nula
@@ -623,6 +627,47 @@ namespace NexusRemoteAgent
 
                 // Mantém o processo ativo permanentemente com o servidor HTTP/TCP
                 srvThread.Join();
+            }
+            catch { }
+        }
+
+        
+        static void EnviarTelemetriaSupabase()
+        {
+            try
+            {
+                ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+                string url = "https://hskxvdcgfgrdofgpdtzm.supabase.co/rest/v1/computadores";
+                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+                req.Method = "POST";
+                req.ContentType = "application/json";
+                req.Headers["apikey"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhza3h2ZGNnZmdyZG9mZ3BkdHptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1NDEzOTEsImV4cCI6MjExMTExNzM5MX0.PKQaCfnlmxAM7Vuc4s84gjLS_21OeteMkI1WLLR1BEU";
+                req.Headers["Authorization"] = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhza3h2ZGNnZmdyZG9mZ3BkdHptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1NDEzOTEsImV4cCI6MjExMTExNzM5MX0.PKQaCfnlmxAM7Vuc4s84gjLS_21OeteMkI1WLLR1BEU";
+                req.Headers["Prefer"] = "resolution=merge-duplicates";
+                req.Timeout = 4000;
+
+                string idComp = !string.IsNullOrEmpty(customMachineName) ? customMachineName : Environment.MachineName;
+                string empComp = !string.IsNullOrEmpty(customEmpresa) ? customEmpresa : "Aço Móveis";
+                string setComp = !string.IsNullOrEmpty(customMachineTag) ? customMachineTag.Replace("#", "").Trim() : "TI";
+                string ipComp = !string.IsNullOrEmpty(localIpAddress) ? localIpAddress : "127.0.0.1";
+                int cpu = 5;
+                int ram = 25;
+                try { cpu = ObterUsoCpuPercent(); } catch { }
+                try { double tg; ObterMemoriaRam(out tg, out ram); } catch { }
+
+                string safeId = (idComp ?? "").Replace("\"", "'");
+                string safeEmp = (empComp ?? "").Replace("\"", "'");
+                string safeSet = (setComp ?? "").Replace("\"", "'");
+
+                string json = "{\"id\":\"" + safeId + "\",\"empresa\":\"" + safeEmp + "\",\"nome_computador\":\"" + safeId + "\",\"setor\":\"" + safeSet + "\",\"ip\":\"" + ipComp + "\",\"is_server\":" + (isServerMachine ? "true" : "false") + ",\"cpu_usage\":" + cpu + ",\"ram_usage\":" + ram + ",\"status\":\"online\",\"ultimo_heartbeat\":\"" + DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ") + "\"}";
+
+                byte[] buffer = Encoding.UTF8.GetBytes(json);
+                req.ContentLength = buffer.Length;
+                using (Stream s = req.GetRequestStream())
+                {
+                    s.Write(buffer, 0, buffer.Length);
+                }
+                using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse()) { }
             }
             catch { }
         }
