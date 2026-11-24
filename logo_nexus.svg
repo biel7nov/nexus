@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" fill="none">
+  <defs>
+    <linearGradient id="nexus-grad-a" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#a855f7" />
+    </linearGradient>
+    <linearGradient id="nexus-grad-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0" />
+    </linearGradient>
+    <filter id="nexus-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#6366f1" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Fundo Sutil de Ícone App -->
+  <rect x="10" y="10" width="100" height="100" rx="28" fill="#0f111a" stroke="rgba(255,255,255,0.08)" stroke-width="1.5" />
+  <rect x="10" y="10" width="100" height="100" rx="28" fill="url(#nexus-grad-glow)" />
+
+  <!-- Símbolo Nexus: Hexágono Conectado com Monograma 'N' -->
+  <g filter="url(#nexus-shadow)">
+    <!-- Barra Esquerda do N -->
+    <path d="M40 34 L40 86" stroke="url(#nexus-grad-a)" stroke-width="7" stroke-linecap="round" />
+    <!-- Diagonal Dinâmica do N -->
+    <path d="M40 38 L80 82" stroke="url(#nexus-grad-a)" stroke-width="7" stroke-linecap="round" />
+    <!-- Barra Direita do N -->
+    <path d="M80 34 L80 86" stroke="url(#nexus-grad-a)" stroke-width="7" stroke-linecap="round" />
+
+    <!-- Nó Central de Conectividade / Telemetria -->
+    <circle cx="60" cy="60" r="4.5" fill="#38bdf8" />
+    <circle cx="60" cy="60" r="8" stroke="#38bdf8" stroke-width="1.5" stroke-opacity="0.6" />
+    
+    <!-- Nós de Topo e Base -->
+    <circle cx="40" cy="34" r="3" fill="#38bdf8" />
+    <circle cx="80" cy="86" r="3" fill="#a855f7" />
+  </g>
+</svg>

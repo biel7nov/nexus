@@ -1,0 +1,13 @@
+[
+  {
+    "id": "FSC-910 248",
+    "host": "QUA-01",
+    "user": "ReviOS-10-23.08",
+    "os": "Microsoft Windows 10 Pro",
+    "hw": "Intel Core i5 - 8GB",
+    "bitlocker": true,
+    "ip": "192.168.13.199",
+    "tag": "#Qualidade",
+    "online": true
+  }
+]

@@ -1,0 +1,53 @@
+# ========================================================
+# Nexus IT Suite - Git Ignore Configuration
+# ========================================================
+
+# Dependências e Ambientes
+node_modules/
+.venv/
+env/
+__pycache__/
+*.pyc
+
+# Arquivos e pastas temporárias de teste/automação
+scratch/
+temp_*/
+Default/
+ShaderCache/
+GrShaderCache/
+*.log
+*.tmp
+*.suo
+*.user
+
+# Scripts temporários de desenvolvimento local
+*.py
+*.ps1
+scripts/dev/
+
+# Backups e relatórios antigos
+*_backup*.html
+* - Copia/
+agent - Copia/
+test_naming/
+*FSC*
+auditoria_*.json
+relatorio_*.md
+empresa.txt
+
+# Arquivos de mídia pesados não utilizados (>90MB estoura limites do GitHub)
+res/login-animation-4k.mp4
+
+# Binários intermediários de debug e compilações temporárias
+agent/*_debug.exe
+agent/*_test.exe
+agent/*_new.exe
+agent/test_build.exe
+agent/*.rar
+
+# Arquivos de sistema / IDE
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store

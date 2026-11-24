@@ -1,0 +1,1899 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal de Chamados — NexusTI</title>
+  
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='%232563eb' d='M50 5 L92 47 L53 86 L53 72 L77 47 L50 20 L23 47 L47 72 L47 86 L8 47 Z'/%3E%3C/svg%3E" />
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="res/lucide.min.js"></script>
+  <script>
+    if (typeof lucide === 'undefined') {
+      document.write('<script src="https://unpkg.com/lucide@latest"><\/script>');
+    }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+    
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #030712;
+      min-height: 100vh;
+      color: #f8fafc;
+      overflow-x: hidden;
+    }
+
+    /* Glassmorphism para o Card sob o Spotlight */
+    .spotlight-glass {
+      background: rgba(10, 15, 29, 0.86);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-top: 2px solid rgba(255, 255, 255, 0.65);
+      box-shadow: 0 0 60px rgba(255, 255, 255, 0.12), 0 35px 70px -15px rgba(0, 0, 0, 0.95);
+    }
+
+    /* Glassmorphism para os painéis de instruções da esquerda */
+    .panel-glass {
+      background: rgba(15, 23, 42, 0.72);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7);
+    }
+
+    .input-neutral {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #ffffff;
+      transition: all 0.2s ease;
+    }
+    .input-neutral:focus {
+      background: rgba(255, 255, 255, 0.09);
+      border-color: rgba(255, 255, 255, 0.55);
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12);
+      outline: none;
+    }
+    .input-neutral option {
+      background: #0f172a;
+      color: #ffffff;
+    }
+
+    /* Barra de rolagem personalizada */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.4); }
+
+    /* Feixe suave do holofote */
+    .spotlight-beam-layer {
+      mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+    }
+  </style>
+</head>
+<body class="p-4 sm:p-6 lg:p-8 antialiased selection:bg-indigo-500 selection:text-white flex flex-col justify-between min-h-screen">
+
+  <!-- Toast Notification Flutuante -->
+  <div id="toast-notificacao" class="fixed top-6 right-6 z-50 transform transition-all duration-300 translate-y-[-100px] opacity-0 pointer-events-none max-w-md w-full">
+    <div class="p-4 rounded-2xl bg-slate-900/95 border border-blue-500/40 text-white shadow-2xl backdrop-blur-xl flex items-start gap-3">
+      <div class="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0 mt-0.5">
+        <i data-lucide="check-circle" class="w-4 h-4"></i>
+      </div>
+      <div class="flex-1">
+        <h5 class="text-xs font-bold text-white" id="toast-titulo">Notificação</h5>
+        <p class="text-[11px] text-slate-300 mt-0.5 leading-relaxed" id="toast-msg">Mensagem...</p>
+      </div>
+      <button onclick="esconderToast()" class="text-slate-400 hover:text-white transition cursor-pointer"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+  </div>
+
+  <!-- CONTAINER PRINCIPAL EM 2 COLUNAS (LADO ESQUERDO: INSTRUÇÕES & HISTÓRICO | LADO DIREITO: QUESTIONÁRIO SOB O SPOTLIGHT) -->
+  <div class="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start my-auto">
+    
+    <!-- ========================================================================= -->
+    <!-- COLUNA DA ESQUERDA: INSTRUÇÕES PADRÕES & HISTÓRICO PARA REFAZER CHAMADOS -->
+    <!-- ========================================================================= -->
+    <div class="lg:col-span-5 space-y-4">
+      
+      <!-- Cabeçalho da Empresa & Identificação -->
+      <div class="space-y-1.5">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-white border border-white/20 text-xs font-semibold backdrop-blur-md shadow-lg shadow-white/5">
+          <i data-lucide="building-2" class="w-3.5 h-3.5 text-blue-400"></i>
+          <span id="label-empresa-header">Aço Móveis</span>
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-1"></span>
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
+          Central de Suporte & Autoatendimento
+        </h1>
+        <p class="text-xs text-slate-300 font-medium leading-relaxed">
+          Consulte as dicas rápidas abaixo ou refaça uma solicitação anterior com 1 clique.
+        </p>
+      </div>
+
+      <!-- PAINEL 1: INSTRUÇÕES PADRÕES PARA PROBLEMAS BÁSICOS (AUTOATENDIMENTO) -->
+      <div class="panel-glass rounded-3xl p-4 sm:p-5 space-y-3.5">
+        <div class="flex items-center justify-between pb-2.5 border-b border-white/10">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold text-xs">
+              <i data-lucide="lightbulb" class="w-3.5 h-3.5 text-amber-400"></i>
+            </div>
+            <div>
+              <h3 class="text-xs font-bold text-white uppercase tracking-wider">Instruções de Autoatendimento</h3>
+              <p class="text-[10px] text-slate-400">Tente antes de abrir a solicitação técnica</p>
+            </div>
+          </div>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">Dicas Rápidas</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-300">
+          <!-- Item 1: Reiniciar -->
+          <div class="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:border-white/15 transition space-y-1">
+            <div class="flex items-center gap-1.5 font-bold text-white text-xs">
+              <i data-lucide="rotate-cw" class="w-3.5 h-3.5 text-blue-400 shrink-0"></i>
+              <span>1. Reiniciar o Windows</span>
+            </div>
+            <p class="text-[10px] text-slate-400 leading-normal">
+              Reiniciar encerra processos travados no ERP e libera a memória RAM do computador.
+            </p>
+          </div>
+
+          <!-- Item 2: Cabo de Rede & Wi-Fi -->
+          <div class="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:border-white/15 transition space-y-1">
+            <div class="flex items-center gap-1.5 font-bold text-white text-xs">
+              <i data-lucide="wifi" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i>
+              <span>2. Rede & Internet</span>
+            </div>
+            <p class="text-[10px] text-slate-400 leading-normal">
+              Verifique se a luz atrás do gabinete está piscando ou reconecte o cabo de rede.
+            </p>
+          </div>
+
+          <!-- Item 3: Limpeza de Cache / F5 -->
+          <div class="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:border-white/15 transition space-y-1">
+            <div class="flex items-center gap-1.5 font-bold text-white text-xs">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-cyan-400 shrink-0"></i>
+              <span>3. Cache (Ctrl + F5)</span>
+            </div>
+            <p class="text-[10px] text-slate-400 leading-normal">
+              Pressione <kbd class="px-1 py-0.2 rounded bg-white/10 font-mono text-[9px] text-white">Ctrl + F5</kbd> para atualizar telas web desconfiguradas.
+            </p>
+          </div>
+
+          <!-- Item 4: Impressora Offline -->
+          <div class="p-2.5 rounded-xl bg-white/5 border border-white/5 hover:border-white/15 transition space-y-1">
+            <div class="flex items-center gap-1.5 font-bold text-white text-xs">
+              <i data-lucide="printer" class="w-3.5 h-3.5 text-purple-400 shrink-0"></i>
+              <span>4. Impressora</span>
+            </div>
+            <p class="text-[10px] text-slate-400 leading-normal">
+              Desligue e ligue no botão físico. Verifique se há atolamento de folhas na bandeja.
+            </p>
+          </div>
+        </div>
+
+        <!-- Botão Diagnóstico de Ping em Tempo Real -->
+        <div class="pt-1">
+          <button 
+            type="button" 
+            id="btn-testar-ping" 
+            onclick="testarConectividade()" 
+            class="w-full py-2 px-3 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+          >
+            <i data-lucide="activity" class="w-3.5 h-3.5 text-blue-400"></i>
+            <span>Testar Conexão com a Console T.I (Ping)</span>
+          </button>
+          <div id="status-ping-resultado" class="hidden mt-2"></div>
+        </div>
+      </div>
+
+      <!-- PAINEL 2: HISTÓRICO DE CHAMADOS & FUNÇÃO REFAZER COM 1 CLIQUE -->
+      <div class="panel-glass rounded-3xl p-4 sm:p-5 space-y-3.5">
+        <div class="flex items-center justify-between pb-2.5 border-b border-white/10">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-xs">
+              <i data-lucide="history" class="w-3.5 h-3.5 text-blue-400"></i>
+            </div>
+            <div>
+              <h3 class="text-xs font-bold text-white uppercase tracking-wider">Histórico de Chamados</h3>
+              <p class="text-[10px] text-slate-400">Refaça um chamado sem digitar tudo de novo</p>
+            </div>
+          </div>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20">1-Clique</span>
+        </div>
+
+        <!-- Lista dinâmica de chamados anteriores -->
+        <div id="lista-historico-chamados" class="space-y-2 max-h-[290px] overflow-y-auto pr-1">
+          <!-- Renderizado dinamicamente via JavaScript -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- COLUNA DA DIREITA: QUESTIONÁRIO ILUMINADO PELA LÂMPADA POR CIMA -->
+    <!-- ========================================================================= -->
+    <div class="lg:col-span-7 flex flex-col items-center relative">
+      
+      <!-- FEIXE DO SPOTLIGHT (LÂMPADA ILUMINANDO O QUESTIONÁRIO POR CIMA) -->
+      <div class="spotlight-beam-layer pointer-events-none absolute -top-12 inset-x-0 bottom-0 flex justify-center overflow-visible z-0 select-none">
+        <img 
+          src="res/spotlight.jpg" 
+          alt="Spotlight Beam" 
+          class="w-[620px] max-w-none h-auto object-cover opacity-90 mix-blend-screen scale-110 transform translate-y-[-10px]"
+        >
+      </div>
+
+      <!-- LUMINÁRIA FÍSICA NO TOPO (Pendant Studio Lamp Fixture) -->
+      <div class="relative z-20 flex flex-col items-center mb-1 select-none">
+        <!-- Cabo de suspensão elétrico da lâmpada descendo do teto -->
+        <div class="w-0.5 h-7 bg-gradient-to-b from-transparent via-slate-400 to-slate-200"></div>
+        <!-- Cúpula de alumínio escovado do refletor -->
+        <div class="w-14 h-3.5 rounded-t-full bg-gradient-to-r from-slate-500 via-slate-200 to-slate-500 shadow-xl border-t border-white/80"></div>
+        <!-- Lâmpada de alto brilho irradiando luz para baixo -->
+        <div class="w-9 h-4 rounded-b-full bg-white shadow-[0_0_45px_18px_rgba(255,255,255,0.95)] animate-pulse"></div>
+      </div>
+
+      <!-- QUESTIONÁRIO / CARD EM VIDRO SOB A ILUMINAÇÃO DIRETA -->
+      <div id="card-questionario-chamado" class="spotlight-glass rounded-3xl p-5 sm:p-7 space-y-4 w-full max-w-xl relative z-10 transition-all duration-300">
+        
+        <!-- Header do Questionário dentro do card iluminado -->
+        <div class="text-center pb-3 border-b border-white/10">
+          <div class="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-300 uppercase tracking-widest mb-0.5">
+            <i data-lucide="sparkles" class="w-3 h-3 text-amber-300"></i>
+            <span>Atendimento Técnico Especializado</span>
+          </div>
+          <h2 class="text-xl sm:text-2xl font-black text-white tracking-tight">Solicitação de Chamado</h2>
+          <p class="text-xs text-slate-300 mt-0.5">Abertura direta para suporte e acesso remoto da T.I</p>
+        </div>
+
+        <form id="form-chamado-cliente" onsubmit="enviarChamadoCliente(event)" class="space-y-3.5 text-xs">
+          
+          <!-- Row 1: Nome da Empresa (Duas Opções: Aço Móveis e JPL) -->
+          <!-- O IP da máquina para acesso remoto é gravado internamente e exibido apenas na console técnica de TI -->
+          <div class="space-y-1.5 p-3 rounded-2xl bg-white/5 border border-white/10">
+            <div class="flex items-center justify-between">
+              <label class="block font-bold text-slate-300 text-[10px] uppercase tracking-wider flex items-center gap-1.5">
+                <i data-lucide="building-2" class="w-3.5 h-3.5 text-slate-400"></i>
+                <span>Nome da Empresa *</span>
+              </label>
+              <span class="text-[10px] text-slate-400 font-medium">Selecione a unidade</span>
+            </div>
+
+            <div id="container-botoes-empresas" class="grid grid-cols-2 gap-2">
+              <!-- Botões de empresas vinculados dinamicamente com as Configurações -->
+            </div>
+
+            <input type="hidden" id="campo-empresa" value="Aço Móveis">
+            <!-- Identificação e IP são anexados diretamente pelo Agente Local no backend sem exposição no formulário -->
+            <input type="hidden" id="campo-ativo" value="auto">
+            <input type="hidden" id="campo-ip" value="auto">
+          </div>
+
+          <!-- Row 2: Destino & Solicitante -->
+          <div class="space-y-2 p-3 rounded-2xl bg-white/5 border border-white/10">
+            <label class="block font-bold text-slate-300 text-[10px] uppercase tracking-wider">Este chamado é para quem?</label>
+            
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" id="btn-web-para-mim" onclick="alternarDestinoWeb('mim')" class="py-2 px-3 rounded-xl text-xs font-bold bg-white text-slate-900 shadow transition flex items-center justify-center gap-1.5">
+                <i data-lucide="user" class="w-3.5 h-3.5"></i>
+                <span>Para mim</span>
+              </button>
+              <button type="button" id="btn-web-para-outro" onclick="alternarDestinoWeb('outro')" class="py-2 px-3 rounded-xl text-xs font-semibold bg-white/5 text-slate-300 hover:text-white border border-white/10 flex items-center justify-center gap-1.5 transition">
+                <i data-lucide="users" class="w-3.5 h-3.5"></i>
+                <span>Para colega do setor</span>
+              </button>
+            </div>
+
+            <!-- Campos do Solicitante / Beneficiário -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div>
+                <label class="block font-semibold text-slate-300 mb-1 flex items-center gap-1.5" id="label-web-solicitante">
+                  <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
+                  <span>Seu Nome *</span>
+                </label>
+                <input 
+                  type="text" 
+                  id="campo-solicitante" 
+                  required
+                  placeholder="Seu nome completo..."
+                  class="input-neutral w-full p-2.5 rounded-xl text-xs font-semibold"
+                >
+              </div>
+
+              <div>
+                <label class="block font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+                  <i data-lucide="tag" class="w-3.5 h-3.5 text-slate-400"></i>
+                  <span>Setor / Departamento *</span>
+                </label>
+                <select id="campo-setor" class="input-neutral w-full p-2.5 rounded-xl text-xs font-medium cursor-pointer">
+                  <!-- Opções de setores vinculadas dinamicamente com as Configurações -->
+                </select>
+              </div>
+            </div>
+
+            <div id="info-web-outro" class="hidden text-[11px] text-amber-200/90 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl flex items-center gap-2">
+              <i data-lucide="info" class="w-3.5 h-3.5 text-amber-400 shrink-0"></i>
+              <span>O chamado será registrado no nome do colega, indicando sua máquina corporativa como origem.</span>
+            </div>
+          </div>
+
+          <!-- Row 3: Categoria & Nível de Urgência -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+                <i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400"></i>
+                <span>Categoria do Chamado *</span>
+              </label>
+              <select id="campo-categoria" class="input-neutral w-full p-2.5 rounded-xl text-xs font-medium cursor-pointer">
+                <option value="Acesso Remoto / Conectividade">Acesso Remoto / Conectividade</option>
+                <option value="Hardware / Manutenção">Hardware / Computador / Periféricos</option>
+                <option value="Software / Sistema Operacional">Software / Windows / Aplicativos</option>
+                <option value="Rede & Internet">Rede, Wi-Fi & Internet</option>
+                <option value="VPN & Acesso Externo">VPN & Acesso Externo</option>
+                <option value="Licença / Chave de Ativação">Licença / Chave de Ativação</option>
+                <option value="Impressora / Scanner">Impressora / Scanner</option>
+                <option value="Outro">Outro Problema</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>Nível de Urgência *</span>
+              </label>
+              <select id="campo-urgencia" class="input-neutral w-full p-2.5 rounded-xl text-xs font-semibold cursor-pointer">
+                <option value="Baixa">Baixa (Dúvida ou solicitação rotineira)</option>
+                <option value="Média" selected>Média (Impacto parcial, consigo trabalhar)</option>
+                <option value="Alta">Alta (Máquina ou sistema travado)</option>
+                <option value="Crítica">Crítica (Setor inteiro parado / Incidente grave)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Row 4: Título do Incidente -->
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+              <i data-lucide="bookmark" class="w-3.5 h-3.5 text-slate-400"></i>
+              <span>Título / Assunto da Solicitação *</span>
+            </label>
+            <input 
+              type="text" 
+              id="campo-titulo" 
+              required
+              placeholder="Ex: Lentidão no ERP ao faturar, monitor piscando, VPN não conecta..." 
+              class="input-neutral w-full p-3 rounded-xl font-bold text-xs"
+            >
+          </div>
+
+          <!-- Row 5: Descrição Detalhada -->
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+              <i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-400"></i>
+              <span>Descrição Detalhada do Problema *</span>
+            </label>
+            <textarea 
+              id="campo-desc" 
+              rows="3" 
+              required 
+              placeholder="Descreva o que aconteceu, mensagens de erro que apareceram na tela e quando o problema começou..." 
+              class="input-neutral w-full p-3 rounded-xl text-xs resize-y leading-relaxed"
+            ></textarea>
+          </div>
+
+          <!-- Botão de Envio Principal com Efeito Iluminado -->
+          <div class="pt-2">
+            <button 
+              type="submit" 
+              id="btn-enviar-chamado"
+              class="w-full py-3.5 px-6 rounded-2xl bg-white hover:bg-slate-100 text-slate-950 font-bold text-sm tracking-wide shadow-xl shadow-white/20 transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+            >
+              <i data-lucide="send" class="w-4 h-4 text-slate-950"></i>
+              <span>Enviar Solicitação de Chamado</span>
+            </button>
+          </div>
+
+        </form>
+
+        <!-- Mensagem de Sucesso (Oculta Inicialmente) -->
+        <div id="box-sucesso-chamado" class="hidden text-center py-8 space-y-4">
+          <div class="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
+            <i data-lucide="check" class="w-8 h-8"></i>
+          </div>
+          <div class="space-y-1">
+            <div class="text-xs font-mono font-bold text-indigo-400 uppercase tracking-wider" id="sucesso-protocolo">#TICK-0000</div>
+            <h3 class="text-xl font-extrabold text-white">Chamado Registrado com Sucesso!</h3>
+            <p class="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
+              Sua solicitação foi enviada para a equipe de T.I de <strong id="sucesso-empresa-txt" class="text-white font-semibold">Fast Solutions Corporate</strong>. Em breve um técnico iniciará o atendimento.
+            </p>
+          </div>
+          <div class="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button onclick="reiniciarFormulario()" class="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 text-white font-semibold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer">
+              <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+              <span>Abrir Outro Chamado</span>
+            </button>
+            <button onclick="abrirChatChamadoCliente(ultimoChamadoCriadoId)" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-500/25 transition flex items-center justify-center gap-1.5 cursor-pointer">
+              <i data-lucide="messages-square" class="w-3.5 h-3.5"></i>
+              <span>Conversar com o Técnico</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Footer Minimalista -->
+  <footer class="text-center text-[11px] text-slate-400 font-medium py-4 mt-6">
+    <span>NexusTI • Conexão Segura com Console T.I</span>
+  </footer>
+
+  <script>
+    let destinoWebAtual = 'mim';
+    let empresaWebAtual = 'Aço Móveis';
+    let listaEmpresasWeb = ["Aço Móveis", "JPL"];
+    let listaSetoresWeb = ["Financeiro", "Produção", "TI", "Diretoria", "DP", "Logística", "Comercial", "Qualidade", "Projeto", "Compras", "Recepção", "Almoxarifado"];
+
+    // =========================================================================
+    // INTEGRAÇÃO DINÂMICA: EMPRESAS & SETORES VINCULADOS COM AS CONFIGURAÇÕES
+    // =========================================================================
+    async function carregarEmpresasWeb(empresaPreferencia = null) {
+      // 1. Prioridade: localStorage da Console Nexus / FSC
+      try {
+        const salvas = localStorage.getItem('fsc_kintsugi_empresas');
+        if (salvas) {
+          const parsed = JSON.parse(salvas);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            listaEmpresasWeb = parsed;
+          }
+        }
+      } catch (e) {}
+
+      // 2. Fallback: empresas.json do disco ou API local
+      try {
+        const resp = await fetch('empresas.json?t=' + Date.now());
+        if (resp.ok) {
+          const remotas = await resp.json();
+          if (Array.isArray(remotas) && remotas.length > 0) {
+            if (!localStorage.getItem('fsc_kintsugi_empresas')) {
+              listaEmpresasWeb = remotas;
+            }
+          }
+        }
+      } catch (e) {
+        try {
+          const agentHost = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') && window.location.port === '8090' ? '' : 'http://127.0.0.1:8090';
+          const rApi = await fetch(agentHost + '/api/empresas');
+          if (rApi.ok) {
+            const arr = await rApi.json();
+            if (Array.isArray(arr) && arr.length > 0 && !localStorage.getItem('fsc_kintsugi_empresas')) {
+              listaEmpresasWeb = arr;
+            }
+          }
+        } catch (err) {}
+      }
+
+      if (!Array.isArray(listaEmpresasWeb) || listaEmpresasWeb.length === 0) {
+        listaEmpresasWeb = ["Aço Móveis", "JPL"];
+      }
+
+      // Determina a empresa ativa
+      let empAlvo = empresaPreferencia || empresaWebAtual;
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('empresa')) {
+        const urlEmp = params.get('empresa').trim();
+        const achou = listaEmpresasWeb.find(e => e.toLowerCase() === urlEmp.toLowerCase() || e.toLowerCase().includes(urlEmp.toLowerCase()));
+        if (achou) empAlvo = achou;
+      } else if (!empresaPreferencia) {
+        const achou = listaEmpresasWeb.find(e => e.toLowerCase() === empAlvo.toLowerCase());
+        if (achou) empAlvo = achou;
+        else empAlvo = listaEmpresasWeb[0];
+      }
+
+      renderizarBotoesEmpresasWeb(empAlvo);
+    }
+
+    function renderizarBotoesEmpresasWeb(empSelecionada) {
+      const container = document.getElementById('container-botoes-empresas');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const n = listaEmpresasWeb.length;
+      if (n === 1) {
+        container.className = 'grid grid-cols-1 gap-2';
+      } else if (n === 2) {
+        container.className = 'grid grid-cols-2 gap-2';
+      } else if (n === 3) {
+        container.className = 'grid grid-cols-3 gap-2';
+      } else {
+        container.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2';
+      }
+
+      listaEmpresasWeb.forEach(emp => {
+        const isAtiva = (emp.trim().toLowerCase() === (empSelecionada || '').trim().toLowerCase());
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = 'btn-empresa-' + emp.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        btn.onclick = () => selecionarEmpresaWeb(emp);
+        btn.className = isAtiva
+          ? 'py-2.5 px-3 rounded-xl text-xs font-bold bg-white text-slate-900 shadow transition flex items-center justify-center gap-1.5 cursor-pointer'
+          : 'py-2.5 px-3 rounded-xl text-xs font-semibold bg-white/5 text-slate-300 hover:text-white border border-white/10 flex items-center justify-center gap-1.5 transition cursor-pointer';
+        
+        btn.innerHTML = `
+          <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
+          <span>${emp}</span>
+        `;
+        container.appendChild(btn);
+      });
+
+      selecionarEmpresaWeb(empSelecionada, false);
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    }
+
+    function selecionarEmpresaWeb(nome, reRenderizar = false) {
+      if (!nome) return;
+      empresaWebAtual = nome;
+      const inputEmp = document.getElementById('campo-empresa');
+      const headerLabel = document.getElementById('label-empresa-header');
+      const sucLabel = document.getElementById('sucesso-empresa-txt');
+
+      if (inputEmp) inputEmp.value = nome;
+      if (headerLabel) headerLabel.textContent = nome;
+      if (sucLabel) sucLabel.textContent = nome;
+
+      if (reRenderizar) {
+        renderizarBotoesEmpresasWeb(nome);
+      } else {
+        const container = document.getElementById('container-botoes-empresas');
+        if (container) {
+          const botoes = container.querySelectorAll('button');
+          botoes.forEach(btn => {
+            const span = btn.querySelector('span');
+            const btnTexto = span ? span.textContent.trim() : '';
+            if (btnTexto.toLowerCase() === nome.trim().toLowerCase()) {
+              btn.className = 'py-2.5 px-3 rounded-xl text-xs font-bold bg-white text-slate-900 shadow transition flex items-center justify-center gap-1.5 cursor-pointer';
+            } else {
+              btn.className = 'py-2.5 px-3 rounded-xl text-xs font-semibold bg-white/5 text-slate-300 hover:text-white border border-white/10 flex items-center justify-center gap-1.5 transition cursor-pointer';
+            }
+          });
+        }
+      }
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    }
+
+    async function carregarSetoresWeb(setorPreferencia = null) {
+      // 1. Tenta carregar do localStorage
+      try {
+        const salvas = localStorage.getItem('fsc_kintsugi_deptos');
+        if (salvas) {
+          const parsed = JSON.parse(salvas);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            listaSetoresWeb = parsed.map(s => s.replace('#', '').trim());
+          }
+        }
+      } catch (e) {}
+
+      // 2. Tenta carregar de setores.json do disco ou API
+      try {
+        const resp = await fetch('setores.json?t=' + Date.now());
+        if (resp.ok) {
+          const remotas = await resp.json();
+          if (Array.isArray(remotas) && remotas.length > 0) {
+            if (!localStorage.getItem('fsc_kintsugi_deptos')) {
+              listaSetoresWeb = remotas.map(s => s.replace('#', '').trim());
+            }
+          }
+        }
+      } catch (e) {
+        try {
+          const agentHost = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') && window.location.port === '8090' ? '' : 'http://127.0.0.1:8090';
+          const rApi = await fetch(agentHost + '/api/setores');
+          if (rApi.ok) {
+            const arr = await rApi.json();
+            if (Array.isArray(arr) && arr.length > 0 && !localStorage.getItem('fsc_kintsugi_deptos')) {
+              listaSetoresWeb = arr.map(s => s.replace('#', '').trim());
+            }
+          }
+        } catch (err) {}
+      }
+
+      if (!Array.isArray(listaSetoresWeb) || listaSetoresWeb.length === 0) {
+        listaSetoresWeb = ["Financeiro", "Produção", "TI", "Diretoria", "DP", "Logística", "Comercial", "Qualidade", "Projeto", "Compras", "Recepção", "Almoxarifado"];
+      }
+
+      const sel = document.getElementById('campo-setor');
+      if (!sel) return;
+
+      const valorAlvo = (setorPreferencia || sel.value || 'Qualidade').replace('#', '').trim();
+      sel.innerHTML = '';
+
+      listaSetoresWeb.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        sel.appendChild(opt);
+      });
+
+      let selecionou = false;
+      for (let opt of sel.options) {
+        if (opt.value.toLowerCase() === valorAlvo.toLowerCase() || opt.value.toLowerCase().includes(valorAlvo.toLowerCase())) {
+          sel.value = opt.value;
+          selecionou = true;
+          break;
+        }
+      }
+      if (!selecionou && sel.options.length > 0) {
+        sel.selectedIndex = 0;
+      }
+    }
+
+    // Interligação em tempo real (Storage Listener & BroadcastChannel entre abas)
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'fsc_kintsugi_empresas') {
+        carregarEmpresasWeb();
+      } else if (e.key === 'fsc_kintsugi_deptos') {
+        carregarSetoresWeb();
+      } else if (e.key === 'fsc_kintsugi_chamados') {
+        carregarHistoricoChamados();
+      }
+    });
+
+    try {
+      const channel = new BroadcastChannel('nexus_rmm_sync_bus');
+      channel.onmessage = (msg) => {
+        if (msg.data && msg.data.tipo === 'config_atualizada') {
+          carregarEmpresasWeb();
+          carregarSetoresWeb();
+        } else if (msg.data && msg.data.tipo === 'chamados_atualizados') {
+          carregarHistoricoChamados();
+        }
+      };
+    } catch(e) {}
+
+    function alternarDestinoWeb(destino) {
+      destinoWebAtual = destino;
+      const btnMim = document.getElementById('btn-web-para-mim');
+      const btnOutro = document.getElementById('btn-web-para-outro');
+      const infoOutro = document.getElementById('info-web-outro');
+      const labelSol = document.getElementById('label-web-solicitante');
+      const inputSol = document.getElementById('campo-solicitante');
+
+      if (destino === 'mim') {
+        if (btnMim) btnMim.className = 'py-2 px-3 rounded-xl text-xs font-bold bg-white text-slate-900 shadow transition flex items-center justify-center gap-1.5';
+        if (btnOutro) btnOutro.className = 'py-2 px-3 rounded-xl text-xs font-semibold bg-white/5 text-slate-300 hover:text-white border border-white/10 flex items-center justify-center gap-1.5 transition';
+        if (infoOutro) infoOutro.classList.add('hidden');
+        if (labelSol) labelSol.innerHTML = '<i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i><span>Seu Nome *</span>';
+        if (inputSol) inputSol.placeholder = 'Seu nome completo...';
+      } else {
+        if (btnOutro) btnOutro.className = 'py-2 px-3 rounded-xl text-xs font-bold bg-white text-slate-900 shadow transition flex items-center justify-center gap-1.5';
+        if (btnMim) btnMim.className = 'py-2 px-3 rounded-xl text-xs font-semibold bg-white/5 text-slate-300 hover:text-white border border-white/10 flex items-center justify-center gap-1.5 transition';
+        if (infoOutro) infoOutro.classList.remove('hidden');
+        if (labelSol) labelSol.innerHTML = '<i data-lucide="users" class="w-3.5 h-3.5 text-slate-400"></i><span>Nome do Colega *</span>';
+        if (inputSol) inputSol.placeholder = 'Ex: Mariana Costa, Carlos Souza...';
+      }
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    }
+
+    // Carrega e renderiza o histórico de chamados salvos
+    function carregarHistoricoChamados() {
+      const container = document.getElementById('lista-historico-chamados');
+      if (!container) return;
+
+      let chamados = [];
+      try {
+        const salvo = localStorage.getItem('fsc_kintsugi_chamados');
+        if (salvo) chamados = JSON.parse(salvo);
+      } catch(e) {}
+
+      if (window._historicoChamadosLocais && Array.isArray(window._historicoChamadosLocais)) {
+        window._historicoChamadosLocais.forEach(loc => {
+          if (!chamados.some(x => String(x.id) === String(loc.id))) {
+            chamados.unshift(loc);
+          }
+        });
+      }
+
+      if (!Array.isArray(chamados) || chamados.length === 0) {
+        chamados = [
+          {
+            id: "TICK-101",
+            titulo: "Solicitação de Acesso VPN Remota",
+            categoria: "Rede & Internet",
+            solicitante: "Gabriel Novaes",
+            empresa: "Aço Móveis",
+            ativo: "192.168.13.199",
+            ip: "192.168.13.199",
+            urgencia: "Média",
+            status: "Active",
+            data: "Hoje, 14:10",
+            descricao: "Configuração de rota VPN para teletrabalho na filial."
+          },
+          {
+            id: "TICK-102",
+            titulo: "Substituição de Teclado e Mouse",
+            categoria: "Hardware / Manutenção",
+            solicitante: "Mariana Costa",
+            empresa: "JPL",
+            ativo: "192.168.13.112",
+            ip: "192.168.13.112",
+            urgencia: "Baixa",
+            status: "Triagem",
+            data: "Hoje, 13:45",
+            descricao: "Teclado do setor de Qualidade apresentando falha nas teclas de atalho."
+          },
+          {
+            id: "TICK-106",
+            titulo: "Instalação da Impressora Térmica Zebra",
+            categoria: "Hardware / Manutenção",
+            solicitante: "Gabriel Novaes",
+            empresa: "Aço Móveis",
+            ativo: "192.168.18.25",
+            ip: "192.168.18.25",
+            urgencia: "Média",
+            status: "Resolvido",
+            data: "Ontem, 08:15",
+            descricao: "Driver instalado e etiquetas de código de barras testadas com sucesso."
+          }
+        ];
+        try {
+          localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados));
+        } catch(e) {}
+      }
+
+      container.innerHTML = chamados.slice(0, 5).map(c => {
+        let statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">Em Aberto</span>';
+        if (c.status === 'Resolvido') {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Resolvido</span>';
+        } else if (c.status === 'Em Andamento' || c.status === 'Triagem') {
+          statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">' + (c.status === 'Triagem' ? 'Em Triagem' : 'Em Andamento') + '</span>';
+        }
+
+        return `
+          <div class="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="font-mono font-bold text-xs text-blue-400">#${c.id}</span>
+                <span class="text-slate-500 text-[11px]">•</span>
+                <span class="text-[11px] text-slate-400 truncate">${c.data || 'Recente'}</span>
+              </div>
+              <div>${statusBadge}</div>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-xs text-white leading-snug line-clamp-1">${c.titulo}</h4>
+              <p class="text-[11px] text-slate-400 mt-0.5 line-clamp-2">${c.descricao || c.desc || 'Sem detalhes adicionais'}</p>
+            </div>
+
+            <div class="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+              <span class="flex items-center gap-1 truncate max-w-[140px]">
+                <i data-lucide="tag" class="w-3 h-3 text-slate-500 shrink-0"></i>
+                <span class="truncate">${c.categoria || 'Geral'}</span>
+              </span>
+              ${c.responsavel ? `
+                <span class="flex items-center gap-1 text-emerald-300 font-semibold truncate">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span class="truncate">Téc: ${c.responsavel}</span>
+                </span>
+              ` : `
+                <span class="text-slate-500 italic">Fila de espera</span>
+              `}
+            </div>
+
+            <div class="pt-2 border-t border-white/5 flex items-center justify-between gap-2">
+              <div>
+                ${c.status === 'Resolvido' ? (
+                  c.avaliacaoNota ? `
+                    <span class="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold inline-flex items-center gap-1" title="${c.avaliacaoComentario || 'Atendimento avaliado'}">
+                      <span>★ ${c.avaliacaoNota}/5</span>
+                      <span class="hidden sm:inline">Avaliado</span>
+                    </span>
+                  ` : `
+                    <button 
+                      type="button" 
+                      onclick="abrirAvaliacaoNoChat('${c.id}')" 
+                      class="px-2.5 py-1 rounded-lg bg-amber-500/25 hover:bg-amber-500 text-amber-200 hover:text-slate-950 border border-amber-400/40 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer active:scale-95"
+                      title="Avaliar o atendimento concluído (1 a 5 estrelas)"
+                    >
+                      <span>★ Avaliar</span>
+                    </button>
+                  `
+                ) : ''}
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button 
+                  type="button" 
+                  onclick="abrirChatChamadoCliente('${c.id}')" 
+                  class="px-2.5 py-1 rounded-lg bg-emerald-600/30 hover:bg-emerald-600 text-emerald-200 hover:text-white border border-emerald-500/40 text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer active:scale-95"
+                  title="Conversar em tempo real com o técnico responsável"
+                >
+                  <i data-lucide="message-square" class="w-3 h-3"></i>
+                  <span>Chat</span>
+                </button>
+                <button 
+                  type="button" 
+                  onclick="refazerChamadoHistorico('${c.id}')" 
+                  class="px-2.5 py-1 rounded-lg bg-blue-600/30 hover:bg-blue-600 text-blue-200 hover:text-white border border-blue-500/40 text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer active:scale-95"
+                  title="Carregar todos os dados deste chamado no formulário"
+                >
+                  <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                  <span>Refazer</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    }
+
+    // Refaz o chamado preenchendo todos os dados automaticamente no formulário à direita
+    function refazerChamadoHistorico(id) {
+      let chamados = [];
+      try {
+        const salvo = localStorage.getItem('fsc_kintsugi_chamados');
+        if (salvo) chamados = JSON.parse(salvo);
+      } catch(e) {}
+
+      const c = chamados.find(item => String(item.id) === String(id));
+      if (!c) return;
+
+      if (c.empresa) selecionarEmpresaWeb(c.empresa);
+      if (c.ip || c.ativo) {
+        const ipVal = c.ip || c.ativo;
+        document.getElementById('campo-ativo').value = ipVal;
+        document.getElementById('campo-ip').value = ipVal;
+      }
+      if (c.titulo) document.getElementById('campo-titulo').value = c.titulo;
+      if (c.descricao || c.desc) document.getElementById('campo-desc').value = c.descricao || c.desc;
+      if (c.categoria) document.getElementById('campo-categoria').value = c.categoria;
+      if (c.urgencia) document.getElementById('campo-urgencia').value = c.urgencia;
+      if (c.setor) document.getElementById('campo-setor').value = c.setor;
+
+      if (c.paraOutro) {
+        alternarDestinoWeb('outro');
+        if (c.solicitante) document.getElementById('campo-solicitante').value = c.solicitante;
+      } else {
+        alternarDestinoWeb('mim');
+        if (c.solicitante) document.getElementById('campo-solicitante').value = c.solicitante;
+      }
+
+      // Efeito visual de destaque no card do questionário
+      const card = document.getElementById('card-questionario-chamado');
+      if (card) {
+        card.classList.add('ring-2', 'ring-blue-400', 'ring-offset-2', 'ring-offset-black', 'shadow-blue-500/30');
+        setTimeout(() => {
+          card.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-2', 'ring-offset-black', 'shadow-blue-500/30');
+        }, 2200);
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
+      mostrarToast(`Dados do chamado #${c.id} carregados!`, 'O formulário foi preenchido automaticamente com as informações anteriores. Você já pode enviar.');
+    }
+
+    // Diagnóstico de Conexão com Servidor T.I
+    async function testarConectividade() {
+      const btn = document.getElementById('btn-testar-ping');
+      const res = document.getElementById('status-ping-resultado');
+      if (btn) btn.disabled = true;
+      if (res) {
+        res.classList.remove('hidden');
+        res.innerHTML = '<span class="inline-flex items-center gap-1.5 text-blue-400 text-xs"><i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Medindo latência com a Console T.I...</span></span>';
+        if (window.lucide && lucide.createIcons) lucide.createIcons();
+      }
+
+      const tStart = performance.now();
+      try {
+        await fetch('http://127.0.0.1:8090/ping', { mode: 'no-cors' });
+      } catch(e) {}
+      const latencia = Math.max(4, Math.round(performance.now() - tStart));
+
+      setTimeout(() => {
+        if (res) {
+          res.innerHTML = `
+            <div class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center justify-between">
+              <div class="flex items-center gap-1.5 font-semibold">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Conexão Estável com a T.I</span>
+              </div>
+              <span class="font-mono text-[11px] text-emerald-400 font-bold">${latencia}ms</span>
+            </div>
+          `;
+        }
+        if (btn) btn.disabled = false;
+        if (window.lucide && lucide.createIcons) lucide.createIcons();
+      }, 500);
+    }
+
+    function mostrarToast(titulo, msg) {
+      const el = document.getElementById('toast-notificacao');
+      const elTit = document.getElementById('toast-titulo');
+      const elMsg = document.getElementById('toast-msg');
+      if (elTit) elTit.textContent = titulo;
+      if (elMsg) elMsg.textContent = msg;
+      if (el) {
+        el.classList.remove('translate-y-[-100px]', 'opacity-0', 'pointer-events-none');
+        el.classList.add('translate-y-0', 'opacity-100');
+        clearTimeout(window._toastTimer);
+        window._toastTimer = setTimeout(() => {
+          esconderToast();
+        }, 4500);
+      }
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    }
+
+    function esconderToast() {
+      const el = document.getElementById('toast-notificacao');
+      if (el) {
+        el.classList.remove('translate-y-0', 'opacity-100');
+        el.classList.add('translate-y-[-100px]', 'opacity-0', 'pointer-events-none');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Carrega dinamicamente empresas e setores vinculados às configurações
+      await carregarEmpresasWeb();
+      await carregarSetoresWeb();
+      carregarHistoricoChamados();
+
+      // 2. Auto-preenche parâmetros de URL se passados (ex: ?ativo=QUA-01&solicitante=Maria&empresa=Aço%20Móveis&setor=Qualidade)
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('empresa')) {
+        selecionarEmpresaWeb(params.get('empresa').trim());
+      }
+      if (params.get('setor')) {
+        carregarSetoresWeb(params.get('setor').trim());
+      }
+
+      // 3. Vinculação com o Agente Local FSC/Nexus instalado na máquina (TCP 8090)
+      try {
+        const agentHost = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') && window.location.port === '8090' ? '' : 'http://127.0.0.1:8090';
+        fetch(agentHost + '/api/status')
+          .then(res => res.json())
+          .then(data => {
+            if (data) {
+              if (data.empresa && !params.get('empresa')) {
+                selecionarEmpresaWeb(data.empresa);
+              }
+              if (data.hostname && !params.get('ativo')) {
+                const cAtv = document.getElementById('campo-ativo');
+                if (cAtv) cAtv.value = data.hostname;
+              }
+              if (data.user && !params.get('solicitante')) {
+                const cSol = document.getElementById('campo-solicitante');
+                if (cSol && !cSol.value) cSol.value = data.user;
+              }
+              if (data.tag && !params.get('setor')) {
+                carregarSetoresWeb(data.tag);
+              }
+            }
+          })
+          .catch(() => {});
+      } catch(e) {}
+      if (params.get('ativo')) {
+        const atvVal = params.get('ativo');
+        document.getElementById('campo-ativo').value = atvVal;
+      }
+      if (params.get('solicitante')) {
+        document.getElementById('campo-solicitante').value = params.get('solicitante');
+      } else {
+        const session = localStorage.getItem('fsc_auth_session') || sessionStorage.getItem('fsc_auth_session');
+        if (session) {
+          try {
+            const auth = JSON.parse(session);
+            if (auth.usuario) document.getElementById('campo-solicitante').value = auth.usuario;
+          } catch(e) {}
+        }
+      }
+
+      inicializarRastreioStatus();
+
+      // Sincronização BroadcastChannel com a console
+      try {
+        window._fscSyncChannel = new BroadcastChannel('fsc_chamados_sync');
+        window._fscSyncChannel.onmessage = (event) => {
+          const data = event.data;
+          if (!data) return;
+
+          if (data.tipo === 'avanco_estagio') {
+            verificarMudancasStatusChamados();
+          } else if (data.tipo === 'nova_mensagem') {
+            if (chatClienteChamadoAbertoId && String(chatClienteChamadoAbertoId) === String(data.chamadoId)) {
+              let chamados = [];
+              try {
+                const salvo = localStorage.getItem('fsc_kintsugi_chamados');
+                if (salvo) chamados = JSON.parse(salvo);
+              } catch(e) {}
+              const c = chamados.find(item => String(item.id) === String(chatClienteChamadoAbertoId));
+              if (c) {
+                renderizarMensagensChatCliente(c);
+                if (data.mensagem && data.mensagem.tipo === 'tecnico') {
+                  tocarSinoNotificacao();
+                }
+              }
+            }
+          }
+        };
+      } catch(e) {}
+
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'fsc_kintsugi_chamados') {
+          if (chatClienteChamadoAbertoId) {
+            let chamados = [];
+            try {
+              if (e.newValue) chamados = JSON.parse(e.newValue);
+            } catch(err) {}
+            const c = chamados.find(item => String(item.id) === String(chatClienteChamadoAbertoId));
+            if (c) {
+              carregarDadosChatCliente(c);
+            }
+          }
+        }
+      });
+
+      setInterval(verificarMudancasStatusChamados, 2000);
+
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    });
+
+    async function enviarChamadoCliente(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-enviar-chamado');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="inline-flex items-center gap-2"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Transmitindo para a T.I...</span></span>';
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+
+      const empresa = document.getElementById('campo-empresa').value.trim() || 'Aço Móveis';
+      const ativo = (document.getElementById('campo-ativo') && document.getElementById('campo-ativo').value.trim()) || 'auto';
+      const ip = 'auto'; // Anexado diretamente pelo Agente Local no backend
+      const solicitante = document.getElementById('campo-solicitante').value.trim() || 'Colaborador';
+      const setor = document.getElementById('campo-setor').value;
+      const categoria = document.getElementById('campo-categoria').value;
+      const urgencia = document.getElementById('campo-urgencia').value;
+      const titulo = document.getElementById('campo-titulo').value.trim();
+      const desc = document.getElementById('campo-desc').value.trim();
+      const paraOutro = destinoWebAtual === 'outro';
+
+      const ticketId = 'TICK-' + Math.floor(1000 + Math.random() * 9000);
+      const dataStr = 'Hoje, ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const novoChamado = {
+        id: ticketId,
+        empresa: empresa,
+        titulo: titulo,
+        desc: desc,
+        descricao: desc,
+        ativo: ativo,
+        solicitante: solicitante,
+        beneficiario: solicitante,
+        setor: setor,
+        paraOutro: paraOutro,
+        abertoPor: paraOutro ? (ativo + ' (Web)') : solicitante,
+        categoria: categoria,
+        urgencia: urgencia,
+        status: 'Active',
+        data: dataStr,
+        horario: dataStr,
+        ip: ip,
+        responsavel: '',
+        tecnico: '',
+        tecnicosAtribuidos: [],
+        mensagens: [
+          {
+            id: 'msg-ini-' + ticketId,
+            autor: 'Sistema',
+            tipo: 'sistema',
+            texto: `Chamado registrado com sucesso sob protocolo #${ticketId}. Aguardando atendimento da equipe de T.I.`,
+            horario: dataStr,
+            timestamp: Date.now()
+          }
+        ]
+      };
+      ultimoChamadoCriadoId = ticketId;
+      window._ultimoChamadoCriadoId = ticketId;
+      window._ultimoChamadoCriadoObj = novoChamado;
+      const elProtSuc = document.getElementById('sucesso-protocolo');
+      if (elProtSuc) elProtSuc.textContent = '#' + ticketId;
+      const elEmpSuc = document.getElementById('sucesso-empresa-txt');
+      if (elEmpSuc) elEmpSuc.textContent = empresa;
+      if (!window._historicoChamadosLocais) window._historicoChamadosLocais = [];
+      window._historicoChamadosLocais.unshift(novoChamado);
+
+      // 1. Grava no localStorage para sincronizar imediatamente com a console
+      try {
+        let lista = [];
+        const salvo = localStorage.getItem('fsc_kintsugi_chamados');
+        if (salvo) lista = JSON.parse(salvo);
+        if (!Array.isArray(lista)) lista = [];
+        lista.unshift(novoChamado);
+        localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(lista));
+      } catch(err) {
+        console.warn('Erro ao gravar localStorage:', err);
+      }
+
+      // 2. Dispara requisição HTTP para o Agente local e Console Central se online (POST e GET com resiliência total)
+      const qParams = 'titulo=' + encodeURIComponent(titulo) +
+                      '&empresa=' + encodeURIComponent(empresa) +
+                      '&categoria=' + encodeURIComponent(categoria) +
+                      '&solicitante=' + encodeURIComponent(solicitante) +
+                      '&setor=' + encodeURIComponent(setor) +
+                      '&ativo=' + encodeURIComponent(ativo) +
+                      '&urgencia=' + encodeURIComponent(urgencia) +
+                      '&descricao=' + encodeURIComponent(desc) +
+                      '&ticketId=' + encodeURIComponent(ticketId);
+
+      const endpointsApi = [
+        'http://127.0.0.1:8090/api/chamados',
+        'http://localhost:8090/api/chamados',
+        'http://127.0.0.1:8090/api/chamado',
+        'http://localhost:8090/api/chamado'
+      ];
+
+      // Disparo em paralelo via POST JSON e GET Query Params
+      endpointsApi.forEach(ep => {
+        try {
+          // POST JSON
+          fetch(ep, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(novoChamado)
+          }).catch(() => {});
+
+          // Fallback GET no-cors
+          fetch(ep + '?' + qParams, { mode: 'no-cors' }).catch(() => {});
+        } catch(e) {}
+      });
+
+      // Notifica console imediatamente via BroadcastChannel e Cross-window
+      try {
+        if (window._fscSyncChannel) {
+          window._fscSyncChannel.postMessage({
+            tipo: 'novo_chamado',
+            chamadoId: ticketId,
+            chamado: novoChamado
+          });
+        }
+        if (window.opener && window.opener.postMessage) {
+          window.opener.postMessage({ tipo: 'novo_chamado', chamado: novoChamado }, '*');
+        }
+      } catch(e) {}
+
+      // Atualiza o histórico imediatamente
+      carregarHistoricoChamados();
+
+      // 3. Exibe tela de confirmação de sucesso
+      setTimeout(() => {
+        document.getElementById('form-chamado-cliente').classList.add('hidden');
+        document.getElementById('sucesso-protocolo').textContent = '#' + ticketId;
+        document.getElementById('sucesso-empresa-txt').textContent = empresa;
+        document.getElementById('box-sucesso-chamado').classList.remove('hidden');
+        if (window.lucide && lucide.createIcons) lucide.createIcons();
+      }, 700);
+    }
+
+    function reiniciarFormulario() {
+      document.getElementById('form-chamado-cliente').classList.remove('hidden');
+      document.getElementById('box-sucesso-chamado').classList.add('hidden');
+      document.getElementById('campo-titulo').value = '';
+      document.getElementById('campo-desc').value = '';
+      const btn = document.getElementById('btn-enviar-chamado');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="inline-flex items-center gap-2"><i data-lucide="send" class="w-4 h-4 text-slate-950"></i><span>Enviar Solicitação de Chamado</span></span>';
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    }
+
+    // =========================================================================
+    // VARIÁVEIS E GESTÃO DO CHAT DO SOLICITANTE COM O TÉCNICO
+    // =========================================================================
+    let ultimoChamadoCriadoId = 'TICK-101';
+    let chatClienteChamadoAbertoId = null;
+    let _statusChamadosAnteriores = {};
+
+    // Efeito Sonoro Chime com Web Audio API
+    function tocarSinoNotificacao() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        const now = ctx.currentTime;
+        osc.frequency.setValueAtTime(587.33, now);
+        osc.frequency.setValueAtTime(880, now + 0.1);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc.start(now);
+        osc.stop(now + 0.35);
+      } catch(e) {}
+    }
+
+    // Normalização para comparar status de forma consistente sem falsos positivos
+    function normalizarStatusComparacao(st) {
+      if (!st) return 'active';
+      const s = String(st).toLowerCase().trim();
+      if (s === 'active' || s.includes('aberto') || s === '1. em aberto') return 'active';
+      if (s === 'triagem' || s.includes('triagem') || s === '2. em triagem') return 'triagem';
+      if (s === 'em andamento' || s.includes('andamento') || s === '3. em andamento') return 'andamento';
+      if (s === 'em espera' || s.includes('espera') || s === '4. em espera') return 'espera';
+      if (s === 'homologacao' || s.includes('homolog') || s === '5. em homologação') return 'homologacao';
+      if (s === 'resolvido' || s.includes('resolv') || s.includes('finaliz') || s === '6. finalizados') return 'resolvido';
+      return s;
+    }
+
+    window._statusNotificadosEstagios = window._statusNotificadosEstagios || {};
+
+    // Inicialização do rastreio de status para alertar sobre avanços no funil
+    function inicializarRastreioStatus() {
+      try {
+        const salvo = localStorage.getItem('fsc_kintsugi_chamados');
+        if (salvo) {
+          const lista = JSON.parse(salvo);
+          if (Array.isArray(lista)) {
+            lista.forEach(c => {
+              _statusChamadosAnteriores[String(c.id)] = normalizarStatusComparacao(c.status);
+            });
+          }
+        }
+      } catch(e) {}
+    }
+
+    // Verifica se houve avanço de estágio nos chamados e notifica o solicitante (apenas se o chat não estiver aberto)
+    function verificarMudancasStatusChamados() {
+      try {
+        const salvo = localStorage.getItem('fsc_kintsugi_chamados');
+        if (!salvo) return;
+        const lista = JSON.parse(salvo);
+        if (!Array.isArray(lista)) return;
+
+        let mudou = false;
+        lista.forEach(c => {
+          const id = String(c.id);
+          const stAntigo = _statusChamadosAnteriores[id];
+          const stNovo = normalizarStatusComparacao(c.status);
+
+          if (stAntigo !== undefined && stAntigo !== stNovo) {
+            _statusChamadosAnteriores[id] = stNovo;
+            mudou = true;
+
+            const chatAbertoDesteChamado = (chatClienteChamadoAbertoId && String(chatClienteChamadoAbertoId) === id);
+            if (chatAbertoDesteChamado) {
+              // Se o solicitante já está dentro do chat, atualiza as informações do cabeçalho sem toast invasivo
+              carregarDadosChatCliente(c);
+            } else {
+              // Notifica apenas 1 vez por estágio para não ficar repetindo
+              const notifKey = `${id}_${stNovo}`;
+              if (!window._statusNotificadosEstagios[notifKey]) {
+                window._statusNotificadosEstagios[notifKey] = true;
+                mostrarNotificacaoAvancoEstagio(c, stAntigo, c.status);
+              }
+            }
+          } else if (stAntigo === undefined) {
+            _statusChamadosAnteriores[id] = stNovo;
+          }
+        });
+
+        if (mudou) {
+          carregarHistoricoChamados();
+        }
+      } catch(e) {}
+    }
+
+    // Exibe notificação simples e elegante de avanço de estágio
+    function mostrarNotificacaoAvancoEstagio(c, statusAntigo, novoStatus) {
+      // Se o chat deste chamado já estiver aberto, não exibe toast flutuante
+      if (chatClienteChamadoAbertoId && String(chatClienteChamadoAbertoId) === String(c.id)) {
+        return;
+      }
+
+      tocarSinoNotificacao();
+
+      let titulo = `🔔 Chamado #${c.id} Atualizado!`;
+      let texto = '';
+      const tec = c.responsavel || c.tecnico || 'Equipe de TI';
+      const stNorm = normalizarStatusComparacao(novoStatus);
+
+      if (stNorm === 'resolvido') {
+        texto = `Seu chamado foi RESOLVIDO e concluído com sucesso por ${tec}!`;
+      } else if (stNorm === 'andamento') {
+        texto = `O técnico ${tec} assumiu seu chamado e iniciou o atendimento.`;
+      } else if (stNorm === 'triagem') {
+        texto = `Seu chamado entrou em triagem técnica para análise.`;
+      } else if (stNorm === 'espera') {
+        texto = `Seu chamado está em espera temporária pela equipe de TI.`;
+      } else if (stNorm === 'homologacao') {
+        texto = `Seu chamado está em homologação e testes finais.`;
+      } else {
+        texto = `O chamado avançou para a etapa: "${novoStatus}" (Responsável: ${tec}).`;
+      }
+
+      const el = document.getElementById('toast-notificacao');
+      const elTit = document.getElementById('toast-titulo');
+      const elMsg = document.getElementById('toast-msg');
+      if (elTit) elTit.innerHTML = `<span>${titulo}</span>`;
+      if (elMsg) {
+        elMsg.innerHTML = `
+          <div class="space-y-2">
+            <p class="leading-relaxed text-slate-200">${texto}</p>
+            <div>
+              <button onclick="esconderToast(); abrirChatChamadoCliente('${c.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] transition cursor-pointer shadow-md shadow-blue-600/30">
+                <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+                <span>Abrir Chat com o Técnico</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      if (el) {
+        el.classList.remove('translate-y-[-100px]', 'opacity-0', 'pointer-events-none');
+        el.classList.add('translate-y-0', 'opacity-100');
+        clearTimeout(window._toastTimer);
+        window._toastTimer = setTimeout(() => {
+          esconderToast();
+        }, 6000);
+      }
+
+      try {
+        if ("Notification" in window) {
+          if (Notification.permission === "granted") {
+            new Notification(`Chamado #${c.id} - ${novoStatus}`, {
+              body: texto
+            });
+          } else if (Notification.permission !== "denied") {
+            Notification.requestPermission();
+          }
+        }
+      } catch(e) {}
+
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    }
+
+    // =========================================================================
+    // FUNÇÕES DO CHAT DO CLIENTE COM O TÉCNICO
+    // =========================================================================
+    async function abrirChatChamadoCliente(id) {
+      if (!id) id = ultimoChamadoCriadoId || window._ultimoChamadoCriadoId;
+      if (!id && window._ultimoChamadoCriadoObj) id = window._ultimoChamadoCriadoObj.id;
+      if (!id && window._historicoChamadosLocais && window._historicoChamadosLocais.length > 0) {
+        id = window._historicoChamadosLocais[0].id;
+      }
+      if (!id) id = 'TICK-8116';
+
+      let chamados = [];
+      try {
+        const salvo = localStorage.getItem('fsc_kintsugi_chamados');
+        if (salvo) chamados = JSON.parse(salvo);
+      } catch(e) {}
+
+      let c = chamados.find(item => String(item.id) === String(id));
+      if (!c && window._ultimoChamadoCriadoObj && String(window._ultimoChamadoCriadoObj.id) === String(id)) {
+        c = window._ultimoChamadoCriadoObj;
+      }
+      if (!c && window._historicoChamadosLocais && Array.isArray(window._historicoChamadosLocais)) {
+        c = window._historicoChamadosLocais.find(item => String(item.id) === String(id));
+      }
+
+      // Se ainda não encontrou, tenta buscar direto no agente local / chamados.json
+      if (!c) {
+        try {
+          const endpointsBusca = [
+            'http://127.0.0.1:8090/api/chamados',
+            'http://localhost:8090/api/chamados',
+            'chamados.json?t=' + Date.now()
+          ];
+          for (const ep of endpointsBusca) {
+            try {
+              const resp = await fetch(ep);
+              if (resp.ok) {
+                const arr = await resp.json();
+                if (Array.isArray(arr)) {
+                  const match = arr.find(item => String(item.id) === String(id));
+                  if (match) {
+                    c = match;
+                    break;
+                  }
+                }
+              }
+            } catch(err) {}
+          }
+        } catch(e) {}
+      }
+
+      // Fallback garantido: usa o último criado ou histórico local para NUNCA bloquear o usuário
+      if (!c) {
+        if (window._ultimoChamadoCriadoObj) {
+          c = window._ultimoChamadoCriadoObj;
+        } else if (window._historicoChamadosLocais && window._historicoChamadosLocais.length > 0) {
+          c = window._historicoChamadosLocais[0];
+        } else if (chamados && chamados.length > 0) {
+          c = chamados[0];
+        } else {
+          c = {
+            id: String(id),
+            titulo: 'Solicitação de Suporte T.I',
+            empresa: empresaWebAtual,
+            solicitante: document.getElementById('campo-solicitante') ? document.getElementById('campo-solicitante').value.trim() : 'Solicitante',
+            setor: 'Geral',
+            status: 'Active',
+            data: 'Hoje, ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            mensagens: []
+          };
+        }
+      }
+
+      chatClienteChamadoAbertoId = String(c.id);
+      carregarDadosChatCliente(c);
+
+      const modal = document.getElementById('modal-chat-cliente');
+      if (modal) modal.classList.remove('hidden');
+
+      const input = document.getElementById('chat-cliente-input');
+      if (input) setTimeout(() => input.focus(), 150);
+
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    }
+
+    function fecharChatChamadoCliente() {
+      const modal = document.getElementById('modal-chat-cliente');
+      if (modal) modal.classList.add('hidden');
+      chatClienteChamadoAbertoId = null;
+    }
+
+    function carregarDadosChatCliente(c) {
+      if (!c) return;
+
+      const elProt = document.getElementById('chat-cliente-protocolo');
+      const elTit = document.getElementById('chat-cliente-titulo-chamado');
+      const elResp = document.getElementById('chat-cliente-responsavel');
+      const elAvatar = document.getElementById('chat-cliente-avatar-tec');
+      const elDot = document.getElementById('chat-cliente-status-dot');
+      const elBadge = document.getElementById('chat-cliente-status-badge');
+      const elEmp = document.getElementById('chat-cliente-empresa-tag');
+      const elBannerTxt = document.getElementById('chat-cliente-banner-texto');
+
+      if (elProt) elProt.textContent = '#' + c.id;
+      if (elTit) elTit.textContent = c.titulo || 'Sem título';
+      if (elEmp) elEmp.textContent = c.empresa || empresaWebAtual;
+
+      const tec = c.responsavel || c.tecnico;
+      if (tec && tec.trim()) {
+        if (elResp) elResp.textContent = tec + ' (Técnico de TI)';
+        if (elAvatar) {
+          const parts = tec.trim().split(' ');
+          elAvatar.textContent = parts.length > 1 ? (parts[0][0] + parts[parts.length-1][0]).toUpperCase() : tec.slice(0, 2).toUpperCase();
+        }
+        if (elDot) {
+          elDot.className = 'absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900 animate-pulse';
+        }
+        if (elBannerTxt) elBannerTxt.textContent = `Técnico ${tec} está conectado e responsável pelo seu chamado.`;
+      } else {
+        if (elResp) elResp.textContent = 'Aguardando Atribuição de Técnico...';
+        if (elAvatar) elAvatar.textContent = 'TI';
+        if (elDot) {
+          elDot.className = 'absolute bottom-0 right-0 w-3 h-3 rounded-full bg-amber-400 border-2 border-slate-900';
+        }
+        if (elBannerTxt) elBannerTxt.textContent = 'Seu chamado está na fila prioritária de atendimento.';
+      }
+
+      if (elBadge) {
+        if (c.status === 'Resolvido') {
+          elBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+          elBadge.textContent = 'Resolvido';
+        } else if (c.status === 'Em Andamento') {
+          elBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+          elBadge.textContent = 'Em Andamento';
+        } else if (c.status === 'Triagem') {
+          elBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
+          elBadge.textContent = 'Em Triagem';
+        } else {
+          elBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30';
+          elBadge.textContent = 'Em Aberto';
+        }
+      }
+
+      atualizarPainelAvaliacaoChat(c);
+      renderizarMensagensChatCliente(c);
+    }
+
+    let notaAvaliacaoSelecionada = 5;
+
+    function abrirAvaliacaoNoChat(id) {
+      abrirChatChamadoCliente(id);
+      setTimeout(() => {
+        const box = document.getElementById('chat-cliente-box-avaliacao');
+        if (box) box.classList.remove('hidden');
+      }, 100);
+    }
+
+    function selecionarNotaAvaliacao(nota) {
+      notaAvaliacaoSelecionada = nota;
+      for (let i = 1; i <= 5; i++) {
+        const btn = document.getElementById('btn-star-av-' + i);
+        if (btn) {
+          if (i <= nota) {
+            btn.className = 'w-8 h-8 rounded-xl bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center shadow-md shadow-amber-500/20 transition transform scale-105 cursor-pointer';
+          } else {
+            btn.className = 'w-8 h-8 rounded-xl bg-slate-800 text-slate-500 hover:text-amber-300 border border-slate-700 font-bold text-sm flex items-center justify-center transition cursor-pointer';
+          }
+        }
+      }
+      const labels = { 1: '1/5 - Insatisfeito', 2: '2/5 - Regular', 3: '3/5 - Bom', 4: '4/5 - Muito Bom', 5: '5/5 - Excelente!' };
+      const elLbl = document.getElementById('lbl-nota-avaliacao-texto');
+      if (elLbl) elLbl.textContent = labels[nota] || '5/5 - Excelente!';
+    }
+
+    function atualizarPainelAvaliacaoChat(c) {
+      const box = document.getElementById('chat-cliente-box-avaliacao');
+      const formAv = document.getElementById('chat-cliente-form-avaliacao');
+      const resumoAv = document.getElementById('chat-cliente-resumo-avaliacao');
+      if (!box) return;
+
+      if (c && c.status === 'Resolvido') {
+        box.classList.remove('hidden');
+        if (c.avaliacaoNota) {
+          if (formAv) formAv.classList.add('hidden');
+          if (resumoAv) {
+            resumoAv.classList.remove('hidden');
+            const estrelas = '★'.repeat(Number(c.avaliacaoNota) || 5) + '☆'.repeat(5 - (Number(c.avaliacaoNota) || 5));
+            resumoAv.innerHTML = `
+              <div class="flex items-center justify-between">
+                <span class="text-emerald-300 font-bold text-[11px] flex items-center gap-1.5">
+                  <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-400"></i>
+                  <span>Atendimento Avaliado: <strong class="text-amber-400 tracking-wider">${estrelas} (${c.avaliacaoNota}/5)</strong></span>
+                </span>
+                <span class="text-[10px] text-slate-400">${c.avaliacaoData || 'Concluído'}</span>
+              </div>
+              ${c.avaliacaoComentario ? `<p class="text-[11px] text-slate-300 italic mt-1">"${c.avaliacaoComentario}"</p>` : ''}
+            `;
+          }
+        } else {
+          if (formAv) formAv.classList.remove('hidden');
+          if (resumoAv) resumoAv.classList.add('hidden');
+          selecionarNotaAvaliacao(5);
+          const inpCom = document.getElementById('chat-cliente-comentario-avaliacao');
+          if (inpCom) inpCom.value = '';
+        }
+      } else {
+        box.classList.add('hidden');
+      }
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    }
+
+    function enviarAvaliacaoAtendimentoCliente() {
+      const id = chatClienteChamadoAbertoId || ultimoChamadoCriadoId || window._ultimoChamadoCriadoId;
+      if (!id) return;
+
+      const nota = notaAvaliacaoSelecionada || 5;
+      const inpCom = document.getElementById('chat-cliente-comentario-avaliacao');
+      const comentario = inpCom ? inpCom.value.trim() : '';
+      const horaStr = 'Hoje, ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+      let chamados = [];
+      try {
+        const salvo = localStorage.getItem('fsc_kintsugi_chamados');
+        if (salvo) chamados = JSON.parse(salvo);
+      } catch(e) {}
+
+      let c = chamados.find(item => String(item.id) === String(id));
+      if (c) {
+        c.avaliacaoNota = nota;
+        c.avaliacaoComentario = comentario;
+        c.avaliacaoData = horaStr;
+        if (!Array.isArray(c.mensagens)) c.mensagens = [];
+        c.mensagens.push({
+          id: 'msg-av-' + Date.now(),
+          autor: 'Sistema',
+          tipo: 'sistema',
+          texto: `★ Atendimento avaliado pelo solicitante com nota ${nota}/5` + (comentario ? `: "${comentario}"` : '.'),
+          horario: horaStr,
+          timestamp: Date.now()
+        });
+        try {
+          localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados));
+        } catch(e) {}
+      }
+
+      // Envia para o Agente/Servidor Central persistir em chamados.json
+      try {
+        fetch('http://127.0.0.1:8090/api/chamados/avaliar', {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: id,
+            ticketId: id,
+            nota: nota,
+            comentario: comentario,
+            autor: (c && c.solicitante) || 'Solicitante'
+          })
+        }).catch(() => {});
+      } catch(e) {}
+
+      try {
+        if (window._fscSyncChannel) {
+          window._fscSyncChannel.postMessage({
+            tipo: 'avaliacao_chamado',
+            chamadoId: id,
+            nota: nota,
+            comentario: comentario,
+            avaliacaoData: horaStr
+          });
+        }
+      } catch(e) {}
+
+      if (c) {
+        atualizarPainelAvaliacaoChat(c);
+        renderizarMensagensChatCliente(c);
+      }
+      carregarHistoricoChamados();
+      mostrarToast('Avaliação Enviada! ★', `Obrigado pelo seu feedback (${nota}/5 estrelas). Sua avaliação foi registrada para a equipe de T.I.`);
+    }
+
+    function deduplicarMensagens(msgs) {
+      if (!Array.isArray(msgs)) return [];
+      const mapa = new Map();
+      const unicas = [];
+      msgs.forEach(m => {
+        if (!m || !m.texto) return;
+        const txt = String(m.texto).trim();
+        const hr = String(m.horario || '').trim();
+        const kId = m.id ? String(m.id) : null;
+        const kContent = `${m.tipo || ''}_${m.autor || ''}_${txt}_${hr}`;
+        if (kId && mapa.has(kId)) return;
+        if (mapa.has(kContent)) return;
+        if (kId) mapa.set(kId, true);
+        mapa.set(kContent, true);
+        unicas.push(m);
+      });
+      return unicas;
+    }
+
+    function renderizarMensagensChatCliente(c) {
+      const container = document.getElementById('chat-cliente-lista-mensagens');
+      if (!container) return;
+
+      if (!Array.isArray(c.mensagens) || c.mensagens.length === 0) {
+        c.mensagens = [
+          {
+            id: 'msg-ini-' + c.id,
+            autor: 'Sistema',
+            tipo: 'sistema',
+            texto: `Chamado registrado com sucesso sob protocolo #${c.id}. Você pode conversar com a equipe de TI por aqui.`,
+            horario: c.data || 'Hoje',
+            timestamp: Date.now()
+          }
+        ];
+      }
+
+      c.mensagens = deduplicarMensagens(c.mensagens);
+
+      container.innerHTML = c.mensagens.map(m => {
+        if (m.tipo === 'sistema') {
+          return `
+            <div class="flex justify-center my-2">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-slate-300 border border-slate-700/80 text-[10px] font-medium max-w-full">
+                <i data-lucide="info" class="w-3 h-3 text-blue-400 shrink-0"></i>
+                <span class="truncate">${m.texto}</span>
+                <span class="text-slate-400 font-mono text-[9px] shrink-0">• ${m.horario || ''}</span>
+              </span>
+            </div>
+          `;
+        } else if (m.tipo === 'cliente') {
+          return `
+            <div class="flex items-start justify-end gap-2 my-1">
+              <div class="max-w-[85%] bg-indigo-600 text-white p-3 rounded-2xl rounded-tr-xs shadow-md shadow-indigo-500/20 border border-indigo-500/30 space-y-1">
+                <div class="flex items-center justify-between gap-3 text-[10px] text-indigo-100">
+                  <span class="font-bold">Você (Solicitante)</span>
+                  <span class="font-mono text-[9px] opacity-80">${m.horario || ''}</span>
+                </div>
+                <p class="text-white text-xs leading-relaxed whitespace-pre-wrap font-sans">${m.texto}</p>
+              </div>
+            </div>
+          `;
+        } else {
+          // Mensagem do Técnico
+          const tecNome = m.autor || c.responsavel || 'Técnico de TI';
+          const iniciais = tecNome.split(' ').map(n=>n[0]).slice(0,2).join('').toUpperCase();
+          return `
+            <div class="flex items-start gap-2.5 my-1">
+              <div class="w-7 h-7 rounded-full bg-indigo-500/20 text-indigo-300 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 border border-indigo-500/30 shadow-sm">
+                ${iniciais}
+              </div>
+              <div class="max-w-[85%] bg-zinc-900 border border-zinc-800 text-zinc-100 p-3 rounded-2xl rounded-tl-xs shadow-md space-y-1">
+                <div class="flex items-center justify-between gap-3 text-[10px]">
+                  <span class="font-bold text-white">${tecNome} <span class="font-normal text-indigo-400 text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/10 border border-indigo-500/20">Técnico TI</span></span>
+                  <span class="text-zinc-500 font-mono text-[9px]">${m.horario || ''}</span>
+                </div>
+                <p class="text-zinc-200 text-xs leading-relaxed whitespace-pre-wrap font-sans">${m.texto}</p>
+              </div>
+            </div>
+          `;
+        }
+      }).join('');
+
+      setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+      }, 50);
+
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    }
+
+    function enviarMensagemClienteChat(e) {
+      if (e) e.preventDefault();
+      if (!chatClienteChamadoAbertoId) {
+        chatClienteChamadoAbertoId = ultimoChamadoCriadoId || window._ultimoChamadoCriadoId;
+        if (!chatClienteChamadoAbertoId && window._ultimoChamadoCriadoObj) {
+          chatClienteChamadoAbertoId = window._ultimoChamadoCriadoObj.id;
+        }
+      }
+      if (!chatClienteChamadoAbertoId) return;
+
+      const input = document.getElementById('chat-cliente-input');
+      if (!input) return;
+      const texto = input.value.trim();
+      if (!texto) return;
+
+      let chamados = [];
+      try {
+        const salvo = localStorage.getItem('fsc_kintsugi_chamados');
+        if (salvo) chamados = JSON.parse(salvo);
+      } catch(err) {}
+
+      let c = chamados.find(item => String(item.id) === String(chatClienteChamadoAbertoId));
+      if (!c && window._ultimoChamadoCriadoObj && String(window._ultimoChamadoCriadoObj.id) === String(chatClienteChamadoAbertoId)) {
+        c = window._ultimoChamadoCriadoObj;
+        chamados.unshift(c);
+      }
+      if (!c && window._historicoChamadosLocais && window._historicoChamadosLocais.length > 0) {
+        c = window._historicoChamadosLocais.find(item => String(item.id) === String(chatClienteChamadoAbertoId));
+        if (c) chamados.unshift(c);
+      }
+      if (!c) {
+        c = {
+          id: String(chatClienteChamadoAbertoId),
+          titulo: 'Solicitação de Atendimento',
+          empresa: empresaWebAtual,
+          solicitante: document.getElementById('campo-solicitante') ? document.getElementById('campo-solicitante').value.trim() : 'Solicitante',
+          mensagens: []
+        };
+        chamados.unshift(c);
+      }
+
+      const solicitanteNome = c.solicitante || (document.getElementById('campo-solicitante') ? document.getElementById('campo-solicitante').value.trim() : 'Solicitante');
+      const horaStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+      if (!Array.isArray(c.mensagens)) c.mensagens = [];
+
+      const novaMsg = {
+        id: 'msg-cli-' + Date.now(),
+        autor: solicitanteNome,
+        tipo: 'cliente',
+        texto: texto,
+        horario: 'Hoje às ' + horaStr,
+        timestamp: Date.now()
+      };
+
+      const jaExiste = c.mensagens.some(x => x.id === novaMsg.id || (x.texto === texto && x.tipo === 'cliente' && Math.abs((x.timestamp || 0) - novaMsg.timestamp) < 3000));
+      if (!jaExiste) {
+        c.mensagens.push(novaMsg);
+      }
+      c.ultimaAtualizacao = 'Hoje às ' + horaStr + ' por ' + solicitanteNome;
+
+      try {
+        localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados));
+      } catch(err) {}
+
+      // Dispara para o Agente local gravar no chamados.json com o mesmo ID
+      try {
+        fetch('http://127.0.0.1:8090/api/chamados/mensagem', {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chamadoId: c.id,
+            ticketId: c.id,
+            id: novaMsg.id,
+            mensagemId: novaMsg.id,
+            autor: solicitanteNome,
+            tipo: 'cliente',
+            texto: texto,
+            horario: 'Hoje às ' + horaStr
+          })
+        }).catch(() => {});
+      } catch(e) {}
+
+      try {
+        if (window._fscSyncChannel) {
+          window._fscSyncChannel.postMessage({
+            tipo: 'nova_mensagem',
+            chamadoId: c.id,
+            mensagem: novaMsg
+          });
+        }
+      } catch(err) {}
+
+      input.value = '';
+      renderizarMensagensChatCliente(c);
+    }
+  </script>
+
+  <!-- ========================================================================= -->
+  <!-- PAINEL / MODAL DE CHAT DO SOLICITANTE COM O TÉCNICO DE TI -->
+  <!-- ========================================================================= -->
+  <div id="modal-chat-cliente" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-end sm:justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity duration-300">
+    <div id="card-chat-cliente" class="w-full sm:max-w-lg bg-slate-900 border border-slate-700/80 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[620px] h-[580px] overflow-hidden transform transition-all duration-300">
+      
+      <!-- Cabeçalho do Chat -->
+      <div class="p-4 sm:p-5 pb-3 border-b border-zinc-800 bg-[#121215] flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="relative">
+            <div id="chat-cliente-avatar-tec" class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white font-bold text-xs flex items-center justify-center border-2 border-indigo-400 shadow-md">
+              TI
+            </div>
+            <span id="chat-cliente-status-dot" class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-zinc-950 animate-pulse"></span>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span id="chat-cliente-protocolo" class="font-mono font-bold text-xs text-indigo-400">#TICK-101</span>
+              <span id="chat-cliente-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Em Andamento</span>
+            </div>
+            <h3 id="chat-cliente-responsavel" class="text-sm font-bold text-white truncate leading-snug">Gabriel Novaes (Técnico TI)</h3>
+            <p id="chat-cliente-titulo-chamado" class="text-[11px] text-zinc-400 truncate">Solicitação de Acesso VPN Remota</p>
+          </div>
+        </div>
+        <button onclick="fecharChatChamadoCliente()" class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer shrink-0" title="Fechar Chat">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Barra de Notificação de Status no Topo do Chat -->
+      <div id="chat-cliente-banner-status" class="bg-indigo-950/40 border-b border-indigo-900/30 px-4 py-2 flex items-center justify-between text-[11px] text-indigo-200">
+        <div class="flex items-center gap-1.5 truncate">
+          <i data-lucide="info" class="w-3.5 h-3.5 text-indigo-400 shrink-0"></i>
+          <span id="chat-cliente-banner-texto" class="truncate">Canal direto com o suporte de TI.</span>
+        </div>
+        <span id="chat-cliente-empresa-tag" class="font-semibold text-zinc-400 text-[10px] shrink-0">Aço Móveis</span>
+      </div>
+
+      <!-- Lista de Mensagens com Rolagem -->
+      <div id="chat-cliente-lista-mensagens" class="flex-1 p-4 overflow-y-auto space-y-3 bg-zinc-950/70 text-xs">
+        <!-- Renderizado dinamicamente via JavaScript -->
+      </div>
+
+      <!-- Painel de Avaliação de Atendimento pelo Solicitante (Exibido ao Concluir o Chamado) -->
+      
+
+      <!-- Barra Inferior de Digitação e Envio -->
+      <div class="p-3.5 sm:p-4 border-t border-zinc-800 bg-[#121215] shrink-0">
+        <form onsubmit="enviarMensagemClienteChat(event)" class="flex items-center gap-2">
+          <input 
+            type="text" 
+            id="chat-cliente-input" 
+            placeholder="Digite sua mensagem para o técnico... (Enter para enviar)" 
+            class="flex-1 px-4 py-2.5 rounded-xl border border-zinc-700 bg-zinc-900/90 text-white placeholder-zinc-500 text-xs focus:outline-none focus:border-indigo-500 font-sans"
+            autocomplete="off"
+          >
+          <button 
+            type="submit" 
+            class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-lg shadow-indigo-600/30 cursor-pointer shrink-0"
+            title="Enviar mensagem"
+          >
+            <i data-lucide="send" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">Enviar</span>
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>

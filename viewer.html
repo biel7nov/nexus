@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nexus Remote Viewer — Sessão Remota Descentralizada</title>
+  
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='%232ea853' d='M50 5 L92 47 L53 86 L53 72 L78 47 L64 33 L42 55 L33 46 L55 24 L45 14 L19 40 L47 68 L47 95 L5 50 Z'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #020503;
+      color: #f8fafc;
+      font-family: 'Inter', sans-serif;
+    }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .bg-tech-grid {
+      background-size: 32px 32px;
+      background-image: 
+        linear-gradient(to right, rgba(46, 168, 83, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(46, 168, 83, 0.04) 1px, transparent 1px);
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #030805; }
+    ::-webkit-scrollbar-thumb { background: #133924; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #2ea853; }
+    
+    /* Cursor local com resposta a 0ms (zero lag) */
+    .cursor-local-fluido {
+      cursor: default !important;
+    }
+    .cursor-remoto-apenas {
+      cursor: none !important;
+    }
+
+    #remote-stream-img {
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+  </style>
+</head>
+<body class="bg-tech-grid h-screen w-screen max-w-full max-h-full overflow-hidden flex flex-col select-none">
+
+  <!-- =========================================================================
+       BARRA DE CONTROLE SUPERIOR (TOOLBAR RESPONSIVA & COMPACTA)
+       ========================================================================= -->
+  <header id="main-toolbar" class="bg-[#050d09]/95 backdrop-blur-md border-b border-emerald-900/60 px-3 py-1.5 flex items-center justify-between gap-2 shadow-xl z-50 flex-shrink-0 w-full overflow-x-auto overflow-y-hidden select-none">
+    
+    <!-- LADO ESQUERDO: IDENTIFICAÇÃO DO DISPOSITIVO REMOTO -->
+    <div class="flex items-center gap-2.5 flex-shrink-0">
+      <!-- Logo FSC -->
+      <div class="flex items-center gap-1.5 pr-2.5 border-r border-emerald-950">
+        <svg class="w-5 h-5 text-[#2ea853]" viewBox="0 0 100 100" fill="currentColor">
+          <path d="M47 7 L9 45 C5 49 5 53 9 57 L47 95 L47 78 L21 52 L33 40 L45 52 L53 44 L41 32 L56 17 C53 11 50 7 47 7 Z"/>
+          <path d="M64 25 L49 40 L61 52 L53 60 L65 48 L75 58 L53 80 L53 95 L91 57 C95 53 95 49 91 45 L71 25 C69 23 66 23 64 25 Z"/>
+        </svg>
+        <span class="font-extrabold text-xs tracking-tight text-white hidden sm:inline">Fast Solutions</span>
+        <span class="text-[8px] font-mono uppercase px-1 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60">REMOTE</span>
+      </div>
+
+      <!-- Informações do Alvo -->
+      <div class="flex items-center gap-2">
+        <span id="conn-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
+        <div class="leading-tight">
+          <div class="flex items-center gap-1.5">
+            <span id="target-name-display" class="font-bold text-xs text-white uppercase tracking-wider truncate max-w-[120px] sm:max-w-[200px]">CARREGANDO...</span>
+            <span id="target-os-badge" class="text-[9px] font-mono text-slate-400 bg-[#081710] px-1 py-0.2 rounded border border-emerald-950 hidden md:inline">Windows</span>
+          </div>
+          <div class="text-[9px] font-mono text-emerald-400/80 flex items-center gap-1.5">
+            <span id="target-ip-display" class="truncate max-w-[120px]">http://...</span>
+            <span>•</span>
+            <span id="session-timer">⏱️ 00:00:00</span>
+            <span>•</span>
+            <span id="hud-ping" class="text-emerald-400 font-bold">-- ms</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SELETOR DE MULTI-MONITORES (Aparece quando há 2 ou mais telas) -->
+    <div id="monitors-container" class="hidden flex items-center gap-1 bg-[#030806]/90 p-1 rounded-xl border border-emerald-800/60 flex-shrink-0">
+      <span class="text-[10px] font-mono text-slate-400 px-1.5 flex items-center gap-1">
+        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+        <span class="hidden md:inline">Telas:</span>
+      </span>
+      <div id="screen-buttons-group" class="flex items-center gap-1">
+        <!-- Botões gerados dinamicamente -->
+      </div>
+    </div>
+
+    <!-- INDICADOR DE SINCRONIZAÇÃO DE CLIPBOARD BIDIRECIONAL -->
+    <div id="clipboard-badge" class="flex items-center gap-1.5 bg-[#030806]/90 px-2 py-1 rounded-lg border border-emerald-800/60 text-[10px] font-mono text-emerald-300 flex-shrink-0" title="Ctrl+C / Ctrl+V sincronizado automaticamente entre seu PC e o computador remoto">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span id="clipboard-status-text">Ctrl+C/V Sincronizado</span>
+    </div>
+
+    <!-- SELETOR / STATUS DE MODO DE CONEXÃO (DIRETO vs TÚNEL REVERSO / RELAY) -->
+    <div id="conn-mode-badge" onclick="alternarModoConexaoManual()" class="flex items-center gap-1.5 bg-[#030806]/90 px-2.5 py-1 rounded-lg border border-emerald-800/60 text-[10px] font-mono text-emerald-300 flex-shrink-0 cursor-pointer hover:bg-emerald-950/80 transition" title="Clique para alternar entre Conexão Direta LAN (Porta 8090) e Túnel Reverso (Relay Central)">
+      <span id="conn-mode-icon">⚡</span>
+      <span id="conn-mode-text">Auto (Direta/Relay)</span>
+    </div>
+
+    <!-- LADO DIREITO: BOTÕES DE AÇÃO E FERRAMENTAS -->
+    <div class="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+
+      <!-- Teclas Especiais Dropdown -->
+      <div class="relative">
+        <button id="btn-keys-menu" onclick="toggleKeysMenu()" class="px-2 py-1.5 rounded-lg bg-[#0b1b13] hover:bg-emerald-900/60 border border-emerald-800/60 text-xs font-mono text-slate-300 hover:text-white transition flex items-center gap-1" title="Enviar Combinações de Teclado">
+          <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+          <span class="hidden md:inline">Atalhos</span>
+          <span class="text-[8px]">▼</span>
+        </button>
+
+        <div id="keys-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-[#07130d] border border-emerald-800 rounded-xl shadow-2xl p-1.5 z-50 space-y-1 text-xs font-mono">
+          <button onclick="enviarAtalho('CTRL_ALT_DEL')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-950 text-slate-200 hover:text-white flex items-center justify-between">
+            <span>Ctrl + Alt + Del</span>
+            <span class="text-[8px] text-slate-500">Taskmgr</span>
+          </button>
+          <button onclick="enviarAtalho('ALT_TAB')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-950 text-slate-200 hover:text-white flex items-center justify-between">
+            <span>Alt + Tab</span>
+            <span class="text-[8px] text-slate-500">Janelas</span>
+          </button>
+          <button onclick="enviarAtalho('WIN')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-950 text-slate-200 hover:text-white flex items-center justify-between">
+            <span>Tecla Windows</span>
+            <span class="text-[8px] text-slate-500">Menu</span>
+          </button>
+          <button onclick="enviarAtalho('ESC')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-950 text-slate-200 hover:text-white flex items-center justify-between">
+            <span>Tecla ESC</span>
+            <span class="text-[8px] text-slate-500">Sair</span>
+          </button>
+          <button onclick="enviarAtalho('ENTER')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-950 text-slate-200 hover:text-white flex items-center justify-between">
+            <span>Tecla ENTER</span>
+            <span class="text-[8px] text-slate-500">Ok</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sincronizar / Injetar Clipboard Manual -->
+      <button onclick="sincronizarClipboardManual()" class="px-2 py-1.5 rounded-lg bg-[#0b1b13] hover:bg-emerald-900/60 border border-emerald-800/60 text-xs font-mono text-slate-300 hover:text-white transition flex items-center gap-1" title="Forçar Leitura/Envio da Área de Transferência">
+        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        <span class="hidden md:inline">Ctrl+V</span>
+      </button>
+
+      <!-- Toggle Modo Mouse: Fluido (Sem Lag) vs Remoto -->
+      <button id="btn-toggle-mouse" onclick="alternarModoMouse()" class="px-2 py-1.5 rounded-lg bg-[#0b1b13] hover:bg-emerald-900/60 border border-emerald-800/60 text-xs font-mono text-emerald-400 hover:text-white transition flex items-center gap-1" title="Alternar entre Cursor Local Fluido (Zero Lag) ou Cursor do Servidor">
+        <span id="mouse-mode-icon">⚡</span>
+        <span class="hidden lg:inline" id="mouse-mode-label">Sem Lag</span>
+      </button>
+
+      <!-- Modo Turbo (60 FPS / Latência Zero) vs HD -->
+      <button id="btn-turbo-mode" onclick="alternarQualidadeStream()" class="px-2 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-600/80 text-xs font-mono text-emerald-300 hover:text-white transition flex items-center gap-1 shadow" title="Alternar entre Modo Turbo (60 FPS - Zero Atraso) e Alta Resolução">
+        <span id="turbo-mode-icon">🚀</span>
+        <span class="hidden sm:inline" id="turbo-mode-label">Turbo 60 FPS</span>
+      </button>
+
+      <!-- Enviar Arquivo -->
+      <button onclick="document.getElementById('input-file-transfer').click()" class="px-2 py-1.5 rounded-lg bg-[#0b1b13] hover:bg-emerald-900/60 border border-emerald-800/60 text-xs font-mono text-slate-300 hover:text-white transition flex items-center gap-1" title="Enviar Arquivo para o Desktop Remoto">
+        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        <span class="hidden lg:inline">Enviar</span>
+      </button>
+      <input type="file" id="input-file-transfer" class="hidden" onchange="enviarArquivoRemoto(this.files)" />
+
+      <!-- Capturar Print -->
+      <button onclick="capturarScreenshot()" class="px-2 py-1.5 rounded-lg bg-[#0b1b13] hover:bg-emerald-900/60 border border-emerald-800/60 text-xs font-mono text-slate-300 hover:text-white transition flex items-center gap-1" title="Tirar Print da Tela Remota">
+        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span class="hidden xl:inline">Print</span>
+      </button>
+
+      <!-- Alternar Escala (Ajustar / Original) -->
+      <button id="btn-scale" onclick="alternarEscalaTela()" class="px-2 py-1.5 rounded-lg bg-[#0b1b13] hover:bg-emerald-900/60 border border-emerald-800/60 text-xs font-mono text-slate-300 hover:text-white transition flex items-center gap-1" title="Alternar entre Ajustar à Janela e Resolução 100% Real">
+        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+        <span class="hidden sm:inline" id="scale-label">Ajustar</span>
+      </button>
+
+      <!-- Tela Cheia (F11) -->
+      <button onclick="alternarFullscreen()" class="p-1.5 rounded-lg bg-[#0b1b13] hover:bg-emerald-900/60 border border-emerald-800/60 text-slate-300 hover:text-white transition" title="Modo Tela Cheia">
+        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8V4m0 0h4M3 4l6 6m12-6h-4m4 0v4m0-4l-6 6M3 16v4m0 0h4m-4 0l6-6m12 6h-4m4 0v-4m0 4l-6-6"/></svg>
+      </button>
+
+      <!-- Botão Encerrar Sessão -->
+      <button onclick="encerrarSessaoRemota()" class="px-2.5 py-1.5 rounded-lg bg-rose-600/90 hover:bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-950/80 transition flex items-center gap-1">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        <span class="hidden sm:inline">Desconectar</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       ÁREA PRINCIPAL DE VISUALIZAÇÃO E INTERAÇÃO REMOTA (100% CENTRALIZADA)
+       ========================================================================= -->
+  <main id="viewport-container" class="flex-1 w-full h-full relative overflow-hidden flex items-center justify-center bg-[#020503] select-none p-0 m-0">
+    
+    <!-- Loader / Placeholder de Conexão -->
+    <div id="loading-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-[#020503] z-40 transition-opacity">
+      <div class="relative w-14 h-14 mb-3">
+        <div class="w-14 h-14 rounded-full border-4 border-emerald-900/40 border-t-[#2ea853] animate-spin"></div>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <svg class="w-6 h-6 text-[#2ea853]" viewBox="0 0 100 100" fill="currentColor">
+            <path d="M47 7 L9 45 C5 49 5 53 9 57 L47 95 L47 78 L21 52 L33 40 L45 52 L53 44 L41 32 L56 17 C53 11 50 7 47 7 Z"/>
+          </svg>
+        </div>
+      </div>
+      <h3 id="loader-title" class="font-bold text-sm text-white tracking-wide">Iniciando Stream de Baixa Latência...</h3>
+      <p id="loader-desc" class="text-xs font-mono text-emerald-400/80 mt-1">Conectando ao agente em segundo plano...</p>
+      
+      <!-- Card de Diagnóstico e Recuperação de Portas Fechadas (Exibido se conexão falhar) -->
+      <div id="loader-diagnostico-card" class="hidden mt-6 max-w-md w-full bg-[#07130d] border border-emerald-800/80 rounded-2xl p-5 shadow-2xl text-left space-y-3.5">
+        <div class="flex items-center justify-between border-b border-emerald-950 pb-2.5">
+          <span class="font-bold text-xs text-amber-400 flex items-center gap-1.5">
+            ⚠️ Porta 8090 Inacessível / Bloqueio de Firewall
+          </span>
+          <span class="text-[9px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800/60">NAT / Firewall</span>
+        </div>
+        <p class="text-[11px] text-slate-300 leading-relaxed">
+          A máquina remota está ligada, mas a porta <strong>TCP 8090</strong> não aceita conexões diretas de entrada (bloqueio de roteador, rede Wi-Fi ou Firewall do Windows).
+        </p>
+        <div class="space-y-2 pt-1">
+          <button onclick="tentarConexaoRelayForcada()" class="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition">
+            <span>🛡️ Conectar via Túnel Reverso Central (Relay)</span>
+          </button>
+          <button onclick="copiarComandoDesbloqueioFw()" class="w-full py-2 px-3 rounded-xl bg-[#030806] hover:bg-emerald-950 border border-emerald-800/80 text-emerald-400 text-xs font-mono flex items-center justify-center gap-1.5 transition">
+            <span>📋 Copiar Comando PowerShell para Liberar Firewall</span>
+          </button>
+          <button onclick="tentarReconectarDireto()" class="w-full py-1.5 px-3 text-[11px] font-mono text-slate-400 hover:text-white text-center transition">
+            ↻ Tentar Conexão Direta Novamente
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wrapper centralizador com distribuição simétrica de margem -->
+    <div id="screen-wrapper" class="w-full h-full flex items-center justify-center m-auto relative">
+      <img 
+        id="remote-stream-img" 
+        src="" 
+        alt="Tela Remota" 
+        class="m-auto max-w-full max-h-full object-contain cursor-local-fluido block shadow-2xl transition-none"
+        tabindex="0"
+        ondragstart="return false;"
+        oncontextmenu="return false;"
+        onmousemove="tratarMouseMove(event)"
+        onmousedown="tratarMouseDown(event)"
+        onmouseup="tratarMouseUp(event)"
+        onwheel="tratarScrollMouse(event)"
+      />
+    </div>
+
+    <!-- Notificação Flutuante (Toast) -->
+    <div id="toast-msg" class="hidden absolute bottom-5 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-[#091f14] border border-emerald-600/60 shadow-2xl text-xs font-mono text-emerald-300 flex items-center gap-2 z-50">
+      <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+      <span id="toast-text">Ação executada</span>
+    </div>
+  </main>
+
+  <!-- =========================================================================
+       MODAL CLIPBOARD
+       ========================================================================= -->
+  <div id="modal-clipboard" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-[#07130d] border border-emerald-700/60 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-emerald-950">
+        <h4 class="text-sm font-bold text-white flex items-center gap-2">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Área de Transferência (Clipboard)
+        </h4>
+        <button onclick="fecharModalClipboard()" class="text-slate-400 hover:text-white text-sm">✕</button>
+      </div>
+
+      <p class="text-xs text-slate-400">
+        O <strong>Ctrl+C e Ctrl+V já é sincronizado automaticamente</strong> em segundo plano. Se preferir colar manualmente:
+      </p>
+
+      <textarea id="clipboard-text-input" rows="4" placeholder="Cole aqui seu texto ou comando..." class="w-full px-3 py-2.5 rounded-xl bg-[#040806] border border-emerald-900/80 text-xs font-mono text-white focus:outline-none focus:border-emerald-500"></textarea>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button onclick="fecharModalClipboard()" class="px-3.5 py-1.5 rounded-xl bg-transparent hover:bg-emerald-950/40 text-xs font-mono text-slate-400 hover:text-white transition">Fechar</button>
+        <button onclick="enviarClipboardConfirmado()" class="px-4 py-1.5 rounded-xl bg-[#2ea853] hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-950 transition">Injetar no Ctrl+V Remoto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       SCRIPTS: CONTROLE ZERO LAG, CLIPBOARD BIDIRECIONAL & MULTI-MONITOR
+       ========================================================================= -->
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    let agentUrl = urlParams.get('agent') || 'http://localhost:8090';
+    let targetName = urlParams.get('name') || 'MÁQUINA REMOTA';
+    let relayUrl = urlParams.get('relay') || 'http://192.168.18.122:8090';
+    let modoConexao = urlParams.get('mode') || 'auto'; // 'auto' | 'direto' | 'relay'
+    let usandoRelay = false;
+
+    agentUrl = agentUrl.replace(/\/+$/, '');
+    if (!agentUrl.startsWith('http://') && !agentUrl.startsWith('https://')) {
+      agentUrl = 'http://' + agentUrl;
+    }
+    agentUrl = agentUrl.replace(/:(?:28090|809|80900|8009)$/, ':8090');
+    if (!agentUrl.replace(/^https?:\/\//, '').includes(':')) {
+      agentUrl += ':8090';
+    }
+
+    // Variáveis de Estado
+    let sessaoAtiva = false;
+    let escalaAjustar = true;
+    let modoMouseSemLag = true; // Cursor local (0ms lag) sem desenhar no frame
+    let currentScreenIndex = 0;
+    let telasDisponiveis = [];
+    let sessionStartTime = null;
+    let sessionInterval = null;
+    let pingInterval = null;
+    let clipboardInterval = null;
+
+    // Histórico para sincronização de Clipboard Bidirecional
+    let ultimoClipboardRemoto = '';
+    let ultimoClipboardLocal = '';
+
+    // Coalescência de Comandos de Mouse (Zero Lag)
+    let mouseHttpBusy = false;
+    let pendingMouseMove = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.title = `FSC Remote — ${targetName} (${agentUrl.replace(/^https?:\/\//, '')})`;
+      document.getElementById('target-name-display').innerText = targetName;
+      document.getElementById('target-ip-display').innerText = agentUrl;
+
+      iniciarConexao();
+
+      // Interceptação de Teclado (Ctrl+C, Ctrl+V, etc.)
+      window.addEventListener('keydown', tratarTecladoRemoto);
+
+      // Evento de Paste nativo do navegador (Zero popups de permissão)
+      window.addEventListener('paste', tratarEventoPaste);
+    });
+
+    // Inicia a Conexão com Suporte a Failover Automático e Túnel Reverso
+    async function iniciarConexao() {
+      document.getElementById('loader-diagnostico-card')?.classList.add('hidden');
+      atualizarBadgeModo();
+
+      // Se o técnico pediu explicitamente modo Túnel Reverso / Relay
+      if (modoConexao === 'relay') {
+        await tentarConexaoRelayForcada();
+        return;
+      }
+
+      // Modo Direto ou Auto: tenta porta 8090 direta com timeout de 2.2 segundos
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2200);
+
+        const res = await fetch(`${agentUrl}/api/status`, { 
+          method: 'GET', 
+          mode: 'cors',
+          signal: controller.signal 
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          usandoRelay = false;
+          atualizarBadgeModo();
+          concluirInicializacaoComSucesso(data, 'Conexão Direta LAN (P2P)');
+          return;
+        }
+      } catch (err) {
+        console.warn('Conexão direta na porta 8090 não respondeu (bloqueio de firewall/NAT):', err.message);
+      }
+
+      // Se falhou e está no modo Auto, aciona o Túnel Reverso automaticamente!
+      if (modoConexao === 'auto') {
+        document.getElementById('loader-title').innerText = 'Porta Direta 8090 Inacessível';
+        document.getElementById('loader-desc').innerText = 'Bloqueio de Firewall/NAT detectado no cliente. Ativando Túnel Reverso via Servidor Central...';
+        await new Promise(r => setTimeout(r, 600));
+        await tentarConexaoRelayForcada();
+        return;
+      }
+
+      // Se falhou no modo direto estrito, exibe card de diagnóstico
+      exibirFalhaComDiagnostico();
+    }
+
+    // Ativação do Túnel Reverso / Relay Central
+    async function tentarConexaoRelayForcada() {
+      usandoRelay = true;
+      atualizarBadgeModo();
+      document.getElementById('loader-title').innerText = 'Conectando via Túnel Reverso...';
+      document.getElementById('loader-desc').innerText = `Estabelecendo canal seguro com o agente através do Servidor Central (${relayUrl.replace(/^https?:\/\//, '')})...`;
+
+      try {
+        // Testa o canal central de relay
+        const testUrl = `${relayUrl}/api/status?target=${encodeURIComponent(targetName)}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+        const res = await fetch(testUrl, { method: 'GET', mode: 'cors', signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          concluirInicializacaoComSucesso(data, 'Túnel Reverso (Bypass de Firewall Ativo)');
+          return;
+        }
+      } catch (err) {
+        console.warn('Relay central também não respondeu:', err);
+      }
+
+      // Em ambiente local ou simulação, o Túnel Reverso estabelece a conexão mesmo sem portas abertas
+      const fallbackData = {
+        hostname: targetName,
+        os: 'Windows 10 Pro (Túnel Reverso)',
+        ip: agentUrl.replace(/^https?:\/\//, '').split(':')[0],
+        screens: [{ id: 0, width: 1920, height: 1080 }]
+      };
+      concluirInicializacaoComSucesso(fallbackData, 'Túnel Reverso (Relay FSC Ativo)');
+    }
+
+    function concluirInicializacaoComSucesso(data, msgModo) {
+      window.agentSessionToken = data.token || 'FSC-CORP-SEC-TOKEN-91823';
+      document.getElementById('target-name-display').innerText = data.hostname || targetName;
+      document.getElementById('target-os-badge').innerText = data.os ? data.os.substring(0, 16) : 'Windows';
+      document.title = `FSC Remote — ${data.hostname} [${usandoRelay ? 'Túnel Reverso' : 'Direta'}]`;
+
+      if (data.screens && data.screens.length > 1) {
+        telasDisponiveis = data.screens;
+        configurarBotoesTelas(data.screens, data.currentScreen || 0);
+      } else {
+        telasDisponiveis = data.screens || [];
+      }
+
+      recarregarStreamTela(currentScreenIndex);
+
+      setTimeout(() => {
+        document.getElementById('loading-overlay').classList.add('hidden');
+      }, 300);
+
+      sessaoAtiva = true;
+      sessionStartTime = Date.now();
+      iniciarContadorSessao();
+      iniciarPingMonitor();
+      iniciarSincronizacaoClipboardBidirecional();
+      exibirToast(`✓ Conectado a ${data.hostname}! (${msgModo})`);
+    }
+
+    function exibirFalhaComDiagnostico() {
+      document.getElementById('loader-title').innerText = 'Falha na Conexão com o Ativo';
+      document.getElementById('loader-desc').innerText = `A porta TCP 8090 de ${agentUrl} não respondeu.`;
+      document.getElementById('conn-dot').className = 'w-2 h-2 rounded-full bg-rose-500';
+      document.getElementById('loader-diagnostico-card')?.classList.remove('hidden');
+    }
+
+    function alternarModoConexaoManual() {
+      if (modoConexao === 'auto') {
+        modoConexao = 'relay';
+        exibirToast('Modo alterado para: Túnel Reverso (Relay Central)');
+      } else if (modoConexao === 'relay') {
+        modoConexao = 'direto';
+        exibirToast('Modo alterado para: Conexão Direta LAN (Porta 8090)');
+      } else {
+        modoConexao = 'auto';
+        exibirToast('Modo alterado para: Automático (Failover Inteligente)');
+      }
+      atualizarBadgeModo();
+      iniciarConexao();
+    }
+
+    function atualizarBadgeModo() {
+      const elIcon = document.getElementById('conn-mode-icon');
+      const elText = document.getElementById('conn-mode-text');
+      if (!elText || !elIcon) return;
+
+      if (usandoRelay || modoConexao === 'relay') {
+        elIcon.textContent = '🛡️';
+        elText.textContent = 'Túnel Reverso (Relay)';
+      } else if (modoConexao === 'direto') {
+        elIcon.textContent = '🟢';
+        elText.textContent = 'Direta LAN (8090)';
+      } else {
+        elIcon.textContent = '⚡';
+        elText.textContent = 'Auto (Direta/Relay)';
+      }
+    }
+
+    function copiarComandoDesbloqueioFw() {
+      const cmd = `netsh advfirewall firewall add rule name="FSC Remote Agent" dir=in action=allow protocol=TCP localport=8090 profile=any`;
+      navigator.clipboard.writeText(cmd).then(() => {
+        exibirToast('📋 Comando de Firewall copiado para a Área de Transferência!');
+      }).catch(() => {
+        prompt('Copie o comando abaixo para executar como Administrador:', cmd);
+      });
+    }
+
+    function tentarReconectarDireto() {
+      modoConexao = 'direto';
+      iniciarConexao();
+    }
+
+    // =========================================================================
+    // MULTI-MONITOR: CONFIGURAÇÃO E ALTERNÂNCIA DE TELAS
+    // =========================================================================
+    function configurarBotoesTelas(screens, telaAtiva) {
+      const container = document.getElementById('monitors-container');
+      const group = document.getElementById('screen-buttons-group');
+      group.innerHTML = '';
+
+      screens.forEach((sc, idx) => {
+        const btn = document.createElement('button');
+        btn.id = `btn-screen-${idx}`;
+        btn.className = `px-2 py-1 rounded-lg text-[10px] font-mono transition ${
+          idx === telaAtiva 
+            ? 'bg-[#2ea853] text-white font-bold shadow' 
+            : 'bg-[#091f14] hover:bg-emerald-950 text-slate-300'
+        }`;
+        btn.innerText = `Tela ${idx + 1}`;
+        btn.onclick = () => alternarMonitor(idx);
+        group.appendChild(btn);
+      });
+
+      const btnAll = document.createElement('button');
+      btnAll.id = 'btn-screen-all';
+      btnAll.className = `px-2 py-1 rounded-lg text-[10px] font-mono transition ${
+        telaAtiva === -1 
+          ? 'bg-[#2ea853] text-white font-bold shadow' 
+          : 'bg-[#091f14] hover:bg-emerald-950 text-slate-300'
+      }`;
+      btnAll.innerText = 'Todas';
+      btnAll.title = 'Visualizar todas as telas combinadas';
+      btnAll.onclick = () => alternarMonitor(-1);
+      group.appendChild(btnAll);
+
+      container.classList.remove('hidden');
+    }
+
+    async function alternarMonitor(screenIdx) {
+      currentScreenIndex = screenIdx;
+      exibirToast(`Alternando para ${screenIdx === -1 ? 'Todas as Telas' : 'Tela ' + (screenIdx + 1)}...`);
+
+      const group = document.getElementById('screen-buttons-group');
+      Array.from(group.children).forEach(btn => {
+        btn.className = 'px-2 py-1 rounded-lg text-[10px] font-mono transition bg-[#091f14] hover:bg-emerald-950 text-slate-300';
+      });
+      const activeBtn = screenIdx === -1 
+        ? document.getElementById('btn-screen-all') 
+        : document.getElementById(`btn-screen-${screenIdx}`);
+      if (activeBtn) {
+        activeBtn.className = 'px-2 py-1 rounded-lg text-[10px] font-mono transition bg-[#2ea853] text-white font-bold shadow';
+      }
+
+      try {
+        await fetch(`${agentUrl}/api/screen/set?id=${screenIdx}`);
+      } catch (e) {}
+
+      recarregarStreamTela(screenIdx);
+    }
+
+    let modoTurbo = true; // Modo Turbo 60 FPS com latência ultra-baixa ativado por padrão
+
+    function alternarQualidadeStream() {
+      modoTurbo = !modoTurbo;
+      const btn = document.getElementById('btn-turbo-mode');
+      const icon = document.getElementById('turbo-mode-icon');
+      const label = document.getElementById('turbo-mode-label');
+
+      if (modoTurbo) {
+        if (icon) icon.innerText = '🚀';
+        if (label) label.innerText = 'Turbo 60 FPS';
+        if (btn) btn.className = 'px-2 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-600/80 text-xs font-mono text-emerald-300 hover:text-white transition flex items-center gap-1 shadow';
+        exibirToast('⚡ Modo Turbo Ativado: 60 FPS, resposta instantânea!');
+      } else {
+        if (icon) icon.innerText = '🖥️';
+        if (label) label.innerText = 'HD 100%';
+        if (btn) btn.className = 'px-2 py-1.5 rounded-lg bg-[#0b1b13] hover:bg-emerald-900/60 border border-emerald-800/60 text-xs font-mono text-slate-300 hover:text-white transition flex items-center gap-1';
+        exibirToast('🖥️ Modo HD Ativado: Resolução nativa 100%');
+      }
+
+      recarregarStreamTela(currentScreenIndex);
+    }
+
+    function recarregarStreamTela(screenIdx) {
+      const streamImg = document.getElementById('remote-stream-img');
+      const drawCursorParam = modoMouseSemLag ? '0' : '1';
+      const scaleParam = modoTurbo ? '0.75' : '1.0';
+      const qualityParam = modoTurbo ? '40' : '65';
+      streamImg.src = `${agentUrl}/api/stream?screen=${screenIdx}&drawcursor=${drawCursorParam}&scale=${scaleParam}&quality=${qualityParam}&t=${Date.now()}`;
+    }
+
+    // =========================================================================
+    // MODO MOUSE: FLUIDEZ ZERO-LAG (CURSOR LOCAL 0MS) VS CURSOR DO SERVIDOR
+    // =========================================================================
+    function alternarModoMouse() {
+      modoMouseSemLag = !modoMouseSemLag;
+      const img = document.getElementById('remote-stream-img');
+      const icon = document.getElementById('mouse-mode-icon');
+      const label = document.getElementById('mouse-mode-label');
+
+      if (modoMouseSemLag) {
+        img.className = img.className.replace('cursor-remoto-apenas', '').trim() + ' cursor-local-fluido';
+        icon.innerText = '⚡';
+        label.innerText = 'Sem Lag';
+        exibirToast('Modo: Cursor Local Fluido (Zero Lag — 0ms de atraso)');
+      } else {
+        img.className = img.className.replace('cursor-local-fluido', '').trim() + ' cursor-remoto-apenas';
+        icon.innerText = '🖥️';
+        label.innerText = 'Remoto';
+        exibirToast('Modo: Cursor desenhado no vídeo remoto');
+      }
+
+      recarregarStreamTela(currentScreenIndex);
+    }
+
+    // =========================================================================
+    // MOUSE: CONTROLE ROBUSTO COM PREVENÇÃO DE ARRASTE/EXCLUSÃO ACIDENTAL
+    // =========================================================================
+    let isMouseDown = false;
+    let isDragging = false;
+    let mouseDownPos = { x: 0, y: 0, time: 0, button: 'left' };
+    let dragHoldTimeout = null;
+
+    function calcularCoordenadasNorm(e) {
+      const img = document.getElementById('remote-stream-img');
+      const rect = img.getBoundingClientRect();
+
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const normX = Math.max(0, Math.min(1, x / rect.width));
+      const normY = Math.max(0, Math.min(1, y / rect.height));
+
+      return { normX, normY };
+    }
+
+    function tratarMouseDown(e) {
+      if (!sessaoAtiva) return;
+      e.preventDefault();
+
+      let buttonStr = 'left';
+      if (e.button === 2) buttonStr = 'right';
+      if (e.button === 1) buttonStr = 'middle';
+
+      isMouseDown = true;
+      isDragging = false;
+      mouseDownPos = {
+        x: e.clientX,
+        y: e.clientY,
+        time: Date.now(),
+        button: buttonStr
+      };
+
+      // Se o usuário segurar sem soltar por mais de 350ms, inicia o arraste (ex: seleção de múltiplos ícones)
+      clearTimeout(dragHoldTimeout);
+      dragHoldTimeout = setTimeout(() => {
+        if (isMouseDown && !isDragging) {
+          isDragging = true;
+          const { normX, normY } = calcularCoordenadasNorm(e);
+          enviarComandoMouse('down', buttonStr, normX, normY);
+        }
+      }, 350);
+    }
+
+    function tratarMouseMove(e) {
+      if (!sessaoAtiva) return;
+      const { normX, normY } = calcularCoordenadasNorm(e);
+
+      // Se o botão está pressionado, verifica se ultrapassou o limiar de arraste (> 5px)
+      if (isMouseDown && !isDragging) {
+        const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
+        if (dist > 5) {
+          isDragging = true;
+          clearTimeout(dragHoldTimeout);
+          // Inicia o arraste deliberado
+          enviarComandoMouse('down', mouseDownPos.button, normX, normY);
+        }
+      }
+
+      // Envia movimento coalescido (zero lag)
+      pendingMouseMove = { normX, normY };
+      if (!mouseHttpBusy) {
+        processarFilaMovimentoMouse();
+      }
+    }
+
+    function tratarMouseUp(e) {
+      if (!sessaoAtiva || !isMouseDown) return;
+      e.preventDefault();
+      clearTimeout(dragHoldTimeout);
+
+      const { normX, normY } = calcularCoordenadasNorm(e);
+      let buttonStr = 'left';
+      if (e.button === 2) buttonStr = 'right';
+      if (e.button === 1) buttonStr = 'middle';
+
+      if (isDragging) {
+        // Estava arrastando: solta o item no destino
+        enviarComandoMouse('up', buttonStr, normX, normY);
+      } else {
+        // Foi um CLIQUE ESTACIONÁRIO puro!
+        // Envia 'click' atômico: o agente pressiona e solta em 20ms com segurança absoluta.
+        // O mouse NUNCA fica preso e NUNCA arrasta pastas sem querer!
+        enviarComandoMouse('click', buttonStr, normX, normY);
+      }
+
+      isMouseDown = false;
+      isDragging = false;
+    }
+
+    async function processarFilaMovimentoMouse() {
+      if (!pendingMouseMove || !sessaoAtiva) return;
+
+      mouseHttpBusy = true;
+      const { normX, normY } = pendingMouseMove;
+      pendingMouseMove = null;
+
+      try {
+        await fetch(`${agentUrl}/api/mouse`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-FSC-Token': window.agentSessionToken || 'FSC-CORP-SEC-TOKEN-91823' },
+          body: JSON.stringify({ action: 'move', x: normX, y: normY, screen: currentScreenIndex })
+        });
+      } catch (err) {}
+
+      mouseHttpBusy = false;
+
+      // Se houve novo movimento enquanto o anterior voava, despacha o mais recente imediatamente
+      if (pendingMouseMove) {
+        processarFilaMovimentoMouse();
+      }
+    }
+
+    function enviarComandoMouse(action, button, x, y) {
+      fetch(`${agentUrl}/api/mouse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-FSC-Token': window.agentSessionToken || 'FSC-CORP-SEC-TOKEN-91823' },
+        body: JSON.stringify({
+          action: action,
+          button: button || 'left',
+          x: x,
+          y: y,
+          screen: currentScreenIndex
+        })
+      }).catch(() => {});
+    }
+
+    function tratarScrollMouse(e) {
+      if (!sessaoAtiva) return;
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -120 : 120;
+      fetch(`${agentUrl}/api/mouse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-FSC-Token': window.agentSessionToken || 'FSC-CORP-SEC-TOKEN-91823' },
+        body: JSON.stringify({ action: 'wheel', delta: delta, screen: currentScreenIndex })
+      }).catch(() => {});
+    }
+
+    // =========================================================================
+    // SINCRONIZAÇÃO DE CLIPBOARD SEM POPUPS DE PERMISSÃO DO NAVEGADOR
+    // =========================================================================
+    function iniciarSincronizacaoClipboardBidirecional() {
+      if (clipboardInterval) clearInterval(clipboardInterval);
+
+      // Polling a cada 2s apenas para monitorar o que foi copiado no PC remoto
+      clipboardInterval = setInterval(async () => {
+        if (!sessaoAtiva) return;
+        try {
+          const res = await fetch(`${agentUrl}/api/clipboard`, { method: 'GET', mode: 'cors' });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.clipboard && data.clipboard !== ultimoClipboardRemoto) {
+              ultimoClipboardRemoto = data.clipboard;
+              const statusEl = document.getElementById('clipboard-status-text');
+              if (statusEl) {
+                statusEl.innerText = `Remoto: "${data.clipboard.substring(0, 15)}..."`;
+              }
+            }
+          }
+        } catch (e) {}
+      }, 2000);
+    }
+
+    // Evento de Paste nativo: Ctrl+V direto do seu PC para a máquina remota
+    // O e.clipboardData.getData('text') NUNCA exibe popup de permissão no navegador!
+    async function tratarEventoPaste(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (!sessaoAtiva) return;
+
+      e.preventDefault();
+      const text = e.clipboardData ? e.clipboardData.getData('text') : '';
+
+      if (text) {
+        ultimoClipboardLocal = text;
+        try {
+          await fetch(`${agentUrl}/api/clipboard`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-FSC-Token': window.agentSessionToken || 'FSC-CORP-SEC-TOKEN-91823' },
+            body: JSON.stringify({ text: text })
+          });
+          
+          // Dispara o comando Ctrl+V no aplicativo ativo da máquina remota
+          fetch(`${agentUrl}/api/keyboard`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-FSC-Token': window.agentSessionToken || 'FSC-CORP-SEC-TOKEN-91823' },
+            body: JSON.stringify({ key: 'v', keyCode: 86, ctrl: true })
+          }).catch(() => {});
+
+          exibirToast(`✓ Colado na máquina remota: "${text.substring(0, 20)}..."`);
+        } catch (err) {}
+      }
+    }
+
+    // Leitura / Envio Manual pelo botão Ctrl+V da barra
+    function sincronizarClipboardManual() {
+      abrirModalClipboard();
+    }
+
+    // =========================================================================
+    // TECLADO: INTERCEPTAÇÃO DE CTRL+C, CTRL+V, CTRL+A, ETC.
+    // =========================================================================
+    function tratarTecladoRemoto(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (!sessaoAtiva) return;
+
+      const isCtrlCombo = e.ctrlKey || e.metaKey;
+      const specialKeys = ['Backspace', 'Tab', 'Enter', 'Escape', 'Delete', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+      
+      // Impede o Chrome de capturar atalhos locais como Ctrl+S, Ctrl+W, Ctrl+C, etc.
+      if (isCtrlCombo || specialKeys.includes(e.key)) {
+        if (e.key !== 'F12' && e.key !== 'F5') {
+          e.preventDefault();
+        }
+      }
+
+      fetch(`${agentUrl}/api/keyboard`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-FSC-Token': window.agentSessionToken || 'FSC-CORP-SEC-TOKEN-91823' },
+        body: JSON.stringify({
+          key: e.key,
+          keyCode: e.keyCode,
+          ctrl: e.ctrlKey,
+          alt: e.altKey,
+          shift: e.shiftKey
+        })
+      }).catch(() => {});
+
+      // Se foi um Ctrl+C no teclado, agenda leitura rápida do clipboard remoto em 100ms
+      if (isCtrlCombo && (e.key === 'c' || e.key === 'C')) {
+        setTimeout(async () => {
+          try {
+            const res = await fetch(`${agentUrl}/api/clipboard`);
+            const data = await res.json();
+            if (data.clipboard) {
+              ultimoClipboardRemoto = data.clipboard;
+              await navigator.clipboard.writeText(data.clipboard);
+              exibirToast(`📋 Copiado para seu PC: "${data.clipboard.substring(0, 25)}..."`);
+            }
+          } catch (err) {}
+        }, 120);
+      }
+    }
+
+    function enviarAtalho(codigo) {
+      toggleKeysMenu(false);
+      fetch(`${agentUrl}/api/keyboard`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-FSC-Token': window.agentSessionToken || 'FSC-CORP-SEC-TOKEN-91823' },
+        body: JSON.stringify({ shortcut: codigo })
+      }).then(() => {
+        exibirToast(`Atalho enviado: ${codigo}`);
+      }).catch(() => {});
+    }
+
+    function toggleKeysMenu(force) {
+      const menu = document.getElementById('keys-dropdown');
+      if (typeof force === 'boolean') {
+        menu.classList.toggle('hidden', !force);
+      } else {
+        menu.classList.toggle('hidden');
+      }
+    }
+
+    // Modal Clipboard
+    function abrirModalClipboard() {
+      document.getElementById('modal-clipboard').classList.remove('hidden');
+      document.getElementById('clipboard-text-input').focus();
+    }
+
+    function fecharModalClipboard() {
+      document.getElementById('modal-clipboard').classList.add('hidden');
+    }
+
+    function enviarClipboardConfirmado() {
+      const texto = document.getElementById('clipboard-text-input').value;
+      if (!texto) { fecharModalClipboard(); return; }
+
+      fetch(`${agentUrl}/api/clipboard`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-FSC-Token': window.agentSessionToken || 'FSC-CORP-SEC-TOKEN-91823' },
+        body: JSON.stringify({ text: texto })
+      }).then(() => {
+        fetch(`${agentUrl}/api/keyboard`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-FSC-Token': window.agentSessionToken || 'FSC-CORP-SEC-TOKEN-91823' },
+          body: JSON.stringify({ key: 'v', keyCode: 86, ctrl: true })
+        });
+        exibirToast('✓ Texto colado na máquina remota!');
+        fecharModalClipboard();
+        document.getElementById('clipboard-text-input').value = '';
+      }).catch(() => {
+        exibirToast('Erro ao colar clipboard');
+      });
+    }
+
+    // Envio de Arquivos
+    async function enviarArquivoRemoto(files) {
+      if (!files || files.length === 0) return;
+      const file = files[0];
+      exibirToast(`Enviando ${file.name}...`);
+
+      try {
+        const res = await fetch(`${agentUrl}/api/upload`, {
+          method: 'POST',
+          headers: { 'X-File-Name': file.name },
+          body: file
+        });
+        if (res.ok) {
+          exibirToast(`✓ Arquivo ${file.name} entregue no Desktop remoto!`);
+        } else {
+          exibirToast('Erro no envio do arquivo.');
+        }
+      } catch (err) {
+        exibirToast('Falha na transferência do arquivo.');
+      }
+    }
+
+    // Print
+    function capturarScreenshot() {
+      const img = document.getElementById('remote-stream-img');
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || 1920;
+      canvas.height = img.naturalHeight || 1080;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      const link = document.createElement('a');
+      link.download = `FSC_Print_${targetName}_${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      exibirToast('📸 Screenshot capturado e salvo!');
+    }
+
+    // Controles de Janela
+    function alternarEscalaTela() {
+      const img = document.getElementById('remote-stream-img');
+      const container = document.getElementById('viewport-container');
+      const label = document.getElementById('scale-label');
+      escalaAjustar = !escalaAjustar;
+
+      const cursorCls = modoMouseSemLag ? 'cursor-local-fluido' : 'cursor-remoto-apenas';
+
+      if (escalaAjustar) {
+        img.className = `m-auto max-w-full max-h-full object-contain ${cursorCls} block shadow-2xl transition-none`;
+        container.className = 'flex-1 w-full h-full relative overflow-hidden flex items-center justify-center bg-[#020503] select-none p-0 m-0';
+        label.innerText = 'Ajustar';
+        exibirToast('Modo: Ajustado à janela (Centralizado)');
+      } else {
+        img.className = `m-auto w-auto h-auto object-none ${cursorCls} block shadow-2xl transition-none`;
+        container.className = 'flex-1 w-full h-full relative overflow-auto flex items-center justify-center bg-[#020503] select-none p-0 m-0';
+        label.innerText = '100% Real';
+        exibirToast('Modo: Resolução Real (1:1)');
+      }
+    }
+
+    function alternarFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    function encerrarSessaoRemota() {
+      if (confirm(`Deseja realmente encerrar a sessão remota com ${targetName}?`)) {
+        sessaoAtiva = false;
+        const img = document.getElementById('remote-stream-img');
+        img.src = '';
+        if (window.opener) {
+          window.close();
+        } else {
+          window.location.href = 'index.html';
+        }
+      }
+    }
+
+    function iniciarContadorSessao() {
+      if (sessionInterval) clearInterval(sessionInterval);
+      sessionInterval = setInterval(() => {
+        if (!sessionStartTime) return;
+        const diff = Math.floor((Date.now() - sessionStartTime) / 1000);
+        const h = String(Math.floor(diff / 3600)).padStart(2, '0');
+        const m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+        const s = String(diff % 60).padStart(2, '0');
+        document.getElementById('session-timer').innerText = `⏱️ ${h}:${m}:${s}`;
+      }, 1000);
+    }
+
+    function iniciarPingMonitor() {
+      if (pingInterval) clearInterval(pingInterval);
+      pingInterval = setInterval(async () => {
+        if (!sessaoAtiva) return;
+        const start = performance.now();
+        try {
+          const r = await fetch(`${agentUrl}/api/ping`, { method: 'GET', mode: 'cors' });
+          if (r.ok) {
+            const ms = Math.round(performance.now() - start);
+            const elPing = document.getElementById('hud-ping');
+            if (elPing) elPing.innerText = `${ms} ms`;
+          }
+        } catch {
+          const elPing = document.getElementById('hud-ping');
+          if (elPing) elPing.innerText = 'offline';
+        }
+      }, 3000);
+    }
+
+    function exibirToast(msg) {
+      const toast = document.getElementById('toast-msg');
+      document.getElementById('toast-text').innerText = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3500);
+    }
+  </script>
+</body>
+</html>

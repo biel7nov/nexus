@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="min-h-screen w-full bg-slate-950 overflow-x-hidden">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - NexusTI</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Three.js Local (Para Renderização Nativa 4K GPU sem Compressão ou Pixelização) -->
+  <script src="res/three.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background-color: #030712;
+      color: #f8fafc;
+      letter-spacing: -0.011em;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Canvas 4K Ultra HD GPU */
+    #canvas-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Glassmorphism Card Ultra Refinado */
+    .glass-login-card {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(36px);
+      -webkit-backdrop-filter: blur(36px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 
+        0 30px 70px -15px rgba(0, 0, 0, 0.8),
+        inset 0 1px 1px 0 rgba(255, 255, 255, 0.22);
+    }
+
+    /* Campos de Input em Vidro */
+    .glass-input {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .glass-input:focus {
+      background: rgba(255, 255, 255, 0.11);
+      border-color: rgba(255, 255, 255, 0.45);
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.12);
+      outline: none;
+    }
+    .glass-input::placeholder {
+      color: rgba(203, 213, 225, 0.6);
+    }
+
+    /* Botão Glass Pill */
+    .glass-btn-login {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      color: #ffffff;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .glass-btn-login:hover {
+      background: rgba(255, 255, 255, 0.16);
+      border-color: rgba(255, 255, 255, 0.5);
+      box-shadow: 0 8px 25px -4px rgba(255, 255, 255, 0.15);
+    }
+    .glass-btn-login:active {
+      transform: scale(0.98);
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    /* Efeito Ripple Tátil nos Botões */
+    button, [role="button"] {
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+    .btn-ripple {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.35);
+      transform: scale(0);
+      animation: ripple-anim 0.55s ease-out;
+      pointer-events: none;
+    }
+    @keyframes ripple-anim {
+      to {
+        transform: scale(4);
+        opacity: 0;
+      }
+    }
+
+    /* Modern Toast System */
+    #toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .modern-toast {
+      pointer-events: auto;
+      min-width: 290px;
+      max-width: 400px;
+      background: rgba(15, 23, 42, 0.95);
+      color: #ffffff;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.5);
+      border-radius: 14px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: toast-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      transition: all 0.28s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    @keyframes toast-in {
+      from { transform: translateX(110%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .toast-progress {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      background: #3b82f6;
+      animation: toast-bar 3.2s linear forwards;
+    }
+    @keyframes toast-bar {
+      from { width: 100%; }
+      to { width: 0%; }
+    }
+  </style>
+
+  <!-- Lucide Icons -->
+  <script src="res/lucide.min.js"></script>
+</head>
+<body class="min-h-screen w-full bg-slate-950 flex flex-col justify-center items-center lg:items-start lg:pl-20 xl:pl-36 relative overflow-x-hidden select-none p-4 sm:p-6">
+
+  <!-- ===================================================================== -->
+  <!-- 1. FUNDO CROMÁTICO & ESFERA 3D NATIVA 4K EM WEBGL (Zero Compressão) -->
+  <!-- ===================================================================== -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0 bg-slate-950">
+    
+    <!-- Luzes Cromáticas Refletivas e Aurora (Azul, Ciano, Violeta, Âmbar) -->
+    <div class="absolute -top-40 -left-40 w-[650px] h-[650px] bg-indigo-600/25 rounded-full blur-[130px] animate-pulse"></div>
+    <div class="absolute -bottom-40 -right-40 w-[700px] h-[700px] bg-blue-500/25 rounded-full blur-[140px] animate-pulse" style="animation-duration: 7s;"></div>
+    <div class="absolute top-1/2 left-1/4 -translate-y-1/2 w-[550px] h-[550px] bg-cyan-500/15 rounded-full blur-[130px]"></div>
+    <div class="absolute top-1/3 right-1/4 w-[450px] h-[450px] bg-purple-600/20 rounded-full blur-[120px]"></div>
+
+    <!-- Container do Canvas 4K WebGL Nativo -->
+    <div id="canvas-container"></div>
+
+    <!-- Texto Centralizado no Meio da Animação 3D -->
+    <div id="sphere-center-overlay" class="fixed pointer-events-none select-none z-[9] flex flex-col items-center justify-center text-center px-4 max-w-md transition-all duration-300" style="left: 65.5%; top: 50%; transform: translate(-50%, -50%);">
+      <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 text-[10px] sm:text-xs font-mono font-bold tracking-widest uppercase backdrop-blur-md mb-2 shadow-[0_0_20px_rgba(6,182,212,0.5)]">
+        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+        <span>NexusTI Enterprise</span>
+      </div>
+      <h2 class="text-3xl sm:text-4xl lg:text-5xl font-black tracking-wider text-white drop-shadow-[0_0_35px_rgba(59,130,246,1)] uppercase">
+        NEXUS TI
+      </h2>
+      <div class="h-0.5 w-24 bg-gradient-to-r from-transparent via-cyan-400 to-transparent my-2"></div>
+      <p class="text-xs sm:text-sm text-cyan-200 font-semibold tracking-wider drop-shadow-[0_0_15px_rgba(6,182,212,0.8)]">
+        Gestão de TI & Acesso Remoto
+      </p>
+    </div>
+
+    <!-- Vinheta e Camada de Profundidade Sutil -->
+    <div class="absolute inset-0 bg-radial from-transparent via-slate-950/20 to-slate-950/80 pointer-events-none z-[2]"></div>
+  </div>
+
+  <!-- Container de Toasts Flutuantes -->
+  <div id="toast-container"></div>
+
+  <!-- ===================================================================== -->
+  <!-- 2. CARD CENTRAL GLASSMORPHISM (Exatamente conforme referência visual) -->
+  <!-- ===================================================================== -->
+  <main class="relative z-10 w-[92%] sm:w-full max-w-[420px] mx-auto lg:mx-0 my-auto">
+    <div class="glass-login-card rounded-[28px] sm:rounded-[32px] p-6 sm:p-9 text-white">
+
+      <!-- Cabeçalho do Card: Login & Welcome back to NexusTI -->
+      <div class="mb-7">
+        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+          Login
+        </h1>
+        <p class="text-sm font-medium text-slate-300 mt-1">
+          Welcome back to NexusTI
+        </p>
+      </div>
+
+      <!-- Formulário de Autenticação -->
+      <form id="loginForm" onsubmit="realizarLogin(event)" class="space-y-4">
+        
+        <!-- Campo: User Name / Usuário -->
+        <div class="relative">
+          <input 
+            type="text" 
+            id="usernameInput" 
+            required 
+            placeholder="User Name" 
+            autocomplete="username"
+            value="gabriel@empresa.com"
+            class="glass-input w-full rounded-2xl px-5 pr-12 py-3.5 text-sm font-medium placeholder-slate-400/80"
+          >
+          <div class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none">
+            <i data-lucide="user" class="w-5 h-5"></i>
+          </div>
+        </div>
+
+        <!-- Campo: Password / Senha -->
+        <div class="relative">
+          <input 
+            type="password" 
+            id="passwordInput" 
+            required 
+            placeholder="Password" 
+            autocomplete="current-password"
+            value="admin1234"
+            class="glass-input w-full rounded-2xl px-5 pr-12 py-3.5 text-sm font-medium placeholder-slate-400/80"
+          >
+          <button 
+            type="button" 
+            id="btnToggleSenha"
+            onclick="alternarVisibilidadeSenha()" 
+            class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-white transition-colors focus:outline-none p-1 rounded-lg"
+            title="Alternar visibilidade da senha"
+          >
+            <i id="eyeIcon" data-lucide="eye-off" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Linha de Opções: Remember me & Esqueceu a senha -->
+        <div class="flex items-center justify-between gap-2 pt-1 pb-2 text-xs">
+          <label class="flex items-center gap-2 cursor-pointer select-none group">
+            <input 
+              type="checkbox" 
+              id="rememberMe" 
+              checked
+              class="w-4 h-4 rounded border-white/20 bg-white/10 text-blue-500 focus:ring-0 focus:ring-offset-0 cursor-pointer accent-blue-500"
+            >
+            <span class="text-slate-300 group-hover:text-white transition-colors">Remember me</span>
+          </label>
+
+          <button 
+            type="button" 
+            onclick="abrirModalRecuperacao()" 
+            class="text-slate-400 hover:text-white transition-colors focus:outline-none"
+          >
+            Esqueceu a senha?
+          </button>
+        </div>
+
+        <!-- Botão Principal: Login -->
+        <button 
+          type="submit" 
+          id="btnLogin"
+          class="glass-btn-login w-full rounded-2xl py-3.5 text-sm sm:text-base font-semibold tracking-wide flex items-center justify-center gap-2 mt-2"
+        >
+          <span id="btnText">Login</span>
+          <i id="btnSpinner" data-lucide="loader-2" class="w-4 h-4 animate-spin hidden"></i>
+        </button>
+
+        <!-- Atalho Rápido para Demonstração (Facilidade para Testes TI) -->
+        <div class="pt-3 flex flex-col items-center gap-2 border-t border-white/10 mt-5">
+          <button 
+            type="button" 
+            onclick="preencherDadosDemo()" 
+            class="text-[11px] font-medium text-slate-400 hover:text-white py-1 px-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center gap-1.5"
+          >
+            <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+            <span>Preencher Demonstração (Admin TI)</span>
+          </button>
+          
+          <div class="text-[10px] text-slate-500 font-mono tracking-tight">
+            NexusTI Enterprise • Conexão Segura
+          </div>
+        </div>
+
+      </form>
+
+    </div>
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- 3. MODAL DE RECUPERAÇÃO DE SENHA -->
+  <!-- ===================================================================== -->
+  <div id="modalRecuperacao" onclick="if(event.target===this) fecharModalRecuperacao()" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md hidden transition-opacity duration-200 opacity-0">
+    <div class="glass-login-card rounded-[28px] max-w-sm w-full p-6 text-white space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <div class="flex items-center gap-2">
+          <i data-lucide="key-round" class="w-4 h-4 text-blue-400"></i>
+          <h3 class="text-sm font-bold text-white">Recuperação de Acesso</h3>
+        </div>
+        <button onclick="fecharModalRecuperacao()" class="text-slate-400 hover:text-white transition-colors">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      
+      <p class="text-xs text-slate-300 leading-relaxed">
+        Informe seu e-mail institucional ou usuário de rede corporativa para receber as instruções de redefinição de credencial.
+      </p>
+
+      <form onsubmit="solicitarRecuperacao(event)" class="space-y-3">
+        <input 
+          type="text" 
+          id="recuperaEmail" 
+          required 
+          placeholder="seu.email@empresa.com"
+          class="glass-input w-full rounded-xl px-4 py-2.5 text-xs placeholder-slate-400/80"
+        >
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button 
+            type="button" 
+            onclick="fecharModalRecuperacao()" 
+            class="px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+          >
+            Cancelar
+          </button>
+          <button 
+            type="submit" 
+            class="glass-btn-login px-4 py-2 rounded-xl text-xs font-semibold"
+          >
+            Enviar Instruções
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- 4. RENDERIZADOR 4K GPU THREE.JS (PARTÍCULAS CRISTALINAS EM ALTA DEFINIÇÃO) -->
+  <!-- ===================================================================== -->
+  <script>
+    // Inicialização do Canvas WebGL 4K Nativo
+    function init4KParticleSphere() {
+      const container = document.getElementById('canvas-container');
+      if (!container || typeof THREE === 'undefined') return;
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.z = 9.2;
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      // Suporte a resolução 4K real conforme densidade de pixels do monitor (Retina/4K)
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+      container.appendChild(renderer.domElement);
+
+      // 110.000 pontos em distribuição Fibonacci esférica uniforme
+      const count = 110000;
+      const positions = new Float32Array(count * 3);
+      const normals = new Float32Array(count * 3);
+      const phi = Math.PI * (3 - Math.sqrt(5));
+
+      for (let i = 0; i < count; i++) {
+        const y = 1 - (i / (count - 1)) * 2;
+        const radius = Math.sqrt(1 - y * y);
+        const theta = phi * i;
+        const x = Math.cos(theta) * radius;
+        const z = Math.sin(theta) * radius;
+
+        normals[i * 3] = x;
+        normals[i * 3 + 1] = y;
+        normals[i * 3 + 2] = z;
+
+        positions[i * 3] = x * 2.85;
+        positions[i * 3 + 1] = y * 2.85;
+        positions[i * 3 + 2] = z * 2.85;
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('aBaseNormal', new THREE.BufferAttribute(normals, 3));
+
+      // Vertex Shader: Simplex Noise 3D Orgânico em tempo real no hardware
+      const vertexShader = `
+        uniform float uTime;
+        uniform float uNoiseFreq;
+        uniform float uNoiseAmp;
+        uniform vec3 uLightPos;
+        attribute vec3 aBaseNormal;
+        varying float vIntensity;
+
+        vec4 permute(vec4 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+        vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+        float snoise(vec3 v){
+          const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+          const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+          vec3 i  = floor(v + dot(v, C.yyy));
+          vec3 x0 = v - i + dot(i, C.xxx);
+          vec3 g = step(x0.yzx, x0.xyz);
+          vec3 l = 1.0 - g;
+          vec3 i1 = min(g.xyz, l.zxy);
+          vec3 i2 = max(g.xyz, l.zxy);
+          vec3 x1 = x0 - i1 + 1.0 * C.xxx;
+          vec3 x2 = x0 - i2 + 2.0 * C.xxx;
+          vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
+          i = mod(i, 289.0);
+          vec4 p = permute(permute(permute(
+                    i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                  + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                  + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+          float n_ = 0.142857142857;
+          vec3 ns = n_ * D.wyz - D.xzx;
+          vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+          vec4 x_ = floor(j * ns.z);
+          vec4 y_ = floor(j - 7.0 * x_);
+          vec4 x = x_ *ns.x + ns.yyyy;
+          vec4 y = y_ *ns.x + ns.yyyy;
+          vec4 h = 1.0 - abs(x) - abs(y);
+          vec4 b0 = vec4(x.xy, y.xy);
+          vec4 b1 = vec4(x.zw, y.zw);
+          vec4 s0 = floor(b0)*2.0 + 1.0;
+          vec4 s1 = floor(b1)*2.0 + 1.0;
+          vec4 sh = -step(h, vec4(0.0));
+          vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+          vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+          vec3 p0 = vec3(a0.xy, h.x);
+          vec3 p1 = vec3(a0.zw, h.y);
+          vec3 p2 = vec3(a1.xy, h.z);
+          vec3 p3 = vec3(a1.zw, h.w);
+          vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+          p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+          vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+          m = m * m;
+          return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+        }
+
+        void main() {
+          vec3 n = normalize(aBaseNormal);
+          float noise1 = snoise(n * uNoiseFreq + vec3(0.0, uTime * 0.16, uTime * 0.10));
+          float noise2 = snoise(n * (uNoiseFreq * 2.1) - vec3(uTime * 0.12, 0.0, uTime * 0.14)) * 0.35;
+          float totalNoise = noise1 + noise2;
+
+          float radius = 2.75 + totalNoise * uNoiseAmp;
+          vec3 newPos = n * radius;
+
+          // Cálculo de iluminação com realce especular e sombra profunda
+          vec3 lightDir = normalize(uLightPos);
+          vec3 worldNorm = normalize((modelMatrix * vec4(n, 0.0)).xyz);
+          float diff = max(dot(worldNorm, lightDir), 0.0);
+          
+          vec3 viewDir = normalize(- (modelViewMatrix * vec4(newPos, 1.0)).xyz);
+          vec3 halfVector = normalize(lightDir + viewDir);
+          float spec = pow(max(dot(worldNorm, halfVector), 0.0), 12.0) * 0.7;
+          
+          vIntensity = clamp(diff * 0.85 + spec + 0.06, 0.03, 1.0);
+          
+          vec4 mvPos = modelViewMatrix * vec4(newPos, 1.0);
+          gl_Position = projectionMatrix * mvPos;
+          // Partículas microscópicas ultra nítidas (sem borrão ou pixelização)
+          gl_PointSize = (1.55 / -mvPos.z) * 11.5;
+        }
+      `;
+
+      // Fragment Shader: Partículas circulares anti-serrilhadas em 4K
+      const fragmentShader = `
+        varying float vIntensity;
+        void main() {
+          vec2 c = gl_PointCoord - vec2(0.5);
+          float d = length(c);
+          if (d > 0.5) discard;
+          float alpha = smoothstep(0.5, 0.25, d);
+          vec3 shadowCol = vec3(0.12, 0.18, 0.30);
+          vec3 lightCol = vec3(1.0, 1.0, 1.0);
+          vec3 col = mix(shadowCol, lightCol, pow(vIntensity, 1.3));
+          gl_FragColor = vec4(col, alpha * (0.3 + vIntensity * 0.7));
+        }
+      `;
+
+      const material = new THREE.ShaderMaterial({
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader,
+        uniforms: {
+          uTime: { value: 0 },
+          uNoiseFreq: { value: 1.15 },
+          uNoiseAmp: { value: 0.65 },
+          uLightPos: { value: new THREE.Vector3(1.6, 1.9, 2.2) }
+        },
+        transparent: true,
+        blending: THREE.NormalBlending,
+        depthTest: true,
+        depthWrite: false
+      });
+
+      const points = new THREE.Points(geometry, material);
+      scene.add(points);
+
+      // Posicionamento e escala dinâmica da esfera 3D e do texto central
+      const overlayEl = document.getElementById('sphere-center-overlay');
+
+      function updateSpherePosition() {
+        if (window.innerWidth >= 1024) {
+          // No desktop, a esfera fica na metade direita com escala ampla
+          points.position.x = 2.05;
+          points.scale.set(1.35, 1.35, 1.35);
+          if (overlayEl) {
+            overlayEl.style.display = 'flex';
+            overlayEl.style.left = '65.5%';
+            overlayEl.style.top = '50%';
+            overlayEl.style.transform = 'translate(-50%, -50%) scale(1)';
+            overlayEl.style.opacity = '1';
+          }
+        } else {
+          // No mobile ou janelas menores, a esfera e o texto ficam centralizados
+          points.position.x = 0;
+          points.scale.set(0.95, 0.95, 0.95);
+          if (overlayEl) {
+            overlayEl.style.display = 'flex';
+            overlayEl.style.left = '50%';
+            overlayEl.style.top = '15%';
+            overlayEl.style.transform = 'translate(-50%, -50%) scale(0.85)';
+            overlayEl.style.opacity = '1';
+          }
+        }
+      }
+
+      updateSpherePosition();
+      window.addEventListener('resize', updateSpherePosition);
+
+
+      // Suporte sutil à interação de mouse com amortecimento
+      let mouseX = 0, mouseY = 0;
+      let targetRotX = 0, targetRotY = 0;
+      window.addEventListener('mousemove', (e) => {
+        mouseX = (e.clientX / window.innerWidth - 0.5) * 0.4;
+        mouseY = (e.clientY / window.innerHeight - 0.5) * 0.4;
+      });
+
+      const clock = new THREE.Clock();
+      function animate() {
+        requestAnimationFrame(animate);
+        const elapsed = clock.getElapsedTime();
+        material.uniforms.uTime.value = elapsed;
+
+        targetRotY = elapsed * 0.07 + mouseX;
+        targetRotX = elapsed * 0.035 + mouseY;
+
+        points.rotation.y += (targetRotY - points.rotation.y) * 0.05;
+        points.rotation.x += (targetRotX - points.rotation.x) * 0.05;
+
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        updateSpherePosition();
+      });
+    }
+
+    // Inicializar renderização 3D quando o DOM estiver pronto
+    document.addEventListener("DOMContentLoaded", () => {
+      init4KParticleSphere();
+    });
+  </script>
+
+  <!-- ===================================================================== -->
+  <!-- 5. LÓGICA DE LOGIN & INTERAÇÃO -->
+  <!-- ===================================================================== -->
+  <script>
+    // Inicializar ícones Lucide
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+
+    // Verificar se já há sessão salva
+        // Garantir que a conta Admin gabriel@empresa.com com senha admin1234 esteja sempre presente e ativa
+    function garantirContaAdmin() {
+      try {
+        let usuarios = [];
+        const saved = localStorage.getItem("fsc_kintsugi_usuarios_ti");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) usuarios = parsed;
+        }
+
+        const adminIndex = usuarios.findIndex(u => 
+          (u.email && u.email.toLowerCase() === "gabriel@empresa.com") ||
+          (u.email && u.email.toLowerCase() === "gabriel.novaes@empresa.com") ||
+          (u.nome && u.nome.toLowerCase().includes("gabriel"))
+        );
+
+        const adminData = {
+          nome: "Gabriel Novaes",
+          email: "gabriel@empresa.com",
+          cargo: "Administrador de TI",
+          permissao: "Administrador da Empresa",
+          status: "Ativo",
+          telefone: "(11) 98765-4321",
+          senha: "admin1234",
+          empresaPermitida: "todas",
+          permissoes: {
+            editarEmpresa: true,
+            editarSetores: true,
+            gerenciarUsuarios: true,
+            acessoRemoto: true,
+            supervisionarChamados: true,
+            visualizarBi: true
+          }
+        };
+
+        if (adminIndex >= 0) {
+          usuarios[adminIndex] = { ...usuarios[adminIndex], ...adminData };
+        } else {
+          usuarios.unshift(adminData);
+        }
+
+        localStorage.setItem("fsc_kintsugi_usuarios_ti", JSON.stringify(usuarios));
+      } catch (err) {
+        console.warn("Erro ao inicializar admin:", err);
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      garantirContaAdmin();
+      const session = localStorage.getItem("fsc_auth_session") || sessionStorage.getItem("fsc_auth_session");
+      if (session) {
+        try {
+          const authData = JSON.parse(session);
+          if (authData.usuario && document.getElementById("usernameInput")) {
+            document.getElementById("usernameInput").value = authData.usuario;
+          }
+        } catch (e) {}
+      }
+    });
+
+    // Alternar visibilidade da senha (eye / eye-off)
+    function alternarVisibilidadeSenha() {
+      const passwordInput = document.getElementById("passwordInput");
+      const btn = document.getElementById("btnToggleSenha");
+      if (!passwordInput) return;
+
+      if (passwordInput.type === "password") {
+        passwordInput.type = "text";
+        if (btn) btn.innerHTML = '<i data-lucide="eye" class="w-5 h-5"></i>';
+      } else {
+        passwordInput.type = "password";
+        if (btn) btn.innerHTML = '<i data-lucide="eye-off" class="w-5 h-5"></i>';
+      }
+      if (window.lucide && lucide.createIcons) lucide.createIcons();
+    }
+
+    // Preencher dados rápidos para demonstração
+    function preencherDadosDemo() {
+      document.getElementById("usernameInput").value = "gabriel@empresa.com";
+      document.getElementById("passwordInput").value = "admin1234";
+      document.getElementById("rememberMe").checked = true;
+      mostrarToast("Credenciais preenchidas para demonstração!", "sucesso", "Acesso Rápido");
+    }
+
+    // Realizar Login validando dinamicamente contra a equipe cadastrada em Configurações
+    function realizarLogin(e) {
+      e.preventDefault();
+      
+      const inputUser = document.getElementById("usernameInput").value.trim();
+      const inputPass = document.getElementById("passwordInput").value;
+      const remember = document.getElementById("rememberMe").checked;
+      const btn = document.getElementById("btnLogin");
+      const btnText = document.getElementById("btnText");
+      const btnSpinner = document.getElementById("btnSpinner");
+
+      if (!inputUser || !inputPass) {
+        mostrarToast("Preencha o usuário e a senha.", "erro", "Autenticação");
+        return;
+      }
+
+      // Carregar lista de usuários cadastrados na console (fsc_kintsugi_usuarios_ti)
+      let usuarios = [];
+      try {
+        const saved = localStorage.getItem("fsc_kintsugi_usuarios_ti");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) usuarios = parsed;
+        }
+      } catch (err) {
+        console.warn("Erro ao ler usuários locais:", err);
+      }
+
+      // Se não houver usuários no localStorage, usar defaults
+      if (usuarios.length === 0) {
+        usuarios = [
+          {
+            nome: "Gabriel Novaes",
+            email: "gabriel@empresa.com",
+            cargo: "Coordenador de TI & Admin",
+            permissao: "Administrador",
+            status: "Ativo",
+            senha: "admin1234"
+          },
+          {
+            nome: "Mariana Santos",
+            email: "mariana.santos@empresa.com",
+            cargo: "Analista de Suporte N2",
+            permissao: "Suporte N2",
+            status: "Ativo",
+            senha: "123456"
+          }
+        ];
+        localStorage.setItem("fsc_kintsugi_usuarios_ti", JSON.stringify(usuarios));
+      }
+
+      const searchNorm = inputUser.toLowerCase();
+
+      // Procurar usuário por E-mail, Nome Completo ou Username (antes do @)
+      const userFound = usuarios.find(u => {
+        const emailNorm = (u.email || "").toLowerCase();
+        const nomeNorm = (u.nome || "").toLowerCase();
+        const usernameOnly = emailNorm.includes("@") ? emailNorm.split("@")[0] : "";
+        return emailNorm === searchNorm || nomeNorm === searchNorm || usernameOnly === searchNorm;
+      });
+
+      if (!userFound) {
+        mostrarToast("Usuário não encontrado. Cadastre-o na aba de Configurações.", "erro", "Credenciais Inválidas");
+        return;
+      }
+
+      // Verificar status da conta
+      if (userFound.status === "Inativo") {
+        mostrarToast("Esta conta de usuário está inativa. Contate o administrador de TI.", "erro", "Acesso Bloqueado");
+        return;
+      }
+
+      // Verificar senha cadastrada (senha padrão 123456 se não definida)
+      const senhaCorreta = userFound.senha || "123456";
+      if (inputPass !== senhaCorreta) {
+        mostrarToast("Senha incorreta. Verifique os dados digitados.", "erro", "Falha de Autenticação");
+        return;
+      }
+
+      // Feedback visual e login efetuado com sucesso!
+      btn.disabled = true;
+      btnText.textContent = "Autenticando...";
+      btnSpinner.classList.remove("hidden");
+
+      setTimeout(() => {
+        // Gravar sessão com os dados reais do usuário encontrado
+                const authPayload = {
+          usuario: userFound.nome,
+          email: userFound.email,
+          cargo: userFound.cargo || "Técnico de TI",
+          permissao: userFound.permissao || "Suporte",
+          loginEm: new Date().toISOString(),
+          nivel: (userFound.permissao === "Administrador" || userFound.permissao === "Administrador da Empresa") ? "SuperAdmin" : userFound.permissao,
+          empresaPermitida: userFound.empresaPermitida || "todas",
+          permissoes: userFound.permissoes || {
+            editarEmpresa: userFound.permissao === "Administrador" || userFound.permissao === "Administrador da Empresa",
+            editarSetores: userFound.permissao === "Administrador" || userFound.permissao === "Administrador da Empresa" || userFound.permissao === "Gerente de TI",
+            gerenciarUsuarios: userFound.permissao === "Administrador" || userFound.permissao === "Administrador da Empresa",
+            acessoRemoto: userFound.permissao !== "Apenas Consulta",
+            supervisionarChamados: userFound.permissao === "Administrador" || userFound.permissao === "Administrador da Empresa" || userFound.permissao === "Gerente de TI",
+            visualizarBi: true
+          }
+        };
+
+        if (remember) {
+          localStorage.setItem("fsc_auth_session", JSON.stringify(authPayload));
+        } else {
+          sessionStorage.setItem("fsc_auth_session", JSON.stringify(authPayload));
+        }
+
+        mostrarToast(`Bem-vindo de volta, ${userFound.nome}!`, "sucesso", "Acesso Autorizado");
+
+        setTimeout(() => {
+          window.location.href = "index.html";
+        }, 600);
+      }, 700);
+    }
+
+    // Sistema de Toasts Modernos
+    function mostrarToast(mensagem, tipo = 'info', titulo = 'Notificação') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      toast.className = 'modern-toast';
+
+      let iconHtml = '<i data-lucide="info" class="w-5 h-5 text-blue-400"></i>';
+      if (tipo === 'sucesso') {
+        iconHtml = '<i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400"></i>';
+      } else if (tipo === 'erro') {
+        iconHtml = '<i data-lucide="alert-circle" class="w-5 h-5 text-rose-400"></i>';
+      }
+
+      toast.innerHTML = `
+        <div class="shrink-0">${iconHtml}</div>
+        <div class="flex-1 min-w-0 pr-2">
+          <div class="text-xs font-bold leading-tight text-white">${titulo}</div>
+          <div class="text-[11px] text-slate-300 leading-snug mt-0.5 truncate">${mensagem}</div>
+        </div>
+        <div class="toast-progress"></div>
+      `;
+
+      container.appendChild(toast);
+      if (window.lucide) lucide.createIcons();
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(60px)';
+        setTimeout(() => toast.remove(), 280);
+      }, 3200);
+    }
+
+    // Modal de Recuperação de Senha
+    function abrirModalRecuperacao() {
+      const modal = document.getElementById("modalRecuperacao");
+      modal.classList.remove("hidden");
+      setTimeout(() => {
+        modal.classList.remove("opacity-0");
+        document.getElementById("recuperaEmail").focus();
+      }, 10);
+    }
+
+    function fecharModalRecuperacao() {
+      const modal = document.getElementById("modalRecuperacao");
+      modal.classList.add("opacity-0");
+      setTimeout(() => modal.classList.add("hidden"), 200);
+    }
+
+    function solicitarRecuperacao(e) {
+      e.preventDefault();
+      const email = document.getElementById("recuperaEmail").value.trim();
+      fecharModalRecuperacao();
+      mostrarToast(`Instruções de redefinição enviadas para ${email}`, "sucesso", "Recuperação de Senha");
+    }
+
+    // Feedback de clique tátil
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest('button, [role="button"]');
+      if (!btn) return;
+      const icon = btn.querySelector('[data-lucide="refresh-cw"], svg.lucide-refresh-cw');
+      if (icon) {
+        icon.classList.add('animate-spin');
+        setTimeout(() => icon.classList.remove('animate-spin'), 850);
+      }
+    });
+  </script>
+</body>
+</html>

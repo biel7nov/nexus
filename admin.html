@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-[#08090c]">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexus Master Admin — Gestão de Licenças & Tenants</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="res/lucide.min.js"></script>
+  <script>
+    if (typeof lucide === 'undefined') {
+      document.write('<script src="https://unpkg.com/lucide@latest"><\/script>');
+    }
+  </script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background-color: #08090c;
+      color: #f4f4f5;
+      letter-spacing: -0.011em;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Scrollbars Minimalistas */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #08090c;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    /* Utilitários de Superfície */
+    .surface-card {
+      background-color: #0d0f14;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .surface-well {
+      background-color: #090b0f;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .surface-border {
+      border-color: rgba(255, 255, 255, 0.06);
+    }
+
+    /* Toasts Minimalistas */
+    #toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .toast-item {
+      pointer-events: auto;
+      background: #101217;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: #f4f4f5;
+      animation: slideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slideIn {
+      from { transform: translateY(12px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="h-full w-full flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- ========================================================================= -->
+  <!-- TOP NAVIGATION BAR -->
+  <!-- ========================================================================= -->
+  <header class="h-14 border-b border-white/[0.06] bg-[#090b0f]/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
+        <i data-lucide="shield-alert" class="w-4 h-4"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-semibold text-zinc-100 text-sm tracking-tight">FSC Master Licensing</h1>
+          <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">SUPERADMIN</span>
+        </div>
+        <p class="text-[10px] text-zinc-500 font-mono hidden sm:block">Painel de Gestão Central de Clientes, Contratos e Chaves Criptográficas</p>
+      </div>
+    </div>
+
+    <!-- Status da API Central & Ações -->
+    <div class="flex items-center gap-2.5">
+      <div class="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-md bg-white/[0.02] border border-white/[0.05] text-[11px] font-mono text-zinc-400">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>Licensing API: <strong class="text-emerald-400">Online</strong></span>
+        <span class="text-zinc-600">•</span>
+        <span class="text-zinc-500">v4.2.0 Core</span>
+      </div>
+
+      <button onclick="exportarBaseClientesJSON()" class="px-2.5 py-1 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] text-zinc-300 hover:text-white text-xs font-medium transition flex items-center gap-1.5" title="Exportar Todos os Clientes e Licenças">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+        <span class="hidden sm:inline">Exportar JSON</span>
+      </button>
+
+      <button onclick="abrirModalNovaLicenca()" class="px-3 py-1 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition flex items-center gap-1.5 shadow-xs shadow-indigo-600/30">
+        <i data-lucide="key" class="w-3.5 h-3.5"></i>
+        <span>+ Emitir Licença</span>
+      </button>
+
+      <a href="index.html" class="px-2.5 py-1 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] text-zinc-300 hover:text-white text-xs font-medium transition flex items-center gap-1.5" title="Abrir Console do Técnico">
+        <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+        <span class="hidden md:inline">Console Cliente</span>
+      </a>
+
+      <!-- Perfil SuperAdmin -->
+      <div class="flex items-center gap-2 pl-2 border-l border-white/[0.06]">
+        <div class="w-7 h-7 rounded-full bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 font-bold text-xs flex items-center justify-center">
+          GN
+        </div>
+        <div class="hidden lg:block text-left">
+          <div class="text-xs font-semibold text-zinc-200 leading-tight">Gabriel Novaes</div>
+          <div class="text-[10px] text-zinc-500 leading-tight">Software Vendor</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- MAIN WORKSPACE -->
+  <!-- ========================================================================= -->
+  <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl w-full mx-auto">
+
+    <!-- KPI MATRIX ROW -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      
+      <!-- MRR (Receita Recorrente Mensal) -->
+      <div class="surface-card p-4 rounded-xl flex flex-col justify-between space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Receita Mensal (MRR)</span>
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">+14.2%</span>
+        </div>
+        <div>
+          <div id="kpi-mrr-total" class="text-2xl font-bold font-mono text-zinc-100 tracking-tight">R$ 0,00</div>
+          <div class="text-[11px] text-zinc-500 font-mono mt-0.5" id="kpi-arr-total">ARR Est: R$ 0,00 / ano</div>
+        </div>
+        <div class="w-full h-[2px] rounded-full bg-white/[0.06] overflow-hidden">
+          <div class="h-full bg-emerald-400 rounded-full" style="width: 82%"></div>
+        </div>
+      </div>
+
+      <!-- Total de Clientes / Tenants -->
+      <div class="surface-card p-4 rounded-xl flex flex-col justify-between space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Clientes Ativos</span>
+          <span id="kpi-status-ratio" class="text-[10px] font-mono text-zinc-400">0/0 100%</span>
+        </div>
+        <div>
+          <div id="kpi-clientes-total" class="text-2xl font-bold font-mono text-zinc-100 tracking-tight">0</div>
+          <div class="text-[11px] text-zinc-500 mt-0.5" id="kpi-clientes-detalhe">Empresas adquirentes</div>
+        </div>
+        <div class="w-full h-[2px] rounded-full bg-white/[0.06] overflow-hidden">
+          <div id="kpi-bar-clientes" class="h-full bg-indigo-500 rounded-full" style="width: 90%"></div>
+        </div>
+      </div>
+
+      <!-- Endpoints / Máquinas sob Gestão -->
+      <div class="surface-card p-4 rounded-xl flex flex-col justify-between space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Nós Licenciados</span>
+          <span id="kpi-nos-ocupacao" class="text-[10px] font-mono text-indigo-400">0% ocupação</span>
+        </div>
+        <div>
+          <div id="kpi-nos-total" class="text-2xl font-bold font-mono text-zinc-100 tracking-tight">0 / 0</div>
+          <div class="text-[11px] text-zinc-500 mt-0.5" id="kpi-nos-sub">Estações ativas contratadas</div>
+        </div>
+        <div class="w-full h-[2px] rounded-full bg-white/[0.06] overflow-hidden">
+          <div id="kpi-bar-nos" class="h-full bg-indigo-400 rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Alertas de Renovação (<30 dias) -->
+      <div class="surface-card p-4 rounded-xl flex flex-col justify-between space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Renovações Próximas</span>
+          <span id="kpi-alerta-badge" class="px-1.5 py-0.5 rounded text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20">0 pendentes</span>
+        </div>
+        <div>
+          <div id="kpi-expirando-count" class="text-2xl font-bold font-mono text-amber-400 tracking-tight">0</div>
+          <div class="text-[11px] text-zinc-500 mt-0.5">Vencendo nos próximos 30 dias</div>
+        </div>
+        <div class="w-full h-[2px] rounded-full bg-white/[0.06] overflow-hidden">
+          <div id="kpi-bar-expirando" class="h-full bg-amber-400 rounded-full" style="width: 30%"></div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- FILTROS, BARRA DE BUSCA E CONTROLES DE TABELA -->
+    <!-- ======================================================================= -->
+    <section class="space-y-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <!-- Campo de Pesquisa em Tempo Real -->
+        <div class="relative flex-1 max-w-md">
+          <i data-lucide="search" class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+          <input 
+            type="text" 
+            id="input-busca-tenants" 
+            oninput="filtrarListaTenants()"
+            placeholder="Buscar por empresa, CNPJ, responsável, e-mail ou chave de ativação..."
+            class="w-full pl-9 pr-4 py-1.5 rounded-lg bg-[#0d0f14] border border-white/[0.08] text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50"
+          >
+        </div>
+
+        <!-- Filtros Rápidos de Status -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+          <button onclick="selecionarFiltroStatus('todos')" id="pill-status-todos" class="px-2.5 py-1 rounded-md text-[11px] font-medium transition bg-white/[0.08] text-white border border-white/[0.1]">
+            Todos (<span id="count-filtro-todos">0</span>)
+          </button>
+          <button onclick="selecionarFiltroStatus('ativo')" id="pill-status-ativo" class="px-2.5 py-1 rounded-md text-[11px] font-medium transition bg-white/[0.02] text-zinc-400 hover:text-zinc-200 border border-white/[0.05]">
+            Ativos (<span id="count-filtro-ativos">0</span>)
+          </button>
+          <button onclick="selecionarFiltroStatus('vencendo')" id="pill-status-vencendo" class="px-2.5 py-1 rounded-md text-[11px] font-medium transition bg-white/[0.02] text-zinc-400 hover:text-zinc-200 border border-white/[0.05]">
+            Vencendo (<span id="count-filtro-vencendo">0</span>)
+          </button>
+          <button onclick="selecionarFiltroStatus('bloqueado')" id="pill-status-bloqueado" class="px-2.5 py-1 rounded-md text-[11px] font-medium transition bg-white/[0.02] text-zinc-400 hover:text-zinc-200 border border-white/[0.05]">
+            Suspensos (<span id="count-filtro-suspensos">0</span>)
+          </button>
+          <button onclick="selecionarFiltroStatus('trial')" id="pill-status-trial" class="px-2.5 py-1 rounded-md text-[11px] font-medium transition bg-white/[0.02] text-zinc-400 hover:text-zinc-200 border border-white/[0.05]">
+            Trial (<span id="count-filtro-trial">0</span>)
+          </button>
+        </div>
+      </div>
+
+      <!-- TABELA PRINCIPAL DE TENANTS / CLIENTES ADQUIRENTES -->
+      <div class="surface-card rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-white/[0.06] bg-[#090b0f] text-zinc-400 font-medium uppercase tracking-wider text-[10px]">
+                <th class="px-4 py-3">Cliente / Razão Social</th>
+                <th class="px-4 py-3">Contato Principal</th>
+                <th class="px-4 py-3">Plano & Módulos</th>
+                <th class="px-4 py-3">Capacidade (Nós)</th>
+                <th class="px-4 py-3">Chave de Licença</th>
+                <th class="px-4 py-3">Vencimento / Ciclo</th>
+                <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-tenants-corpo" class="divide-y divide-white/[0.04]">
+              <!-- Preenchido dinamicamente via renderizarTabelaTenants() -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Rodapé da Tabela: Resumo -->
+        <div class="p-3 border-t border-white/[0.06] bg-[#090b0f] flex items-center justify-between text-[11px] text-zinc-500 font-mono">
+          <span id="tabela-tenants-resumo">Carregando clientes...</span>
+          <div class="flex items-center gap-3">
+            <button onclick="restaurarDadosDemo()" class="hover:text-zinc-300 transition underline cursor-pointer">Restaurar Clientes Padrão</button>
+            <span>•</span>
+            <button onclick="exportarBaseClientesCSV()" class="hover:text-zinc-300 transition underline cursor-pointer">Exportar CSV</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- AUDITORIA GLOBAL DE ATIVAÇÕES E EVENTOS DE LICENCIAMENTO -->
+    <!-- ======================================================================= -->
+    <section class="surface-card p-5 rounded-xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+        <div class="flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+            <i data-lucide="activity" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h2 class="text-sm font-semibold text-zinc-100">Log Global de Auditoria & Ativações</h2>
+            <p class="text-[11px] text-zinc-500">Histórico de validação de chaves, upgrades de limite, bloqueios e renovações</p>
+          </div>
+        </div>
+        <button onclick="limparLogsAuditoria()" class="px-2 py-1 rounded-md bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-[11px] font-mono transition">
+          Limpar Logs
+        </button>
+      </div>
+
+      <div class="space-y-2 max-h-56 overflow-y-auto pr-1 font-mono text-[11px]" id="lista-logs-auditoria">
+        <!-- Renderizado dinamicamente -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: EMITIR / CADASTRAR NOVA LICENÇA -->
+  <!-- ========================================================================= -->
+  <div id="modal-nova-licenca" onclick="if(event.target===this) fecharModalNovaLicenca()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+    <div class="surface-card rounded-2xl p-6 max-w-2xl w-full shadow-2xl border border-white/[0.08] space-y-5 max-h-[90vh] overflow-y-auto">
+      
+      <!-- Cabeçalho Modal -->
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center font-bold">
+            <i data-lucide="key" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-zinc-100">Emitir Nova Licença de Cliente (Tenant)</h3>
+            <p class="text-[11px] text-zinc-400">Configure o cliente adquirente, limites de endpoints e gere a chave digital</p>
+          </div>
+        </div>
+        <button onclick="fecharModalNovaLicenca()" class="p-1 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.05] transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <!-- Formulário de Emissão -->
+      <form onsubmit="salvarNovaLicencaTenant(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="form-edit-id" value="">
+
+        <!-- Dados da Empresa Adquirente -->
+        <div class="space-y-3 p-3.5 rounded-xl surface-well">
+          <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 block">1. Dados do Cliente Adquirente</span>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-medium text-zinc-300 mb-1">Nome Fantasia / Empresa *</label>
+              <input type="text" id="form-empresa-nome" required placeholder="Ex: Indústria Metalúrgica Ramos" class="w-full px-3 py-2 rounded-lg bg-[#0d0f14] border border-white/[0.08] text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50">
+            </div>
+            <div>
+              <label class="block font-medium text-zinc-300 mb-1">CNPJ ou Documento *</label>
+              <input type="text" id="form-empresa-cnpj" required placeholder="00.000.000/0001-00" class="w-full px-3 py-2 rounded-lg bg-[#0d0f14] border border-white/[0.08] text-xs font-mono text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block font-medium text-zinc-300 mb-1">Gestor / Contato *</label>
+              <input type="text" id="form-contato-nome" required placeholder="Nome do responsável" class="w-full px-3 py-2 rounded-lg bg-[#0d0f14] border border-white/[0.08] text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50">
+            </div>
+            <div>
+              <label class="block font-medium text-zinc-300 mb-1">E-mail Corporativo *</label>
+              <input type="email" id="form-contato-email" required placeholder="gestor@empresa.com" class="w-full px-3 py-2 rounded-lg bg-[#0d0f14] border border-white/[0.08] text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50">
+            </div>
+            <div>
+              <label class="block font-medium text-zinc-300 mb-1">WhatsApp / Telefone</label>
+              <input type="text" id="form-contato-fone" placeholder="(11) 98765-4321" class="w-full px-3 py-2 rounded-lg bg-[#0d0f14] border border-white/[0.08] text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50">
+            </div>
+          </div>
+        </div>
+
+        <!-- Parâmetros do Plano & Capacidade -->
+        <div class="space-y-3 p-3.5 rounded-xl surface-well">
+          <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 block">2. Plano, Capacidade & Faturamento</span>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block font-medium text-zinc-300 mb-1">Plano do Sistema *</label>
+              <select id="form-plano-tipo" onchange="ajustarLimitesPorPlano(this.value)" class="w-full px-3 py-2 rounded-lg bg-[#0d0f14] border border-white/[0.08] text-xs text-zinc-100 focus:outline-none focus:border-indigo-500/50 cursor-pointer">
+                <option value="Starter">Starter (até 20 estações)</option>
+                <option value="Professional" selected>Professional (até 50 estações)</option>
+                <option value="Enterprise">Enterprise (até 200 estações)</option>
+                <option value="Ultimate MSP">Ultimate MSP (Nós Ilimitados)</option>
+                <option value="Personalizado">Personalizado</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-medium text-zinc-300 mb-1">Limite de Máquinas (Nós) *</label>
+              <input type="number" id="form-limite-nos" min="1" max="5000" value="50" class="w-full px-3 py-2 rounded-lg bg-[#0d0f14] border border-white/[0.08] text-xs font-mono text-zinc-100 focus:outline-none focus:border-indigo-500/50">
+            </div>
+
+            <div>
+              <label class="block font-medium text-zinc-300 mb-1">Valor do Contrato (R$) *</label>
+              <input type="number" id="form-valor-mrr" step="0.01" value="890.00" class="w-full px-3 py-2 rounded-lg bg-[#0d0f14] border border-white/[0.08] text-xs font-mono text-zinc-100 focus:outline-none focus:border-indigo-500/50">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block font-medium text-zinc-300 mb-1">Ciclo de Cobrança</label>
+              <select id="form-ciclo-cobranca" class="w-full px-3 py-2 rounded-lg bg-[#0d0f14] border border-white/[0.08] text-xs text-zinc-100 focus:outline-none focus:border-indigo-500/50 cursor-pointer">
+                <option value="Mensal" selected>Mensal (Recorrência)</option>
+                <option value="Trimestral">Trimestral</option>
+                <option value="Semestral">Semestral</option>
+                <option value="Anual">Anual (À Vista com desconto)</option>
+                <option value="Vitalício">Vitalício (Perpétuo)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-medium text-zinc-300 mb-1">Data de Emissão</label>
+              <input type="date" id="form-data-inicio" class="w-full px-3 py-2 rounded-lg bg-[#0d0f14] border border-white/[0.08] text-xs text-zinc-100 focus:outline-none focus:border-indigo-500/50">
+            </div>
+
+            <div>
+              <label class="block font-medium text-zinc-300 mb-1">Data de Expiração *</label>
+              <input type="date" id="form-data-vencimento" required class="w-full px-3 py-2 rounded-lg bg-[#0d0f14] border border-white/[0.08] text-xs text-zinc-100 focus:outline-none focus:border-indigo-500/50">
+            </div>
+          </div>
+        </div>
+
+        <!-- Módulos Contratados -->
+        <div class="space-y-2 p-3.5 rounded-xl surface-well">
+          <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 block">3. Módulos Autorizados na Licença</span>
+          
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+            <label class="flex items-center gap-2 cursor-pointer select-none text-zinc-300">
+              <input type="checkbox" id="mod-remoto" checked class="w-3.5 h-3.5 rounded bg-zinc-800 border-zinc-700 text-indigo-500 focus:ring-0">
+              <span>Acesso Remoto HD</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none text-zinc-300">
+              <input type="checkbox" id="mod-servidores" checked class="w-3.5 h-3.5 rounded bg-zinc-800 border-zinc-700 text-indigo-500 focus:ring-0">
+              <span>Painel Servidores</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none text-zinc-300">
+              <input type="checkbox" id="mod-chamados" checked class="w-3.5 h-3.5 rounded bg-zinc-800 border-zinc-700 text-indigo-500 focus:ring-0">
+              <span>HelpDesk & Chat</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none text-zinc-300">
+              <input type="checkbox" id="mod-comunicados" checked class="w-3.5 h-3.5 rounded bg-zinc-800 border-zinc-700 text-indigo-500 focus:ring-0">
+              <span>Comunicados & Enquetes</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none text-zinc-300">
+              <input type="checkbox" id="mod-auditoria" checked class="w-3.5 h-3.5 rounded bg-zinc-800 border-zinc-700 text-indigo-500 focus:ring-0">
+              <span>Logs SIEM & LGPD</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none text-zinc-300">
+              <input type="checkbox" id="mod-whitelabel" class="w-3.5 h-3.5 rounded bg-zinc-800 border-zinc-700 text-indigo-500 focus:ring-0">
+              <span>Marca White-Label</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Botões de Ação do Modal -->
+        <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-white/[0.06]">
+          <button type="button" onclick="fecharModalNovaLicenca()" class="px-3.5 py-1.5 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] text-zinc-300 text-xs font-medium transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-4 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition flex items-center gap-1.5">
+            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+            <span id="btn-salvar-licenca-txt">Emitir e Gerar Chave Digital</span>
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: VISUALIZAR CHAVE, CERTIFICADO & PACOTE DE ATIVAÇÃO -->
+  <!-- ========================================================================= -->
+  <div id="modal-ver-chave" onclick="if(event.target===this) fecharModalVerChave()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
+    <div class="surface-card rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-white/[0.08] space-y-5">
+      
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold">
+            <i data-lucide="shield-check" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-zinc-100" id="modal-chave-titulo">Chave de Ativação Digital</h3>
+            <p class="text-[11px] text-zinc-400" id="modal-chave-sub">Payload de ativação do cliente</p>
+          </div>
+        </div>
+        <button onclick="fecharModalVerChave()" class="p-1 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.05] transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <!-- Chave Formatada em Destaque -->
+      <div class="p-4 rounded-xl surface-well space-y-2 text-center">
+        <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Chave de Ativação (License Key)</span>
+        <div class="flex items-center justify-center gap-2">
+          <code id="display-chave-formatada" class="text-base sm:text-lg font-mono font-bold text-indigo-400 tracking-wider select-all bg-[#0d0f14] px-3 py-1.5 rounded-lg border border-white/[0.08]">
+            FSC-ENT-XXXX-XXXX-XXXX
+          </code>
+          <button onclick="copiarChaveAtivacao()" class="p-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 hover:text-white transition" title="Copiar Chave">
+            <i data-lucide="copy" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Token Criptográfico Base64 (JWT-Like Payload) -->
+      <div class="space-y-1.5">
+        <label class="block font-medium text-zinc-300 text-xs">Token Criptográfico Assinado (fsc_license.key)</label>
+        <div class="relative">
+          <textarea id="display-token-base64" readonly rows="3" class="w-full p-2.5 rounded-lg bg-[#090b0f] border border-white/[0.06] text-[10px] font-mono text-zinc-400 focus:outline-none resize-none select-all"></textarea>
+          <button onclick="copiarTokenBase64()" class="absolute right-2 top-2 px-2 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-[10px] font-mono text-zinc-300 border border-white/[0.08] transition">
+            Copiar Token
+          </button>
+        </div>
+      </div>
+
+      <!-- Instruções de Entrega ao Cliente -->
+      <div class="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs space-y-1.5">
+        <strong class="text-indigo-300 block">Como o cliente ativa o sistema:</strong>
+        <p class="text-zinc-400 text-[11px] leading-relaxed">
+          1. <strong>No Instalador:</strong> Executar <code class="font-mono text-zinc-200">Instalador-FSC-Agent.exe /license:<span id="hint-key-cli">CHAVE</span></code><br>
+          2. <strong>No Console:</strong> Colar a chave na aba <em>Configurações & Governança &gt; Licença</em>.<br>
+          3. <strong>Arquivo Direto:</strong> Baixar o arquivo <code class="font-mono text-zinc-200">license.fsc</code> e colar no diretório do software.
+        </p>
+      </div>
+
+      <!-- Ações do Modal -->
+      <div class="flex items-center justify-between pt-2 border-t border-white/[0.06]">
+        <button onclick="baixarArquivoLicencaCliente()" class="px-3 py-1.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-200 text-xs font-medium transition flex items-center gap-1.5">
+          <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
+          <span>Baixar license.fsc</span>
+        </button>
+
+        <button onclick="copiarMensagemBoasVindasCliente()" class="px-3.5 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition flex items-center gap-1.5">
+          <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+          <span>Copiar Mensagem WhatsApp</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: RENOVAÇÃO RÁPIDA DE LICENÇA -->
+  <!-- ========================================================================= -->
+  <div id="modal-renovacao-rapida" onclick="if(event.target===this) fecharModalRenovacao()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+    <div class="surface-card rounded-2xl p-6 max-w-md w-full shadow-2xl border border-white/[0.08] space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+            <i data-lucide="calendar" class="w-4 h-4"></i>
+          </div>
+          <h3 class="text-sm font-semibold text-zinc-100">Renovação / Extensão de Contrato</h3>
+        </div>
+        <button onclick="fecharModalRenovacao()" class="text-zinc-400 hover:text-zinc-100"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <div class="text-xs text-zinc-400 space-y-1">
+        <p>Cliente: <strong class="text-zinc-200" id="renovacao-empresa-nome">-</strong></p>
+        <p>Vencimento Atual: <span class="font-mono text-zinc-300" id="renovacao-vencimento-atual">-</span></p>
+      </div>
+
+      <div class="space-y-2 pt-2">
+        <span class="text-[11px] font-medium text-zinc-300 block">Selecione o período de renovação:</span>
+        <div class="grid grid-cols-3 gap-2">
+          <button onclick="aplicarExtensaoDias(30)" class="p-2.5 rounded-lg bg-[#090b0f] border border-white/[0.06] hover:border-emerald-500/40 text-xs font-mono text-zinc-200 transition">
+            +30 Dias
+          </button>
+          <button onclick="aplicarExtensaoDias(90)" class="p-2.5 rounded-lg bg-[#090b0f] border border-white/[0.06] hover:border-emerald-500/40 text-xs font-mono text-zinc-200 transition">
+            +90 Dias
+          </button>
+          <button onclick="aplicarExtensaoDias(365)" class="p-2.5 rounded-lg bg-[#090b0f] border border-white/[0.06] hover:border-emerald-500/40 text-xs font-mono text-zinc-200 transition">
+            +1 Ano (365d)
+          </button>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-white/[0.06]">
+        <button onclick="fecharModalRenovacao()" class="px-3 py-1.5 rounded-md bg-white/[0.03] text-zinc-400 hover:text-zinc-200 text-xs transition">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT: LÓGICA DO MASTER ADMIN & LICENSING HUB -->
+  <!-- ========================================================================= -->
+  <script>
+    // ESTADO GLOBAL DO PAINEL MASTER
+    let listaTenants = [];
+    let listaLogsAuditoria = [];
+    let filtroStatusAtual = 'todos';
+    let tenantChaveVisualizada = null;
+    let tenantEmRenovacao = null;
+
+    // =========================================================================
+    // INICIALIZAÇÃO & DADOS DEMO REALISTAS
+    // =========================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+      carregarTenants();
+      carregarLogsAuditoria();
+      inicializarDatasFormulario();
+      atualizarIcones();
+    });
+
+    function inicializarDatasFormulario() {
+      const hoje = new Date().toISOString().split('T')[0];
+      const em1Ano = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const elIni = document.getElementById('form-data-inicio');
+      const elVenc = document.getElementById('form-data-vencimento');
+      if (elIni) elIni.value = hoje;
+      if (elVenc) elVenc.value = em1Ano;
+    }
+
+    function atualizarIcones() {
+      if (window.lucide && lucide.createIcons) {
+        lucide.createIcons();
+      }
+    }
+
+    function mostrarToast(mensagem, tipo = 'info', titulo = '') {
+      const cont = document.getElementById('toast-container');
+      if (!cont) return;
+      const el = document.createElement('div');
+      el.className = 'toast-item';
+      
+      let dotColor = 'bg-indigo-400';
+      if (tipo === 'success') dotColor = 'bg-emerald-400';
+      else if (tipo === 'warn') dotColor = 'bg-amber-400';
+      else if (tipo === 'error') dotColor = 'bg-rose-400';
+
+      el.innerHTML = `
+        <span class="w-2 h-2 rounded-full ${dotColor} shrink-0"></span>
+        <div class="flex-1">
+          ${titulo ? `<strong class="block text-[11px] text-zinc-300 font-semibold leading-tight">${titulo}</strong>` : ''}
+          <span class="text-zinc-400 leading-tight">${mensagem}</span>
+        </div>
+      `;
+      cont.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(8px)';
+        el.style.transition = 'all 0.25s ease';
+        setTimeout(() => el.remove(), 260);
+      }, 3500);
+    }
+
+    // =========================================================================
+    // PERSISTÊNCIA & CARREGAMENTO DE TENANTS
+    // =========================================================================
+    function carregarTenants() {
+      try {
+        const salvo = localStorage.getItem('fsc_master_tenants');
+        if (salvo) {
+          listaTenants = JSON.parse(salvo);
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar tenants:', e);
+      }
+
+      if (!Array.isArray(listaTenants) || listaTenants.length === 0) {
+        listaTenants = gerarTenantsDemo();
+        salvarTenants(false);
+      }
+
+      renderizarTabelaTenants();
+      atualizarKpisMaster();
+    }
+
+    function salvarTenants(notificar = true) {
+      try {
+        localStorage.setItem('fsc_master_tenants', JSON.stringify(listaTenants));
+      } catch (e) {
+        console.error('Erro ao salvar tenants:', e);
+      }
+      renderizarTabelaTenants();
+      atualizarKpisMaster();
+    }
+
+    function gerarTenantsDemo() {
+      const hoje = new Date();
+      const formatarData = (d) => d.toISOString().split('T')[0];
+
+      return [
+        {
+          id: 'TEN-9001',
+          empresa: 'Aço Móveis Corporativos',
+          cnpj: '14.288.941/0001-82',
+          contato: 'Carlos Mendonça',
+          email: 'carlos.mendonca@acomoveis.com.br',
+          fone: '(11) 98841-2099',
+          plano: 'Enterprise',
+          limiteNos: 100,
+          nosInstalados: 42,
+          valorMrr: 1450.00,
+          ciclo: 'Mensal',
+          dataInicio: formatarData(new Date(hoje.getTime() - 180 * 86400000)),
+          dataVencimento: formatarData(new Date(hoje.getTime() + 185 * 86400000)),
+          status: 'Ativo',
+          statusFinanceiro: 'Em dia',
+          chave: 'FSC-ENT-9412-8841-2099-M77',
+          modulos: ['remoto', 'servidores', 'chamados', 'comunicados', 'auditoria', 'whitelabel'],
+          criadoEm: new Date(hoje.getTime() - 180 * 86400000).toISOString()
+        },
+        {
+          id: 'TEN-9002',
+          empresa: 'JPL Logística & Distribuição',
+          cnpj: '28.910.450/0001-33',
+          contato: 'Juliana P. Lins',
+          email: 'ti@jpllog.com.br',
+          fone: '(19) 99762-1140',
+          plano: 'Professional',
+          limiteNos: 50,
+          nosInstalados: 38,
+          valorMrr: 890.00,
+          ciclo: 'Mensal',
+          dataInicio: formatarData(new Date(hoje.getTime() - 120 * 86400000)),
+          dataVencimento: formatarData(new Date(hoje.getTime() + 12 * 86400000)), // < 30 dias (alerta!)
+          status: 'Ativo',
+          statusFinanceiro: 'Pendente',
+          chave: 'FSC-PRO-3810-7714-9921-K44',
+          modulos: ['remoto', 'servidores', 'chamados', 'comunicados', 'auditoria'],
+          criadoEm: new Date(hoje.getTime() - 120 * 86400000).toISOString()
+        },
+        {
+          id: 'TEN-9003',
+          empresa: 'Novaes & Prado Engenharia',
+          cnpj: '35.612.802/0001-19',
+          contato: 'Rodrigo Prado',
+          email: 'rodrigo@novaesprado.eng.br',
+          fone: '(11) 97120-8800',
+          plano: 'Starter',
+          limiteNos: 20,
+          nosInstalados: 16,
+          valorMrr: 490.00,
+          ciclo: 'Mensal',
+          dataInicio: formatarData(new Date(hoje.getTime() - 90 * 86400000)),
+          dataVencimento: formatarData(new Date(hoje.getTime() + 275 * 86400000)),
+          status: 'Ativo',
+          statusFinanceiro: 'Em dia',
+          chave: 'FSC-STR-1902-6128-0211-P12',
+          modulos: ['remoto', 'chamados', 'servidores'],
+          criadoEm: new Date(hoje.getTime() - 90 * 86400000).toISOString()
+        },
+        {
+          id: 'TEN-9004',
+          empresa: 'Hospital & Maternidade São Lucas',
+          cnpj: '04.119.782/0001-90',
+          contato: 'Dra. Vanessa Meireles',
+          email: 'ti.hospital@saolucas.med.br',
+          fone: '(11) 3290-4400',
+          plano: 'Enterprise',
+          limiteNos: 250,
+          nosInstalados: 215,
+          valorMrr: 2850.00,
+          ciclo: 'Anual',
+          dataInicio: formatarData(new Date(hoje.getTime() - 300 * 86400000)),
+          dataVencimento: formatarData(new Date(hoje.getTime() + 65 * 86400000)),
+          status: 'Ativo',
+          statusFinanceiro: 'Em dia',
+          chave: 'FSC-ENT-7820-0411-9002-H99',
+          modulos: ['remoto', 'servidores', 'chamados', 'comunicados', 'auditoria', 'whitelabel'],
+          criadoEm: new Date(hoje.getTime() - 300 * 86400000).toISOString()
+        },
+        {
+          id: 'TEN-9005',
+          empresa: 'TechVix Soluções Digitais',
+          cnpj: '41.802.110/0001-44',
+          contato: 'Lucas Bittencourt',
+          email: 'lucas@techvix.io',
+          fone: '(27) 99881-0022',
+          plano: 'Trial 14d',
+          limiteNos: 15,
+          nosInstalados: 7,
+          valorMrr: 0.00,
+          ciclo: 'Trial',
+          dataInicio: formatarData(new Date(hoje.getTime() - 8 * 86400000)),
+          dataVencimento: formatarData(new Date(hoje.getTime() + 6 * 86400000)),
+          status: 'Trial',
+          statusFinanceiro: 'Trial Gratuito',
+          chave: 'FSC-TRL-8021-4110-4491-T07',
+          modulos: ['remoto', 'chamados', 'servidores'],
+          criadoEm: new Date(hoje.getTime() - 8 * 86400000).toISOString()
+        },
+        {
+          id: 'TEN-9006',
+          empresa: 'Transportadora TransBrasil Sul',
+          cnpj: '18.441.902/0001-77',
+          contato: 'Marcos Vinicius',
+          email: 'financeiro@transbrasilsul.com.br',
+          fone: '(41) 99120-7733',
+          plano: 'Professional',
+          limiteNos: 50,
+          nosInstalados: 48,
+          valorMrr: 890.00,
+          ciclo: 'Mensal',
+          dataInicio: formatarData(new Date(hoje.getTime() - 240 * 86400000)),
+          dataVencimento: formatarData(new Date(hoje.getTime() - 15 * 86400000)), // Vencido
+          status: 'Bloqueado',
+          statusFinanceiro: 'Inadimplente (15d)',
+          chave: 'FSC-PRO-9021-1844-7731-B00',
+          modulos: ['remoto', 'servidores', 'chamados'],
+          criadoEm: new Date(hoje.getTime() - 240 * 86400000).toISOString()
+        }
+      ];
+    }
+
+    function restaurarDadosDemo() {
+      if (confirm('Deseja resetar a base de clientes para os dados padrão de demonstração?')) {
+        listaTenants = gerarTenantsDemo();
+        salvarTenants();
+        adicionarLogAuditoria('Sistema', 'Reset de Fábrica', 'Base de clientes restaurada para demonstração.');
+        mostrarToast('Base de clientes restaurada com sucesso!', 'success', 'Base Redefinida');
+      }
+    }
+
+    // =========================================================================
+    // CÁLCULO E RENDERIZAÇÃO DOS KPIS
+    // =========================================================================
+    function atualizarKpisMaster() {
+      const ativos = listaTenants.filter(t => t.status === 'Ativo');
+      const mrrTotal = ativos.reduce((acc, t) => acc + (Number(t.valorMrr) || 0), 0);
+      const arrTotal = mrrTotal * 12;
+
+      const elMrr = document.getElementById('kpi-mrr-total');
+      if (elMrr) elMrr.textContent = mrrTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+      const elArr = document.getElementById('kpi-arr-total');
+      if (elArr) elArr.textContent = `ARR Est: ${arrTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / ano`;
+
+      const elCli = document.getElementById('kpi-clientes-total');
+      if (elCli) elCli.textContent = listaTenants.length;
+
+      const elCliDet = document.getElementById('kpi-clientes-detalhe');
+      if (elCliDet) elCliDet.textContent = `${ativos.length} ativos • ${listaTenants.filter(t => t.status === 'Trial').length} trials • ${listaTenants.filter(t => t.status === 'Bloqueado').length} suspensos`;
+
+      const elRatio = document.getElementById('kpi-status-ratio');
+      if (elRatio) {
+        const pct = listaTenants.length > 0 ? Math.round((ativos.length / listaTenants.length) * 100) : 0;
+        elRatio.textContent = `${pct}% ativos`;
+      }
+
+      // Nós / Endpoints
+      const totalContratado = listaTenants.reduce((acc, t) => acc + (Number(t.limiteNos) || 0), 0);
+      const totalInstalado = listaTenants.reduce((acc, t) => acc + (Number(t.nosInstalados) || 0), 0);
+      const elNos = document.getElementById('kpi-nos-total');
+      if (elNos) elNos.textContent = `${totalInstalado} / ${totalContratado}`;
+
+      const elNosOcup = document.getElementById('kpi-nos-ocupacao');
+      const pctOcup = totalContratado > 0 ? Math.round((totalInstalado / totalContratado) * 100) : 0;
+      if (elNosOcup) elNosOcup.textContent = `${pctOcup}% ocupação`;
+
+      const elBarNos = document.getElementById('kpi-bar-nos');
+      if (elBarNos) elBarNos.style.width = `${Math.min(100, pctOcup)}%`;
+
+      // Vencendo em menos de 30 dias
+      const agora = Date.now();
+      const em30Dias = agora + (30 * 86400000);
+      const expirando = listaTenants.filter(t => {
+        if (t.status === 'Bloqueado') return false;
+        const v = new Date(t.dataVencimento).getTime();
+        return v >= agora && v <= em30Dias;
+      });
+
+      const elExp = document.getElementById('kpi-expirando-count');
+      if (elExp) elExp.textContent = expirando.length;
+
+      const elAlertaBadge = document.getElementById('kpi-alerta-badge');
+      if (elAlertaBadge) elAlertaBadge.textContent = `${expirando.length} para renovar`;
+
+      // Contadores dos botões de filtro
+      document.getElementById('count-filtro-todos').textContent = listaTenants.length;
+      document.getElementById('count-filtro-ativos').textContent = ativos.length;
+      document.getElementById('count-filtro-vencendo').textContent = expirando.length;
+      document.getElementById('count-filtro-suspensos').textContent = listaTenants.filter(t => t.status === 'Bloqueado').length;
+      document.getElementById('count-filtro-trial').textContent = listaTenants.filter(t => t.status === 'Trial').length;
+    }
+
+    // =========================================================================
+    // FILTROS & PESQUISA
+    // =========================================================================
+    function selecionarFiltroStatus(status) {
+      filtroStatusAtual = status;
+      ['todos', 'ativo', 'vencendo', 'bloqueado', 'trial'].forEach(st => {
+        const btn = document.getElementById(`pill-status-${st}`);
+        if (!btn) return;
+        if (st === status) {
+          btn.className = 'px-2.5 py-1 rounded-md text-[11px] font-medium transition bg-white/[0.08] text-white border border-white/[0.1]';
+        } else {
+          btn.className = 'px-2.5 py-1 rounded-md text-[11px] font-medium transition bg-white/[0.02] text-zinc-400 hover:text-zinc-200 border border-white/[0.05]';
+        }
+      });
+      renderizarTabelaTenants();
+    }
+
+    function filtrarListaTenants() {
+      renderizarTabelaTenants();
+    }
+
+    // =========================================================================
+    // RENDERIZAÇÃO DA TABELA DE TENANTS
+    // =========================================================================
+    function renderizarTabelaTenants() {
+      const tbody = document.getElementById('tabela-tenants-corpo');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      const termo = (document.getElementById('input-busca-tenants')?.value || '').trim().toLowerCase();
+      const agora = Date.now();
+      const em30Dias = agora + (30 * 86400000);
+
+      const filtrados = listaTenants.filter(t => {
+        // Filtro de Status
+        if (filtroStatusAtual === 'ativo' && t.status !== 'Ativo') return false;
+        if (filtroStatusAtual === 'bloqueado' && t.status !== 'Bloqueado') return false;
+        if (filtroStatusAtual === 'trial' && t.status !== 'Trial') return false;
+        if (filtroStatusAtual === 'vencendo') {
+          const v = new Date(t.dataVencimento).getTime();
+          if (v < agora || v > em30Dias) return false;
+        }
+
+        // Filtro de Busca
+        if (termo) {
+          const emp = String(t.empresa || '').toLowerCase();
+          const doc = String(t.cnpj || '').toLowerCase();
+          const cli = String(t.contato || '').toLowerCase();
+          const mail = String(t.email || '').toLowerCase();
+          const key = String(t.chave || '').toLowerCase();
+          return emp.includes(termo) || doc.includes(termo) || cli.includes(termo) || mail.includes(termo) || key.includes(termo);
+        }
+
+        return true;
+      });
+
+      const elResumo = document.getElementById('tabela-tenants-resumo');
+      if (elResumo) {
+        elResumo.textContent = `Exibindo ${filtrados.length} de ${listaTenants.length} clientes cadastrados`;
+      }
+
+      if (filtrados.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="p-8 text-center text-zinc-500 font-mono">
+              Nenhum cliente adquirente encontrado com os filtros selecionados.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      filtrados.forEach(t => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-white/[0.02] transition';
+
+        // Badge de Status
+        let badgeStatus = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Ativo</span>';
+        if (t.status === 'Bloqueado') {
+          badgeStatus = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20"><span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>Suspenso</span>';
+        } else if (t.status === 'Trial') {
+          badgeStatus = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"><span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>Trial 14d</span>';
+        }
+
+        // Dias restantes para vencimento
+        const dataVenc = new Date(t.dataVencimento);
+        const diffDias = Math.ceil((dataVenc.getTime() - agora) / 86400000);
+        let vencimentoHtml = `<span class="font-mono text-zinc-300">${formatarDataBr(t.dataVencimento)}</span>`;
+        if (t.status === 'Bloqueado' || diffDias < 0) {
+          vencimentoHtml += `<div class="text-[10px] text-rose-400 font-mono font-medium">Expirada (${Math.abs(diffDias)}d atrás)</div>`;
+        } else if (diffDias <= 30) {
+          vencimentoHtml += `<div class="text-[10px] text-amber-400 font-mono font-medium">Vence em ${diffDias} dias!</div>`;
+        } else {
+          vencimentoHtml += `<div class="text-[10px] text-zinc-500 font-mono">${diffDias} dias restantes</div>`;
+        }
+
+        // Capacidade de Nós
+        const pctNos = t.limiteNos > 0 ? Math.round((t.nosInstalados / t.limiteNos) * 100) : 0;
+        let barColor = 'bg-indigo-400';
+        if (pctNos >= 90) barColor = 'bg-amber-400';
+        if (pctNos >= 100) barColor = 'bg-rose-400';
+
+        // Módulos
+        const modulosList = Array.isArray(t.modulos) ? t.modulos : [];
+        const modsBadges = modulosList.slice(0, 3).map(m => {
+          let label = m;
+          if (m === 'remoto') label = 'Remoto';
+          if (m === 'servidores') label = 'Servidores';
+          if (m === 'chamados') label = 'HelpDesk';
+          if (m === 'comunicados') label = 'Enquetes';
+          if (m === 'auditoria') label = 'SIEM';
+          if (m === 'whitelabel') label = 'Marca Própria';
+          return `<span class="px-1.5 py-0.2 rounded text-[9px] font-mono bg-white/[0.04] text-zinc-400 border border-white/[0.06]">${label}</span>`;
+        }).join(' ');
+
+        tr.innerHTML = `
+          <!-- Cliente / Razão Social -->
+          <td class="px-4 py-3">
+            <div class="min-w-0">
+              <div class="font-semibold text-zinc-100 text-xs truncate max-w-[200px]" title="${t.empresa}">${t.empresa}</div>
+              <div class="text-[11px] font-mono text-zinc-500 mt-0.5">${t.cnpj || 'Sem CNPJ'}</div>
+            </div>
+          </td>
+
+          <!-- Contato Principal -->
+          <td class="px-4 py-3">
+            <div class="text-zinc-200 text-xs">${t.contato}</div>
+            <div class="text-[11px] text-zinc-500 truncate max-w-[160px]">${t.email}</div>
+          </td>
+
+          <!-- Plano & Módulos -->
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">${t.plano}</span>
+              ${(Number(t.valorMrr) > 0) ? `<span class="text-[10px] font-mono text-zinc-400">R$ ${Number(t.valorMrr).toFixed(0)}/mês</span>` : '<span class="text-[10px] font-mono text-zinc-500">Gratuito</span>'}
+            </div>
+            <div class="flex items-center gap-1 mt-1 flex-wrap">
+              ${modsBadges}
+              ${modulosList.length > 3 ? `<span class="text-[9px] text-zinc-500">+${modulosList.length - 3}</span>` : ''}
+            </div>
+          </td>
+
+          <!-- Capacidade (Nós) -->
+          <td class="px-4 py-3">
+            <div class="flex items-center justify-between text-[11px] font-mono mb-1">
+              <span class="text-zinc-300 font-semibold">${t.nosInstalados}</span>
+              <span class="text-zinc-500">/ ${t.limiteNos} nós</span>
+            </div>
+            <div class="w-24 h-[3px] rounded-full bg-white/[0.06] overflow-hidden">
+              <div class="h-full ${barColor} rounded-full" style="width: ${Math.min(100, pctNos)}%"></div>
+            </div>
+          </td>
+
+          <!-- Chave de Licença -->
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-1.5">
+              <code class="font-mono text-[11px] text-zinc-300 bg-[#090b0f] px-2 py-1 rounded border border-white/[0.06]">
+                ${mascararChave(t.chave)}
+              </code>
+              <button onclick="copiarTexto('${t.chave}', 'Chave de Licença')" class="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.05] transition" title="Copiar Chave Completa">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </td>
+
+          <!-- Vencimento / Ciclo -->
+          <td class="px-4 py-3">
+            ${vencimentoHtml}
+          </td>
+
+          <!-- Status -->
+          <td class="px-4 py-3">
+            ${badgeStatus}
+          </td>
+
+          <!-- Ações -->
+          <td class="px-4 py-3 text-right">
+            <div class="flex items-center justify-end gap-1">
+              <button onclick="abrirModalVerChave('${t.id}')" class="p-1.5 rounded-md bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.06] text-zinc-300 hover:text-white transition" title="Ver Chave e Certificado">
+                <i data-lucide="key" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="abrirModalRenovacao('${t.id}')" class="p-1.5 rounded-md bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.06] text-emerald-400 hover:text-emerald-300 transition" title="Renovar / Estender Licença">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="alternarBloqueioTenant('${t.id}')" class="p-1.5 rounded-md bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.06] ${t.status === 'Bloqueado' ? 'text-emerald-400' : 'text-amber-400'} transition" title="${t.status === 'Bloqueado' ? 'Reativar Licença' : 'Suspender Licença'}">
+                <i data-lucide="${t.status === 'Bloqueado' ? 'unlock' : 'lock'}" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="editarTenant('${t.id}')" class="p-1.5 rounded-md bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 transition" title="Editar Contrato">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="excluirTenant('${t.id}')" class="p-1.5 rounded-md bg-white/[0.02] hover:bg-rose-500/20 border border-white/[0.06] text-zinc-500 hover:text-rose-400 transition" title="Remover Cliente">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+
+      atualizarIcones();
+    }
+
+    // =========================================================================
+    // GERADOR DE CHAVE & ASSINATURA CRIPTOGRÁFICA
+    // =========================================================================
+    function gerarChaveLicencaFormatada(plano) {
+      const prefix = plano.toUpperCase().startsWith('ENT') ? 'ENT' : (plano.toUpperCase().startsWith('STA') ? 'STR' : 'PRO');
+      const gerarBloco = (n) => Math.random().toString(36).substring(2, 2 + n).toUpperCase();
+      const num1 = Math.floor(1000 + Math.random() * 9000);
+      const num2 = Math.floor(1000 + Math.random() * 9000);
+      const letra = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+      return `FSC-${prefix}-${num1}-${num2}-${gerarBloco(4)}-${letra}${Math.floor(10 + Math.random() * 89)}`;
+    }
+
+    function mascararChave(chave) {
+      if (!chave || chave.length < 12) return 'FSC-XXXX-****';
+      const parts = chave.split('-');
+      if (parts.length >= 4) {
+        return `${parts[0]}-${parts[1]}-••••-••••-${parts[parts.length-1]}`;
+      }
+      return chave.substring(0, 8) + '••••••••';
+    }
+
+    function gerarPayloadTokenLicenca(tenant) {
+      const payload = {
+        issuer: 'Fast Solutions Corporate - Licensing Authority',
+        software: 'Magma RMM & HelpDesk Enterprise',
+        tenantId: tenant.id,
+        company: tenant.empresa,
+        cnpj: tenant.cnpj,
+        key: tenant.chave,
+        plan: tenant.plano,
+        nodesLimit: tenant.limiteNos,
+        modules: tenant.modulos,
+        validUntil: tenant.dataVencimento,
+        issuedAt: tenant.dataInicio,
+        signature: 'SHA256:' + Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('')
+      };
+      return btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
+    }
+
+    // =========================================================================
+    // MODAL DE EMISSÃO / EDIÇÃO DE LICENÇA
+    // =========================================================================
+    function abrirModalNovaLicenca() {
+      document.getElementById('form-edit-id').value = '';
+      document.getElementById('form-empresa-nome').value = '';
+      document.getElementById('form-empresa-cnpj').value = '';
+      document.getElementById('form-contato-nome').value = '';
+      document.getElementById('form-contato-email').value = '';
+      document.getElementById('form-contato-fone').value = '';
+      document.getElementById('form-plano-tipo').value = 'Professional';
+      document.getElementById('form-limite-nos').value = 50;
+      document.getElementById('form-valor-mrr').value = '890.00';
+      document.getElementById('btn-salvar-licenca-txt').textContent = 'Emitir e Gerar Chave Digital';
+      inicializarDatasFormulario();
+      
+      const modal = document.getElementById('modal-nova-licenca');
+      if (modal) modal.classList.remove('hidden');
+      atualizarIcones();
+    }
+
+    function fecharModalNovaLicenca() {
+      const modal = document.getElementById('modal-nova-licenca');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function ajustarLimitesPorPlano(plano) {
+      const elLim = document.getElementById('form-limite-nos');
+      const elVal = document.getElementById('form-valor-mrr');
+      if (!elLim || !elVal) return;
+
+      if (plano === 'Starter') {
+        elLim.value = 20;
+        elVal.value = '490.00';
+      } else if (plano === 'Professional') {
+        elLim.value = 50;
+        elVal.value = '890.00';
+      } else if (plano === 'Enterprise') {
+        elLim.value = 200;
+        elVal.value = '1950.00';
+      } else if (plano === 'Ultimate MSP') {
+        elLim.value = 999;
+        elVal.value = '3800.00';
+      }
+    }
+
+    function salvarNovaLicencaTenant(e) {
+      e.preventDefault();
+      const editId = document.getElementById('form-edit-id').value;
+      const empresa = document.getElementById('form-empresa-nome').value.trim();
+      const cnpj = document.getElementById('form-empresa-cnpj').value.trim();
+      const contato = document.getElementById('form-contato-nome').value.trim();
+      const email = document.getElementById('form-contato-email').value.trim();
+      const fone = document.getElementById('form-contato-fone').value.trim();
+      const plano = document.getElementById('form-plano-tipo').value;
+      const limiteNos = parseInt(document.getElementById('form-limite-nos').value, 10) || 20;
+      const valorMrr = parseFloat(document.getElementById('form-valor-mrr').value) || 0;
+      const ciclo = document.getElementById('form-ciclo-cobranca').value;
+      const dataInicio = document.getElementById('form-data-inicio').value;
+      const dataVencimento = document.getElementById('form-data-vencimento').value;
+
+      const modulos = [];
+      if (document.getElementById('mod-remoto').checked) modulos.push('remoto');
+      if (document.getElementById('mod-servidores').checked) modulos.push('servidores');
+      if (document.getElementById('mod-chamados').checked) modulos.push('chamados');
+      if (document.getElementById('mod-comunicados').checked) modulos.push('comunicados');
+      if (document.getElementById('mod-auditoria').checked) modulos.push('auditoria');
+      if (document.getElementById('mod-whitelabel').checked) modulos.push('whitelabel');
+
+      if (editId) {
+        // Modo Edição
+        const idx = listaTenants.findIndex(t => t.id === editId);
+        if (idx !== -1) {
+          listaTenants[idx] = {
+            ...listaTenants[idx],
+            empresa, cnpj, contato, email, fone, plano, limiteNos, valorMrr, ciclo, dataInicio, dataVencimento, modulos
+          };
+          salvarTenants();
+          adicionarLogAuditoria(empresa, 'Contrato Atualizado', `Plano ${plano} (${limiteNos} nós) atualizado.`);
+          mostrarToast(`Cliente ${empresa} atualizado com sucesso!`, 'success', 'Licença Atualizada');
+        }
+      } else {
+        // Novo Tenant
+        const novoId = 'TEN-' + Math.floor(1000 + Math.random() * 9000);
+        const novaChave = gerarChaveLicencaFormatada(plano);
+        const novoTenant = {
+          id: novoId,
+          empresa, cnpj, contato, email, fone, plano, limiteNos,
+          nosInstalados: 0,
+          valorMrr, ciclo, dataInicio, dataVencimento,
+          status: 'Ativo',
+          statusFinanceiro: 'Em dia',
+          chave: novaChave,
+          modulos,
+          criadoEm: new Date().toISOString()
+        };
+
+        listaTenants.unshift(novoTenant);
+        salvarTenants();
+        adicionarLogAuditoria(empresa, 'Nova Licença Emitida', `Licença ${plano} gerada com chave ${novaChave}`);
+        mostrarToast(`Licença emitida com sucesso para ${empresa}!`, 'success', 'Chave Digital Criada');
+        
+        // Abre imediatamente modal da chave para visualização e cópia
+        setTimeout(() => abrirModalVerChave(novoId), 300);
+      }
+
+      fecharModalNovaLicenca();
+    }
+
+    function editarTenant(id) {
+      const t = listaTenants.find(item => item.id === id);
+      if (!t) return;
+
+      document.getElementById('form-edit-id').value = t.id;
+      document.getElementById('form-empresa-nome').value = t.empresa || '';
+      document.getElementById('form-empresa-cnpj').value = t.cnpj || '';
+      document.getElementById('form-contato-nome').value = t.contato || '';
+      document.getElementById('form-contato-email').value = t.email || '';
+      document.getElementById('form-contato-fone').value = t.fone || '';
+      document.getElementById('form-plano-tipo').value = t.plano || 'Professional';
+      document.getElementById('form-limite-nos').value = t.limiteNos || 50;
+      document.getElementById('form-valor-mrr').value = t.valorMrr || 0;
+      document.getElementById('form-ciclo-cobranca').value = t.ciclo || 'Mensal';
+      document.getElementById('form-data-inicio').value = t.dataInicio || '';
+      document.getElementById('form-data-vencimento').value = t.dataVencimento || '';
+
+      const mods = Array.isArray(t.modulos) ? t.modulos : [];
+      document.getElementById('mod-remoto').checked = mods.includes('remoto');
+      document.getElementById('mod-servidores').checked = mods.includes('servidores');
+      document.getElementById('mod-chamados').checked = mods.includes('chamados');
+      document.getElementById('mod-comunicados').checked = mods.includes('comunicados');
+      document.getElementById('mod-auditoria').checked = mods.includes('auditoria');
+      document.getElementById('mod-whitelabel').checked = mods.includes('whitelabel');
+
+      document.getElementById('btn-salvar-licenca-txt').textContent = 'Salvar Alterações';
+      const modal = document.getElementById('modal-nova-licenca');
+      if (modal) modal.classList.remove('hidden');
+      atualizarIcones();
+    }
+
+    function excluirTenant(id) {
+      const t = listaTenants.find(item => item.id === id);
+      if (!t) return;
+      if (confirm(`Tem certeza que deseja excluir a licença da empresa "${t.empresa}"?\nEsta ação revogará a chave de acesso.`)) {
+        listaTenants = listaTenants.filter(item => item.id !== id);
+        salvarTenants();
+        adicionarLogAuditoria(t.empresa, 'Licença Revogada / Excluída', `Cliente removido do painel master.`);
+        mostrarToast(`Cliente ${t.empresa} removido.`, 'warn', 'Licença Removida');
+      }
+    }
+
+    function alternarBloqueioTenant(id) {
+      const t = listaTenants.find(item => item.id === id);
+      if (!t) return;
+      const novoBloqueado = t.status !== 'Bloqueado';
+      t.status = novoBloqueado ? 'Bloqueado' : 'Ativo';
+      salvarTenants();
+
+      const acao = novoBloqueado ? 'Licença Suspensa' : 'Licença Reativada';
+      adicionarLogAuditoria(t.empresa, acao, novoBloqueado ? 'Acesso remoto e telemetria bloqueados por inadimplência.' : 'Acesso liberado com sucesso.');
+      mostrarToast(`Licença de ${t.empresa} ${novoBloqueado ? 'suspensa/bloqueada' : 'reativada'}!`, novoBloqueado ? 'warn' : 'success', acao);
+    }
+
+    // =========================================================================
+    // MODAL DE VISUALIZAÇÃO DE CHAVE & CERTIFICADO DIGITAL
+    // =========================================================================
+    function abrirModalVerChave(id) {
+      const t = listaTenants.find(item => item.id === id);
+      if (!t) return;
+      tenantChaveVisualizada = t;
+
+      document.getElementById('modal-chave-titulo').textContent = `Licença: ${t.empresa}`;
+      document.getElementById('modal-chave-sub').textContent = `${t.plano} (${t.limiteNos} nós contratados) • Válida até ${formatarDataBr(t.dataVencimento)}`;
+      document.getElementById('display-chave-formatada').textContent = t.chave;
+      document.getElementById('hint-key-cli').textContent = t.chave;
+
+      const tokenBase64 = gerarPayloadTokenLicenca(t);
+      document.getElementById('display-token-base64').value = tokenBase64;
+
+      const modal = document.getElementById('modal-ver-chave');
+      if (modal) modal.classList.remove('hidden');
+      atualizarIcones();
+    }
+
+    function fecharModalVerChave() {
+      const modal = document.getElementById('modal-ver-chave');
+      if (modal) modal.classList.add('hidden');
+      tenantChaveVisualizada = null;
+    }
+
+    function copiarChaveAtivacao() {
+      if (!tenantChaveVisualizada) return;
+      copiarTexto(tenantChaveVisualizada.chave, 'Chave de Ativação');
+    }
+
+    function copiarTokenBase64() {
+      const val = document.getElementById('display-token-base64')?.value || '';
+      copiarTexto(val, 'Token Criptográfico Base64');
+    }
+
+    function baixarArquivoLicencaCliente() {
+      if (!tenantChaveVisualizada) return;
+      const t = tenantChaveVisualizada;
+      const token = gerarPayloadTokenLicenca(t);
+
+      const blob = new Blob([token], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `license_${t.empresa.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}.fsc`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      adicionarLogAuditoria(t.empresa, 'Certificado Baixado', 'Arquivo license.fsc gerado para implantação.');
+      mostrarToast('Arquivo de ativação license.fsc baixado com sucesso!', 'success', 'Download Concluído');
+    }
+
+    function copiarMensagemBoasVindasCliente() {
+      if (!tenantChaveVisualizada) return;
+      const t = tenantChaveVisualizada;
+      const msg = `Olá ${t.contato}! Seguem os dados de ativação da sua licença do Fast Solutions Corporate (Magma RMM & HelpDesk):\n\n` +
+                  `🏢 Empresa: ${t.empresa}\n` +
+                  `📦 Plano: ${t.plano} (Até ${t.limiteNos} computadores)\n` +
+                  `🔑 Chave de Ativação: ${t.chave}\n` +
+                  `📅 Validade: ${formatarDataBr(t.dataVencimento)}\n\n` +
+                  `Para ativar suas estações, basta executar o Instalador do Agente ou colar a chave no console em Configurações > Licenciamento.\n\n` +
+                  `Qualquer dúvida, conte com nossa equipe de suporte técnico!`;
+      
+      copiarTexto(msg, 'Mensagem formatada para WhatsApp / E-mail');
+    }
+
+    // =========================================================================
+    // MODAL DE RENOVAÇÃO / EXTENSÃO RÁPIDA
+    // =========================================================================
+    function abrirModalRenovacao(id) {
+      const t = listaTenants.find(item => item.id === id);
+      if (!t) return;
+      tenantEmRenovacao = t;
+
+      document.getElementById('renovacao-empresa-nome').textContent = t.empresa;
+      document.getElementById('renovacao-vencimento-atual').textContent = formatarDataBr(t.dataVencimento);
+
+      const modal = document.getElementById('modal-renovacao-rapida');
+      if (modal) modal.classList.remove('hidden');
+      atualizarIcones();
+    }
+
+    function fecharModalRenovacao() {
+      const modal = document.getElementById('modal-renovacao-rapida');
+      if (modal) modal.classList.add('hidden');
+      tenantEmRenovacao = null;
+    }
+
+    function aplicarExtensaoDias(dias) {
+      if (!tenantEmRenovacao) return;
+      const t = tenantEmRenovacao;
+
+      const base = new Date(t.dataVencimento).getTime() > Date.now()
+        ? new Date(t.dataVencimento)
+        : new Date();
+      
+      const novaData = new Date(base.getTime() + (dias * 86400000));
+      t.dataVencimento = novaData.toISOString().split('T')[0];
+      if (t.status === 'Bloqueado') t.status = 'Ativo';
+      salvarTenants();
+
+      adicionarLogAuditoria(t.empresa, 'Renovação Efetuada', `Contrato estendido por +${dias} dias (Novo vencimento: ${formatarDataBr(t.dataVencimento)}).`);
+      mostrarToast(`Licença de ${t.empresa} estendida por +${dias} dias!`, 'success', 'Renovação Confirmada');
+      fecharModalRenovacao();
+    }
+
+    // =========================================================================
+    // AUDITORIA GLOBAL DE LICENCIAMENTO
+    // =========================================================================
+    function carregarLogsAuditoria() {
+      try {
+        const salvo = localStorage.getItem('fsc_master_audit_logs');
+        if (salvo) listaLogsAuditoria = JSON.parse(salvo);
+      } catch (e) {}
+
+      if (!Array.isArray(listaLogsAuditoria) || listaLogsAuditoria.length === 0) {
+        listaLogsAuditoria = [
+          {
+            empresa: 'Aço Móveis Corporativos',
+            acao: 'Chave Validada',
+            detalhe: 'Agente FSC ativado com sucesso no host SRV-PRIMARY (IP 192.168.18.122)',
+            timestamp: new Date(Date.now() - 3600000).toISOString()
+          },
+          {
+            empresa: 'JPL Logística & Distribuição',
+            acao: 'Alerta de Vencimento',
+            detalhe: 'Notificação automática de renovação enviada para ti@jpllog.com.br (Vence em 12 dias)',
+            timestamp: new Date(Date.now() - 14400000).toISOString()
+          },
+          {
+            empresa: 'Transportadora TransBrasil Sul',
+            acao: 'Licença Suspensa',
+            detalhe: 'Chave revogada automaticamente por 15 dias de inadimplência financeira',
+            timestamp: new Date(Date.now() - 86400000).toISOString()
+          }
+        ];
+        salvarLogsAuditoria();
+      }
+
+      renderizarLogsAuditoria();
+    }
+
+    function salvarLogsAuditoria() {
+      try {
+        localStorage.setItem('fsc_master_audit_logs', JSON.stringify(listaLogsAuditoria));
+      } catch (e) {}
+      renderizarLogsAuditoria();
+    }
+
+    function adicionarLogAuditoria(empresa, acao, detalhe) {
+      listaLogsAuditoria.unshift({
+        empresa,
+        acao,
+        detalhe,
+        timestamp: new Date().toISOString()
+      });
+      if (listaLogsAuditoria.length > 50) listaLogsAuditoria.pop();
+      salvarLogsAuditoria();
+    }
+
+    function limparLogsAuditoria() {
+      if (confirm('Deseja limpar todos os logs de auditoria do painel master?')) {
+        listaLogsAuditoria = [];
+        salvarLogsAuditoria();
+        mostrarToast('Logs de auditoria limpos com sucesso.', 'info', 'Auditoria');
+      }
+    }
+
+    function renderizarLogsAuditoria() {
+      const container = document.getElementById('lista-logs-auditoria');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (listaLogsAuditoria.length === 0) {
+        container.innerHTML = '<div class="text-zinc-600 text-center py-4">Nenhum evento registrado até o momento.</div>';
+        return;
+      }
+
+      listaLogsAuditoria.forEach(l => {
+        const item = document.createElement('div');
+        item.className = 'p-2.5 rounded-lg bg-[#090b0f] border border-white/[0.04] flex flex-col sm:flex-row sm:items-center justify-between gap-2';
+
+        const dataStr = new Date(l.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' • ' + new Date(l.timestamp).toLocaleDateString('pt-BR');
+
+        item.innerHTML = `
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+            <div class="truncate">
+              <strong class="text-zinc-200 font-semibold">${l.empresa}</strong>
+              <span class="text-indigo-400/90 font-medium"> [${l.acao}]</span>
+              <span class="text-zinc-400"> — ${l.detalhe}</span>
+            </div>
+          </div>
+          <span class="text-[10px] text-zinc-500 font-mono shrink-0">${dataStr}</span>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    // =========================================================================
+    // EXPORTAÇÃO DE BASE DE CLIENTES
+    // =========================================================================
+    function exportarBaseClientesJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(listaTenants, null, 2));
+      const dl = document.createElement('a');
+      dl.setAttribute("href", dataStr);
+      dl.setAttribute("download", `fsc_tenants_licencas_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(dl);
+      dl.click();
+      dl.remove();
+      mostrarToast('Base de clientes e licenças exportada em JSON com sucesso!', 'success', 'Backup Concluído');
+    }
+
+    function exportarBaseClientesCSV() {
+      let csv = 'ID;Empresa;CNPJ;Contato;Email;Telefone;Plano;NosInstalados;LimiteNos;ValorMRR;Vencimento;Status;Chave\n';
+      listaTenants.forEach(t => {
+        csv += `"${t.id}";"${t.empresa}";"${t.cnpj}";"${t.contato}";"${t.email}";"${t.fone}";"${t.plano}";"${t.nosInstalados}";"${t.limiteNos}";"${t.valorMrr}";"${t.dataVencimento}";"${t.status}";"${t.chave}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fsc_clientes_tenants_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      mostrarToast('Relatório de clientes exportado em CSV com sucesso!', 'success', 'Exportação Concluída');
+    }
+
+    // =========================================================================
+    // UTILITÁRIOS GERAIS
+    // =========================================================================
+    function formatarDataBr(isoStr) {
+      if (!isoStr) return '-';
+      const parts = isoStr.split('-');
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      return isoStr;
+    }
+
+    function copiarTexto(txt, label = 'Texto') {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(() => {
+          mostrarToast(`${label} copiado para a área de transferência!`, 'success', 'Copiado');
+        }).catch(() => fallbackCopiar(txt, label));
+      } else {
+        fallbackCopiar(txt, label);
+      }
+    }
+
+    function fallbackCopiar(txt, label) {
+      const ta = document.createElement('textarea');
+      ta.value = txt;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        mostrarToast(`${label} copiado!`, 'success', 'Copiado');
+      } catch (err) {
+        prompt('Copie manualmente pressionando Ctrl+C:', txt);
+      }
+      document.body.removeChild(ta);
+    }
+  </script>
+</body>
+</html>
