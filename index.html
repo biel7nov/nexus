@@ -9725,6 +9725,29 @@
         console.warn('Erro ao sincronizar chamados Supabase:', err);
       }
 
+      
+      // 5. Sincroniza Usuários / Equipe de TI
+      try {
+        const { data: usrData, error: usrErr } = await supabaseClient.from('usuarios').select('*');
+        if (usrData && usrData.length > 0) {
+          listaUsuariosTi = usrData.map(u => ({
+            nome: u.nome,
+            email: u.email,
+            cargo: u.cargo,
+            telefone: u.telefone,
+            permissao: u.permissao,
+            status: u.status,
+            senha: u.senha,
+            empresaPermitida: u.empresa_permitida || 'todas',
+            permissoes: u.permissoes || {}
+          }));
+          salvarDadosLocais();
+          if (typeof renderizarUsuariosTi === 'function') renderizarUsuariosTi();
+        }
+      } catch(err) {
+        console.warn('Erro ao sincronizar usuários Supabase:', err);
+      }
+
       // 4. Inscrição em Tempo Real (Realtime Channel)
       try {
         supabaseClient.channel('nexus-painel-realtime')
@@ -9778,6 +9801,24 @@
               window.listaEmpresasCadastradas = data.map(d => d.nome);
               salvarDadosLocais();
               renderizarTagsEmpresas();
+            }
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'usuarios' }, async () => {
+            const { data } = await supabaseClient.from('usuarios').select('*');
+            if (data && data.length > 0) {
+              listaUsuariosTi = data.map(u => ({
+                nome: u.nome,
+                email: u.email,
+                cargo: u.cargo,
+                telefone: u.telefone,
+                permissao: u.permissao,
+                status: u.status,
+                senha: u.senha,
+                empresaPermitida: u.empresa_permitida || 'todas',
+                permissoes: u.permissoes || {}
+              }));
+              salvarDadosLocais();
+              if (typeof renderizarUsuariosTi === 'function') renderizarUsuariosTi();
             }
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'setores' }, async () => {
@@ -11193,6 +11234,22 @@
         mostrarToast(`Novo técnico ${nome} adicionado à equipe!`, 'success', 'Usuário Cadastrado');
       }
 
+      if (supabaseClient) {
+        supabaseClient.from('usuarios').upsert({
+          nome: nome,
+          email: email,
+          cargo: cargo,
+          telefone: telefone,
+          permissao: permissao,
+          status: status,
+          senha: senha,
+          empresa_permitida: empresaPermitida,
+          permissoes: permissoes
+        }, { onConflict: 'email' }).then(({ data, error }) => {
+          if (error) console.warn('Erro Supabase upsert usuario:', error);
+        }).catch(console.warn);
+      }
+
       salvarDadosLocais();
       renderizarUsuariosTi();
       fecharModalNovoUsuario();
@@ -11206,7 +11263,10 @@
       const u = listaUsuariosTi[idx];
       if (!u) return;
       if (confirm(`Tem certeza que deseja remover o técnico "${u.nome}" da equipe de TI?`)) {
-        listaUsuariosTi.splice(idx, 1);
+        const uExcluido = listaUsuariosTi.splice(idx, 1)[0];
+        if (supabaseClient && uExcluido && uExcluido.email) {
+          supabaseClient.from('usuarios').delete().eq('email', uExcluido.email).catch(console.warn);
+        }
         salvarDadosLocais();
         renderizarUsuariosTi();
         adicionarLog('127.0.0.1', 'Console TI', 'Usuário Removido', `${u.nome} removido da equipe`, 'text-rose-600');

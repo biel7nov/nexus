@@ -15,6 +15,7 @@
   
   <!-- Three.js Local (Para Renderização Nativa 4K GPU sem Compressão ou Pixelização) -->
   <script src="res/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script>
     tailwind.config = {
@@ -585,7 +586,26 @@
     }
 
     // Inicializar renderização 3D quando o DOM estiver pronto
-    document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("DOMContentLoaded", async () => {
+      if (supabaseClient) {
+        try {
+          const { data: uData } = await supabaseClient.from('usuarios').select('*');
+          if (uData && uData.length > 0) {
+            const listMapeada = uData.map(u => ({
+              nome: u.nome,
+              email: u.email,
+              cargo: u.cargo,
+              telefone: u.telefone,
+              permissao: u.permissao,
+              status: u.status,
+              senha: u.senha,
+              empresaPermitida: u.empresa_permitida || 'todas',
+              permissoes: u.permissoes || {}
+            }));
+            localStorage.setItem("fsc_kintsugi_usuarios_ti", JSON.stringify(listMapeada));
+          }
+        } catch(e) {}
+      }
       init4KParticleSphere();
     });
   </script>
@@ -647,7 +667,26 @@
       }
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("DOMContentLoaded", async () => {
+      if (supabaseClient) {
+        try {
+          const { data: uData } = await supabaseClient.from('usuarios').select('*');
+          if (uData && uData.length > 0) {
+            const listMapeada = uData.map(u => ({
+              nome: u.nome,
+              email: u.email,
+              cargo: u.cargo,
+              telefone: u.telefone,
+              permissao: u.permissao,
+              status: u.status,
+              senha: u.senha,
+              empresaPermitida: u.empresa_permitida || 'todas',
+              permissoes: u.permissoes || {}
+            }));
+            localStorage.setItem("fsc_kintsugi_usuarios_ti", JSON.stringify(listMapeada));
+          }
+        } catch(e) {}
+      }
       garantirContaAdmin();
       const session = localStorage.getItem("fsc_auth_session") || sessionStorage.getItem("fsc_auth_session");
       if (session) {
@@ -685,7 +724,20 @@
     }
 
     // Realizar Login validando dinamicamente contra a equipe cadastrada em Configurações
-    function realizarLogin(e) {
+    
+    // Supabase Cloud Client
+    const SUPABASE_URL = 'https://hskxvdcgfgrdofgpdtzm.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhza3h2ZGNnZmdyZG9mZ3BkdHptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1NDEzOTEsImV4cCI6MjExMTExNzM5MX0.PKQaCfnlmxAM7Vuc4s84gjLS_21OeteMkI1WLLR1BEU';
+    let supabaseClient = null;
+    try {
+      if (window.supabase && typeof window.supabase.createClient === 'function') {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      }
+    } catch(e) {
+      console.warn('Supabase init login:', e);
+    }
+
+    async function realizarLogin(e) {
       e.preventDefault();
       
       const inputUser = document.getElementById("usernameInput").value.trim();
