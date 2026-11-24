@@ -9794,7 +9794,7 @@
               }
             } else if (payload.eventType === 'UPDATE') {
               const ch = payload.new;
-              const idx = listaChamados.findIndex(x => String(x.id) === String(ch.id));
+              let idx = listaChamados.findIndex(x => String(x.id) === String(ch.id));
               if (idx >= 0) {
                 if (ch.status) listaChamados[idx].status = ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : ch.status);
                 if (ch.tecnico) listaChamados[idx].tecnico = ch.tecnico;
@@ -9802,6 +9802,12 @@
                 salvarDadosLocais();
                 renderizarKanban();
                 if (typeof renderizarTabelaChamados === 'function') renderizarTabelaChamados();
+                if (typeof chamadoAbertoNoModalId !== 'undefined' && String(chamadoAbertoNoModalId) === String(ch.id)) {
+                  renderizarChatModal(listaChamados[idx]);
+                  if (typeof tocarSinoNotificacao === 'function') tocarSinoNotificacao();
+                }
+              } else {
+                carregarChamadosDoSupabase();
               }
             }
           })

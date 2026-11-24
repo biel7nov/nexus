@@ -1101,45 +1101,7 @@
         };
       } catch(e) {}
 
-      
-    // Inscrição em Tempo Real (Supabase Realtime)
-    try {
-      if (supabaseClient) {
-        supabaseClient
-          .channel('portal-chamados-realtime')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'empresas' }, () => {
-            carregarEmpresasWeb();
-          })
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'setores' }, () => {
-            carregarSetoresWeb();
-          })
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, (payload) => {
-            carregarHistoricoChamados();
-            if (payload && payload.eventType === 'UPDATE' && payload.new) {
-              const ch = payload.new;
-              if (typeof chatClienteChamadoAbertoId !== 'undefined' && chatClienteChamadoAbertoId && String(chatClienteChamadoAbertoId) === String(ch.id)) {
-                let chamados = [];
-                try {
-                  const s = localStorage.getItem('fsc_kintsugi_chamados');
-                  if (s) chamados = JSON.parse(s);
-                } catch(e){}
-                let c = chamados.find(item => String(item.id) === String(ch.id));
-                if (!c) {
-                  c = { id: ch.id, titulo: ch.descricao || 'Chamado #' + ch.id, mensagens: [] };
-                  chamados.unshift(c);
-                }
-                c.mensagens = ch.historico || [];
-                try { localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados)); } catch(e){}
-                if (typeof renderizarMensagensChatCliente === 'function') {
-                  renderizarMensagensChatCliente(c);
-                  if (typeof tocarSinoNotificacao === 'function') tocarSinoNotificacao();
-                }
-              }
-            }
-          })
-          .subscribe();
-      }
-    } catch(e) {}
+
 
     window.addEventListener('storage', (e) => {
         if (e.key === 'fsc_kintsugi_chamados') {

@@ -631,8 +631,11 @@ namespace NexusRemoteAgent
                 try { CriaTrayIcon(); } catch { }
                 try { Application.Run(); } catch { }
 
-                // Mantém o processo ativo permanentemente com o servidor HTTP/TCP
-                srvThread.Join();
+                // Mantém o processo ativo permanentemente com o servidor HTTP/TCP e telemetria na nuvem
+                while (true)
+                {
+                    try { Thread.Sleep(60000); } catch { }
+                }
             }
             catch { }
         }
@@ -680,7 +683,6 @@ namespace NexusRemoteAgent
 
         
         static HashSet<string> avisosExibidosIds = new HashSet<string>();
-        static bool primeiraChecagemComunicados = true;
 
         static void VerificarComunicadosSupabase()
         {
@@ -717,12 +719,6 @@ namespace NexusRemoteAgent
 
                                 if (!string.IsNullOrEmpty(id) && !avisosExibidosIds.Contains(id))
                                 {
-                                    if (primeiraChecagemComunicados)
-                                    {
-                                        avisosExibidosIds.Add(id);
-                                        continue;
-                                    }
-
                                     avisosExibidosIds.Add(id);
 
                                     bool destinatarioValido = (string.IsNullOrEmpty(destinatario) || destinatario == "broadcast" || destinatario.ToLower() == "todas" || destinatario.ToLower().Contains("todas"));
@@ -743,7 +739,6 @@ namespace NexusRemoteAgent
                         }
                     }
                 }
-                primeiraChecagemComunicados = false;
             }
             catch { }
         }
@@ -3465,10 +3460,13 @@ namespace NexusRemoteAgent
         public static void Exibir(string name, string tag, string ip)
         {
             Thread t = new Thread(() => {
-                Application.EnableVisualStyles();
-                FormChamadoCliente frm = new FormChamadoCliente(name, tag, ip);
-                frm.TopMost = true;
-                Application.Run(frm);
+                try
+                {
+                    FormChamadoCliente frm = new FormChamadoCliente(name, tag, ip);
+                    frm.TopMost = true;
+                    frm.ShowDialog();
+                }
+                catch { }
             });
             t.SetApartmentState(ApartmentState.STA);
             t.Start();
@@ -3737,18 +3735,24 @@ namespace NexusRemoteAgent
         public static void Exibir(string tipo, string titulo, string mensagem, string urgencia, string[] opcoes, string enqueteId, string autor)
         {
             Thread t = new Thread(() => {
-                Application.EnableVisualStyles();
-                FormAvisoClient frm = new FormAvisoClient(tipo, titulo, mensagem, urgencia, opcoes, enqueteId, autor);
-                frm.TopMost = true;
-
                 try
                 {
-                    if (urgencia == "urgente") SystemSounds.Exclamation.Play();
-                    else SystemSounds.Asterisk.Play();
-                }
-                catch { }
+                    FormAvisoClient frm = new FormAvisoClient(tipo, titulo, mensagem, urgencia, opcoes, enqueteId, autor);
+                    frm.TopMost = true;
 
-                Application.Run(frm);
+                    try
+                    {
+                        if (urgencia == "urgente") SystemSounds.Exclamation.Play();
+                        else SystemSounds.Asterisk.Play();
+                    }
+                    catch { }
+
+                    frm.ShowDialog();
+                }
+                catch (Exception ex)
+                {
+                    try { File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "aviso_err.log"), ex.ToString()); } catch { }
+                }
             });
             t.SetApartmentState(ApartmentState.STA);
             t.IsBackground = true;
