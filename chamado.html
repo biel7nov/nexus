@@ -685,8 +685,29 @@
           .on('postgres_changes', { event: '*', schema: 'public', table: 'setores' }, () => {
             carregarSetoresWeb();
           })
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, () => {
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, (payload) => {
             carregarHistoricoChamados();
+            if (payload && payload.eventType === 'UPDATE' && payload.new) {
+              const ch = payload.new;
+              if (typeof chatClienteChamadoAbertoId !== 'undefined' && chatClienteChamadoAbertoId && String(chatClienteChamadoAbertoId) === String(ch.id)) {
+                let chamados = [];
+                try {
+                  const s = localStorage.getItem('fsc_kintsugi_chamados');
+                  if (s) chamados = JSON.parse(s);
+                } catch(e){}
+                let c = chamados.find(item => String(item.id) === String(ch.id));
+                if (!c) {
+                  c = { id: ch.id, titulo: ch.descricao || 'Chamado #' + ch.id, mensagens: [] };
+                  chamados.unshift(c);
+                }
+                c.mensagens = ch.historico || [];
+                try { localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados)); } catch(e){}
+                if (typeof renderizarMensagensChatCliente === 'function') {
+                  renderizarMensagensChatCliente(c);
+                  if (typeof tocarSinoNotificacao === 'function') tocarSinoNotificacao();
+                }
+              }
+            }
           })
           .subscribe();
       }
@@ -1092,8 +1113,29 @@
           .on('postgres_changes', { event: '*', schema: 'public', table: 'setores' }, () => {
             carregarSetoresWeb();
           })
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, () => {
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, (payload) => {
             carregarHistoricoChamados();
+            if (payload && payload.eventType === 'UPDATE' && payload.new) {
+              const ch = payload.new;
+              if (typeof chatClienteChamadoAbertoId !== 'undefined' && chatClienteChamadoAbertoId && String(chatClienteChamadoAbertoId) === String(ch.id)) {
+                let chamados = [];
+                try {
+                  const s = localStorage.getItem('fsc_kintsugi_chamados');
+                  if (s) chamados = JSON.parse(s);
+                } catch(e){}
+                let c = chamados.find(item => String(item.id) === String(ch.id));
+                if (!c) {
+                  c = { id: ch.id, titulo: ch.descricao || 'Chamado #' + ch.id, mensagens: [] };
+                  chamados.unshift(c);
+                }
+                c.mensagens = ch.historico || [];
+                try { localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados)); } catch(e){}
+                if (typeof renderizarMensagensChatCliente === 'function') {
+                  renderizarMensagensChatCliente(c);
+                  if (typeof tocarSinoNotificacao === 'function') tocarSinoNotificacao();
+                }
+              }
+            }
           })
           .subscribe();
       }
@@ -1891,6 +1933,14 @@
       try {
         localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados));
       } catch(err) {}
+
+      // Sincroniza mensagem no Supabase Cloud em tempo real
+      if (supabaseClient && c && c.id) {
+        supabaseClient.from('chamados').update({
+          historico: c.mensagens,
+          atualizado_em: new Date().toISOString()
+        }).eq('id', String(c.id)).catch(err => console.warn('Supabase chat cli error:', err));
+      }
 
       // Dispara para o Agente local gravar no chamados.json com o mesmo ID
       try {

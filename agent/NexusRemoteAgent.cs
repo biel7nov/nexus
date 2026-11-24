@@ -599,17 +599,23 @@ namespace NexusRemoteAgent
                     try { File.WriteAllText(configPath, sessionToken, Encoding.UTF8); } catch { }
                 }
 
-                // Auto-registro do ativo e telemetria contínua via Supabase Cloud
+                // Auto-registro do ativo, telemetria contínua e verificação de comunicados em tempo real via Supabase Cloud
                 ThreadPool.QueueUserWorkItem(_ => {
+                    int tick = 0;
                     while (true)
                     {
                         try
                         {
-                            EnviarTelemetriaSupabase();
-                            RegistrarAtivoNoServidorRemoto();
+                            VerificarComunicadosSupabase();
+                            if (tick % 6 == 0)
+                            {
+                                EnviarTelemetriaSupabase();
+                                RegistrarAtivoNoServidorRemoto();
+                            }
                         }
                         catch { }
-                        Thread.Sleep(30000);
+                        tick++;
+                        Thread.Sleep(5000);
                     }
                 });
 
@@ -668,6 +674,76 @@ namespace NexusRemoteAgent
                     s.Write(buffer, 0, buffer.Length);
                 }
                 using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse()) { }
+            }
+            catch { }
+        }
+
+        
+        static HashSet<string> avisosExibidosIds = new HashSet<string>();
+        static bool primeiraChecagemComunicados = true;
+
+        static void VerificarComunicadosSupabase()
+        {
+            try
+            {
+                ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+                string url = "https://hskxvdcgfgrdofgpdtzm.supabase.co/rest/v1/comunicados?order=criado_em.desc&limit=5";
+                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+                req.Method = "GET";
+                req.Headers["apikey"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhza3h2ZGNnZmdyZG9mZ3BkdHptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1NDEzOTEsImV4cCI6MjExMTExNzM5MX0.PKQaCfnlmxAM7Vuc4s84gjLS_21OeteMkI1WLLR1BEU";
+                req.Headers["Authorization"] = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhza3h2ZGNnZmdyZG9mZ3BkdHptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1NDEzOTEsImV4cCI6MjExMTExNzM5MX0.PKQaCfnlmxAM7Vuc4s84gjLS_21OeteMkI1WLLR1BEU";
+                req.Timeout = 3000;
+                using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse())
+                using (StreamReader sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                {
+                    string json = sr.ReadToEnd();
+                    var js = new System.Web.Script.Serialization.JavaScriptSerializer();
+                    object[] lista = js.Deserialize<object[]>(json);
+                    if (lista != null)
+                    {
+                        foreach (object item in lista)
+                        {
+                            Dictionary<string, object> dict = item as Dictionary<string, object>;
+                            if (dict != null)
+                            {
+                                string id = dict.ContainsKey("id") ? Convert.ToString(dict["id"]) : "";
+                                string tipo = dict.ContainsKey("tipo") ? Convert.ToString(dict["tipo"]) : "aviso";
+                                string titulo = dict.ContainsKey("titulo") ? Convert.ToString(dict["titulo"]) : "";
+                                string mensagem = dict.ContainsKey("mensagem") ? Convert.ToString(dict["mensagem"]) : "";
+                                string urgencia = dict.ContainsKey("urgencia") ? Convert.ToString(dict["urgencia"]) : "informativo";
+                                string destinatario = dict.ContainsKey("destinatario") ? Convert.ToString(dict["destinatario"]) : "broadcast";
+                                string opcoes = dict.ContainsKey("opcoes") ? Convert.ToString(dict["opcoes"]) : "";
+                                string autor = dict.ContainsKey("autor") ? Convert.ToString(dict["autor"]) : "Gestão de TI";
+
+                                if (!string.IsNullOrEmpty(id) && !avisosExibidosIds.Contains(id))
+                                {
+                                    if (primeiraChecagemComunicados)
+                                    {
+                                        avisosExibidosIds.Add(id);
+                                        continue;
+                                    }
+
+                                    avisosExibidosIds.Add(id);
+
+                                    bool destinatarioValido = (string.IsNullOrEmpty(destinatario) || destinatario == "broadcast" || destinatario.ToLower() == "todas" || destinatario.ToLower().Contains("todas"));
+                                    if (!destinatarioValido)
+                                    {
+                                        if (!string.IsNullOrEmpty(customMachineName) && destinatario.Equals(customMachineName, StringComparison.OrdinalIgnoreCase)) destinatarioValido = true;
+                                        if (!string.IsNullOrEmpty(customMachineTag) && destinatario.ToLower().Contains(customMachineTag.Replace("#", "").ToLower())) destinatarioValido = true;
+                                        if (!string.IsNullOrEmpty(customEmpresa) && destinatario.ToLower().Contains(customEmpresa.ToLower())) destinatarioValido = true;
+                                    }
+
+                                    if (destinatarioValido)
+                                    {
+                                        string[] opArr = !string.IsNullOrEmpty(opcoes) ? opcoes.Split('|') : new string[0];
+                                        FormAvisoClient.Exibir(tipo, titulo, mensagem, urgencia, opArr, id, autor);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                primeiraChecagemComunicados = false;
             }
             catch { }
         }

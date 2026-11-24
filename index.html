@@ -7704,6 +7704,16 @@
 
       salvarDadosLocais();
 
+      // Sincroniza mensagem no Supabase Cloud em tempo real
+      if (supabaseClient && c && c.id) {
+        supabaseClient.from('chamados').update({
+          historico: c.mensagens,
+          status: c.status === 'Resolvido' ? 'Finalizados' : (c.status === 'Triagem' ? 'Em Triagem' : c.status),
+          tecnico: c.tecnico || c.responsavel || 'Não atribuído',
+          atualizado_em: new Date().toISOString()
+        }).eq('id', String(c.id)).catch(err => console.warn('Supabase chat tec error:', err));
+      }
+
       try {
         fetch('http://127.0.0.1:8090/api/chamados/mensagem', {
           method: 'POST',
@@ -12680,7 +12690,23 @@
         else alvos = ['127.0.0.1'];
       }
 
-      // Dispara assíncrono para os agentes na porta 8090
+            // 1. Grava no Supabase Cloud para entrega universal (Internet/Nuvem/Qualquer IP)
+      if (supabaseClient) {
+        supabaseClient.from('comunicados').insert({
+          id: idNovo,
+          tipo: tipoEmissaoAtual,
+          titulo: tit,
+          mensagem: msg,
+          urgencia: urg,
+          destinatario: dest,
+          opcoes: opcoesStr,
+          autor: 'Gabriel Novaes (Gestão TI)'
+        }).then(({ data, error }) => {
+          if (error) console.warn('Erro ao gravar comunicado no Supabase:', error);
+        }).catch(console.warn);
+      }
+
+      // 2. Dispara assíncrono para os agentes locais na porta 8090
       alvos.forEach(ip => {
         try {
           const endpoint = tipoEmissaoAtual === 'enquete' ? '/api/enquete' : '/api/aviso';
