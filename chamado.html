@@ -701,7 +701,13 @@
                   chamados.unshift(c);
                 }
                 c.mensagens = ch.historico || [];
+                c.status = ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : ch.status));
+                c.responsavel = ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '';
+                c.tecnico = ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '';
                 try { localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados)); } catch(e){}
+                if (typeof carregarDadosChatCliente === 'function') {
+                  carregarDadosChatCliente(c);
+                }
                 if (typeof renderizarMensagensChatCliente === 'function') {
                   renderizarMensagensChatCliente(c);
                   if (typeof tocarSinoNotificacao === 'function') tocarSinoNotificacao();
@@ -759,16 +765,53 @@
       if (window.lucide && lucide.createIcons) lucide.createIcons();
     }
 
-    // Carrega e renderiza o histórico de chamados salvos
-    function carregarHistoricoChamados() {
+    // Carrega e renderiza o histórico de chamados salvos diretamente do Supabase Cloud
+    async function carregarHistoricoChamados() {
       const container = document.getElementById('lista-historico-chamados');
       if (!container) return;
 
       let chamados = [];
-      try {
-        const salvo = localStorage.getItem('fsc_kintsugi_chamados');
-        if (salvo) chamados = JSON.parse(salvo);
-      } catch(e) {}
+      // 1. Prioridade Máxima: busca chamados reais diretamente do Supabase Cloud
+      if (supabaseClient) {
+        try {
+          const { data, error } = await supabaseClient
+            .from('chamados')
+            .select('*')
+            .order('criado_em', { ascending: false })
+            .limit(10);
+          if (data && data.length > 0) {
+            chamados = data.map(ch => ({
+              id: ch.id,
+              titulo: ch.descricao ? (ch.descricao.length > 40 ? ch.descricao.substring(0, 40) + '...' : ch.descricao) : ('Chamado #' + ch.id),
+              categoria: ch.categoria || 'Geral',
+              solicitante: ch.solicitante,
+              empresa: ch.empresa,
+              setor: ch.setor,
+              ativo: ch.maquina_nome || 'auto',
+              ip: ch.maquina_ip || 'auto',
+              urgencia: ch.urgencia || 'Média',
+              status: ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : ch.status)),
+              data: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
+              horario: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
+              descricao: ch.descricao || '',
+              responsavel: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
+              tecnico: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
+              mensagens: Array.isArray(ch.historico) ? ch.historico : []
+            }));
+            try { localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados)); } catch(e){}
+          }
+        } catch(e) {
+          console.warn('Erro ao carregar chamados do Supabase:', e);
+        }
+      }
+
+      // 2. Fallback no cache do localStorage caso esteja sem conexão
+      if (chamados.length === 0) {
+        try {
+          const salvo = localStorage.getItem('fsc_kintsugi_chamados');
+          if (salvo) chamados = JSON.parse(salvo);
+        } catch(e) {}
+      }
 
       if (window._historicoChamadosLocais && Array.isArray(window._historicoChamadosLocais)) {
         window._historicoChamadosLocais.forEach(loc => {
@@ -779,50 +822,17 @@
       }
 
       if (!Array.isArray(chamados) || chamados.length === 0) {
-        chamados = [
-          {
-            id: "TICK-101",
-            titulo: "Solicitação de Acesso VPN Remota",
-            categoria: "Rede & Internet",
-            solicitante: "Gabriel Novaes",
-            empresa: "Aço Móveis",
-            ativo: "192.168.13.199",
-            ip: "192.168.13.199",
-            urgencia: "Média",
-            status: "Active",
-            data: "Hoje, 14:10",
-            descricao: "Configuração de rota VPN para teletrabalho na filial."
-          },
-          {
-            id: "TICK-102",
-            titulo: "Substituição de Teclado e Mouse",
-            categoria: "Hardware / Manutenção",
-            solicitante: "Mariana Costa",
-            empresa: "JPL",
-            ativo: "192.168.13.112",
-            ip: "192.168.13.112",
-            urgencia: "Baixa",
-            status: "Triagem",
-            data: "Hoje, 13:45",
-            descricao: "Teclado do setor de Qualidade apresentando falha nas teclas de atalho."
-          },
-          {
-            id: "TICK-106",
-            titulo: "Instalação da Impressora Térmica Zebra",
-            categoria: "Hardware / Manutenção",
-            solicitante: "Gabriel Novaes",
-            empresa: "Aço Móveis",
-            ativo: "192.168.18.25",
-            ip: "192.168.18.25",
-            urgencia: "Média",
-            status: "Resolvido",
-            data: "Ontem, 08:15",
-            descricao: "Driver instalado e etiquetas de código de barras testadas com sucesso."
-          }
-        ];
-        try {
-          localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados));
-        } catch(e) {}
+        container.innerHTML = `
+          <div class="text-center py-8 text-slate-400 space-y-2">
+            <div class="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-slate-400">
+              <i data-lucide="inbox" class="w-5 h-5"></i>
+            </div>
+            <p class="text-xs font-semibold text-slate-300">Nenhum chamado aberto ainda</p>
+            <p class="text-[10px] text-slate-400 max-w-[200px] mx-auto">Suas solicitações de suporte registradas aparecerão listadas aqui em tempo real.</p>
+          </div>
+        `;
+        if (window.lucide && lucide.createIcons) lucide.createIcons();
+        return;
       }
 
       container.innerHTML = chamados.slice(0, 5).map(c => {
@@ -968,10 +978,22 @@
       }
 
       const tStart = performance.now();
+      let ok = false;
       try {
-        await fetch('http://127.0.0.1:8090/ping', { mode: 'no-cors' });
-      } catch(e) {}
-      const latencia = Math.max(4, Math.round(performance.now() - tStart));
+        if (supabaseClient) {
+          await supabaseClient.from('empresas').select('id').limit(1);
+          ok = true;
+        } else {
+          await fetch('http://127.0.0.1:8090/ping', { mode: 'no-cors' });
+          ok = true;
+        }
+      } catch(e) {
+        try {
+          await fetch('http://127.0.0.1:8090/ping', { mode: 'no-cors' });
+          ok = true;
+        } catch(err2) {}
+      }
+      const latencia = Math.max(8, Math.round(performance.now() - tStart));
 
       setTimeout(() => {
         if (res) {
@@ -979,7 +1001,7 @@
             <div class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center justify-between">
               <div class="flex items-center gap-1.5 font-semibold">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>Conexão Estável com a T.I</span>
+                <span>Conexão Nuvem Ativa (Supabase)</span>
               </div>
               <span class="font-mono text-[11px] text-emerald-400 font-bold">${latencia}ms</span>
             </div>
@@ -987,7 +1009,7 @@
         }
         if (btn) btn.disabled = false;
         if (window.lucide && lucide.createIcons) lucide.createIcons();
-      }, 500);
+      }, 400);
     }
 
     function mostrarToast(titulo, msg) {
@@ -1019,7 +1041,7 @@
       // 1. Carrega dinamicamente empresas e setores vinculados às configurações
       await carregarEmpresasWeb();
       await carregarSetoresWeb();
-      carregarHistoricoChamados();
+      await carregarHistoricoChamados();
 
       // 2. Auto-preenche parâmetros de URL se passados (ex: ?ativo=QUA-01&solicitante=Maria&empresa=Aço%20Móveis&setor=Qualidade)
       const params = new URLSearchParams(window.location.search);
@@ -1479,6 +1501,37 @@
       } catch(e) {}
 
       let c = chamados.find(item => String(item.id) === String(id));
+
+      // 1. Prioridade Máxima: busca o chamado mais recente no Supabase Cloud
+      if (supabaseClient) {
+        try {
+          const { data, error } = await supabaseClient.from('chamados').select('*').eq('id', String(id)).single();
+          if (data) {
+            const nv = {
+              id: data.id,
+              titulo: data.descricao ? (data.descricao.length > 50 ? data.descricao.substring(0, 50) + '...' : data.descricao) : ('Chamado #' + data.id),
+              categoria: data.categoria || 'Geral',
+              solicitante: data.solicitante,
+              empresa: data.empresa,
+              setor: data.setor,
+              ativo: data.maquina_nome || 'auto',
+              ip: data.maquina_ip || 'auto',
+              urgencia: data.urgencia || 'Média',
+              status: data.status === 'Finalizados' ? 'Resolvido' : (data.status === 'Em Andamento' ? 'Em Andamento' : (data.status === 'Em Triagem' ? 'Triagem' : data.status)),
+              data: data.criado_em ? ('Hoje, ' + new Date(data.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
+              responsavel: data.tecnico && data.tecnico !== 'Não atribuído' ? data.tecnico : '',
+              tecnico: data.tecnico && data.tecnico !== 'Não atribuído' ? data.tecnico : '',
+              mensagens: Array.isArray(data.historico) ? data.historico : []
+            };
+            c = Object.assign({}, c || {}, nv);
+            const idx = chamados.findIndex(x => String(x.id) === String(id));
+            if (idx >= 0) chamados[idx] = c;
+            else chamados.unshift(c);
+            try { localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados)); } catch(e){}
+          }
+        } catch(e) {}
+      }
+
       if (!c && window._ultimoChamadoCriadoObj && String(window._ultimoChamadoCriadoObj.id) === String(id)) {
         c = window._ultimoChamadoCriadoObj;
       }

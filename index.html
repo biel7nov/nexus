@@ -7068,7 +7068,8 @@
       adicionarLog(item.ip || '127.0.0.1', item.ativo, 'Movimentação no Funil', `${item.id} movido para ${nomeEtapa}`, 'text-blue-600 font-semibold', 'Push 0s', userLogado.nome, obterEmpresaNormalizadaRegistro(item));
       salvarDadosLocais();
 
-      // Persiste a mudança de status na base central (chamados.json)
+      // Persiste a mudança de status na base central e nuvem Supabase
+      sincronizarChamadoNoSupabase(item);
       try {
         fetch('http://127.0.0.1:8090/api/chamados/atualizar', {
           method: 'POST',
@@ -7123,6 +7124,7 @@
       c.ultimaAtualizacao = 'Hoje às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' por ' + novoResponsavel;
 
       salvarDadosLocais();
+      sincronizarChamadoNoSupabase(c);
       try {
         fetch('http://127.0.0.1:8090/api/chamados/atualizar', {
           method: 'POST',
@@ -9728,7 +9730,7 @@
           });
 
           salvarDadosLocais();
-          renderizarKanban();
+          renderizarChamados();
           if (typeof renderizarTabelaChamados === 'function') renderizarTabelaChamados();
         }
       } catch(err) {
@@ -9786,8 +9788,9 @@
               if (!listaChamados.some(x => String(x.id) === String(nv.id))) {
                 listaChamados.unshift(nv);
                 salvarDadosLocais();
-                renderizarKanban();
+                renderizarChamados();
                 if (typeof renderizarTabelaChamados === 'function') renderizarTabelaChamados();
+                if (typeof tocarAlertaSonoroChamado === 'function') tocarAlertaSonoroChamado();
                 if (typeof mostrarToast === 'function') {
                   mostrarToast(`Novo chamado #${nv.id} recebido de ${nv.solicitante} (${nv.empresa})!`, 'info', 'Novo Chamado em Tempo Real');
                 }
@@ -9800,11 +9803,11 @@
                 if (ch.tecnico) listaChamados[idx].tecnico = ch.tecnico;
                 if (ch.historico) listaChamados[idx].mensagens = ch.historico;
                 salvarDadosLocais();
-                renderizarKanban();
+                renderizarChamados();
                 if (typeof renderizarTabelaChamados === 'function') renderizarTabelaChamados();
                 if (typeof chamadoAbertoNoModalId !== 'undefined' && String(chamadoAbertoNoModalId) === String(ch.id)) {
                   renderizarChatModal(listaChamados[idx]);
-                  if (typeof tocarSinoNotificacao === 'function') tocarSinoNotificacao();
+                  if (typeof tocarAlertaSonoroChamado === 'function') tocarAlertaSonoroChamado();
                 }
               } else {
                 carregarChamadosDoSupabase();
@@ -9871,6 +9874,52 @@
         }).then(() => {}).catch(err => console.warn('Erro ao atualizar chamado no Supabase:', err));
       } catch(e) {}
     }
+
+    async function carregarChamadosDoSupabase() {
+      if (!supabaseClient) return;
+      try {
+        const { data: chamData, error: chamErr } = await supabaseClient.from('chamados').select('*').order('criado_em', { ascending: false });
+        if (chamData && chamData.length > 0) {
+          const listaNuvem = chamData.map(ch => ({
+            id: ch.id,
+            titulo: ch.descricao ? (ch.descricao.length > 40 ? ch.descricao.substring(0, 40) + '...' : ch.descricao) : ('Chamado #' + ch.id),
+            descricao: ch.descricao,
+            desc: ch.descricao,
+            empresa: ch.empresa,
+            solicitante: ch.solicitante,
+            setor: ch.setor,
+            categoria: ch.categoria || 'Geral',
+            urgencia: ch.urgencia || 'Média',
+            status: ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : (ch.status === 'Em Espera' ? 'Em Espera' : (ch.status === 'Em Homologação' ? 'Homologacao' : 'Active')))),
+            data: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
+            horario: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
+            responsavel: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
+            tecnico: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
+            ip: ch.maquina_ip || 'auto',
+            ativo: ch.maquina_nome || 'auto',
+            mensagens: Array.isArray(ch.historico) ? ch.historico : []
+          }));
+
+          listaNuvem.forEach(nv => {
+            const idx = listaChamados.findIndex(x => String(x.id) === String(nv.id));
+            if (idx >= 0) {
+              listaChamados[idx] = Object.assign({}, listaChamados[idx], nv);
+            } else {
+              listaChamados.unshift(nv);
+            }
+          });
+
+          salvarDadosLocais();
+          renderizarChamados();
+          if (typeof renderizarTabelaChamados === 'function') renderizarTabelaChamados();
+        }
+      } catch(err) {
+        console.warn('Erro ao carregar chamados Supabase:', err);
+      }
+    }
+    window.carregarChamadosDoSupabase = carregarChamadosDoSupabase;
+    window.renderizarKanban = renderizarChamados;
+    window.tocarSinoNotificacao = tocarAlertaSonoroChamado;
 
     function salvarDadosLocais() {
       localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(listaChamados));
