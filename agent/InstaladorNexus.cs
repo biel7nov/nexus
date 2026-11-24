@@ -1225,18 +1225,29 @@ namespace NexusInstaller
                 bool extraiu = false;
                 try
                 {
-                    Stream resStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("NexusRemoteAgent.exe");
-                    if (resStream == null) resStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("FSCRemoteAgent.exe");
-                    using (resStream)
+                    string[] candResources = Assembly.GetExecutingAssembly().GetManifestResourceNames();
+                    Stream resStream = null;
+                    foreach (string rName in candResources)
                     {
-                        if (resStream != null)
+                        if (rName.EndsWith("NexusRemoteAgent.exe", StringComparison.OrdinalIgnoreCase) ||
+                            rName.EndsWith("FSCRemoteAgent.exe", StringComparison.OrdinalIgnoreCase))
                         {
-                            using (FileStream fs = new FileStream(targetExe, FileMode.Create, FileAccess.Write))
-                            {
-                                resStream.CopyTo(fs);
-                            }
-                            extraiu = true;
+                            resStream = Assembly.GetExecutingAssembly().GetManifestResourceStream(rName);
+                            if (resStream != null) break;
                         }
+                    }
+                    if (resStream == null) resStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Agent.NexusRemoteAgent.exe");
+                    if (resStream == null) resStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("NexusRemoteAgent.exe");
+                    if (resStream == null) resStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("FSCRemoteAgent.exe");
+
+                    if (resStream != null)
+                    {
+                        using (resStream)
+                        using (FileStream fs = new FileStream(targetExe, FileMode.Create, FileAccess.Write))
+                        {
+                            resStream.CopyTo(fs);
+                        }
+                        extraiu = true;
                     }
                 }
                 catch { }
@@ -1244,11 +1255,18 @@ namespace NexusInstaller
                 if (!extraiu)
                 {
                     string localExe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NexusRemoteAgent.exe");
-                if (!File.Exists(localExe)) localExe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FSCRemoteAgent.exe");
+                    if (!File.Exists(localExe)) localExe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "agent", "NexusRemoteAgent.exe");
+                    if (!File.Exists(localExe)) localExe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FSCRemoteAgent.exe");
                     if (File.Exists(localExe))
                     {
                         File.Copy(localExe, targetExe, true);
+                        extraiu = true;
                     }
+                }
+
+                if (!File.Exists(targetExe))
+                {
+                    throw new FileNotFoundException("O arquivo do agente '" + targetExe + "' não pôde ser extraído do instalador.");
                 }
 
                 try { string fscLegacy = Path.Combine(targetDir, "FSCRemoteAgent.exe"); if (File.Exists(targetExe)) File.Copy(targetExe, fscLegacy, true); } catch { }
