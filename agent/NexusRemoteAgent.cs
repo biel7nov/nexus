@@ -417,8 +417,18 @@ namespace NexusRemoteAgent
                         if (dict.ContainsKey("country")) geoCountry = Convert.ToString(dict["country"]);
                         if (dict.ContainsKey("isp")) geoIsp = Convert.ToString(dict["isp"]);
                         if (dict.ContainsKey("publicIp")) geoPublicIp = Convert.ToString(dict["publicIp"]);
-                        if (dict.ContainsKey("lat")) double.TryParse(Convert.ToString(dict["lat"]), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out geoLat);
-                        if (dict.ContainsKey("lon")) double.TryParse(Convert.ToString(dict["lon"]), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out geoLon);
+                        if (dict.ContainsKey("lat"))
+                        {
+                            try { geoLat = Convert.ToDouble(dict["lat"], System.Globalization.CultureInfo.InvariantCulture); }
+                            catch { double.TryParse(Convert.ToString(dict["lat"]).Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out geoLat); }
+                        }
+                        if (dict.ContainsKey("lon"))
+                        {
+                            try { geoLon = Convert.ToDouble(dict["lon"], System.Globalization.CultureInfo.InvariantCulture); }
+                            catch { double.TryParse(Convert.ToString(dict["lon"]).Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out geoLon); }
+                        }
+                        while (Math.Abs(geoLat) > 90.0) geoLat /= 10.0;
+                        while (Math.Abs(geoLon) > 180.0) geoLon /= 10.0;
                         if (dict.ContainsKey("mapsUrl")) geoMapsUrl = Convert.ToString(dict["mapsUrl"]);
                         if (dict.ContainsKey("label")) geoLabel = Convert.ToString(dict["label"]);
                     }
@@ -477,11 +487,30 @@ namespace NexusRemoteAgent
                         string prov = dict.ContainsKey("isp") ? Convert.ToString(dict["isp"]) : (dict.ContainsKey("connection") ? Convert.ToString(dict["connection"]) : "");
                         double lt = 0, ln = 0;
 
-                        if (dict.ContainsKey("lat")) double.TryParse(Convert.ToString(dict["lat"]), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out lt);
-                        else if (dict.ContainsKey("latitude")) double.TryParse(Convert.ToString(dict["latitude"]), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out lt);
+                        if (dict.ContainsKey("lat"))
+                        {
+                            try { lt = Convert.ToDouble(dict["lat"], System.Globalization.CultureInfo.InvariantCulture); }
+                            catch { double.TryParse(Convert.ToString(dict["lat"]).Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out lt); }
+                        }
+                        else if (dict.ContainsKey("latitude"))
+                        {
+                            try { lt = Convert.ToDouble(dict["latitude"], System.Globalization.CultureInfo.InvariantCulture); }
+                            catch { double.TryParse(Convert.ToString(dict["latitude"]).Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out lt); }
+                        }
 
-                        if (dict.ContainsKey("lon")) double.TryParse(Convert.ToString(dict["lon"]), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out ln);
-                        else if (dict.ContainsKey("longitude")) double.TryParse(Convert.ToString(dict["longitude"]), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out ln);
+                        if (dict.ContainsKey("lon"))
+                        {
+                            try { ln = Convert.ToDouble(dict["lon"], System.Globalization.CultureInfo.InvariantCulture); }
+                            catch { double.TryParse(Convert.ToString(dict["lon"]).Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out ln); }
+                        }
+                        else if (dict.ContainsKey("longitude"))
+                        {
+                            try { ln = Convert.ToDouble(dict["longitude"], System.Globalization.CultureInfo.InvariantCulture); }
+                            catch { double.TryParse(Convert.ToString(dict["longitude"]).Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out ln); }
+                        }
+
+                        while (Math.Abs(lt) > 90.0) lt /= 10.0;
+                        while (Math.Abs(ln) > 180.0) ln /= 10.0;
 
                         if (!string.IsNullOrEmpty(c))
                         {
@@ -1070,8 +1099,8 @@ namespace NexusRemoteAgent
         static long clipboardVersion = 1;
 
         // Versão oficial do Agente NexusTI & Build para Atualizações Silenciosas OTA
-        public const string AGENT_VERSION = "1.2.7";
-        public const int AGENT_BUILD = 127;
+        public const string AGENT_VERSION = "1.2.8";
+        public const int AGENT_BUILD = 128;
         public static bool isAtualizando = false;
 
         [STAThread]

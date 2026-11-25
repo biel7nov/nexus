@@ -1,6 +1,6 @@
 {
-  "version": "1.2.7",
-  "build": 127,
+  "version": "1.2.8",
+  "build": 128,
   "releaseDate": "2026-11-25",
   "downloadUrl": "https://raw.githubusercontent.com/biel7nov/nexus/main/agent/NexusRemoteAgent.exe",
   "fallbackUrl": "https://nexus-ten-brown.vercel.app/agent/NexusRemoteAgent.exe",
