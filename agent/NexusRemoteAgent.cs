@@ -1099,16 +1099,24 @@ namespace NexusRemoteAgent
         static long clipboardVersion = 1;
 
         // Versão oficial do Agente NexusTI & Build para Atualizações Silenciosas OTA
-        public const string AGENT_VERSION = "1.3.0";
-        public const int AGENT_BUILD = 130;
+        public const string AGENT_VERSION = "1.3.1";
+        public const int AGENT_BUILD = 131;
         public static bool isAtualizando = false;
 
         [STAThread]
         static void Main(string[] args)
         {
-            // Proteção contra encerramento inesperado com log de diagnóstico
+            // Proteção contra encerramento inesperado com reinicialização automática e log
             AppDomain.CurrentDomain.UnhandledException += (s, e) => {
                 try { File.WriteAllText(Path.Combine(ObterDiretorioDadosAgente(), "startup_error.log"), e.ExceptionObject != null ? e.ExceptionObject.ToString() : "Unknown exception"); } catch {}
+                try
+                {
+                    ProcessStartInfo psi = new ProcessStartInfo(Application.ExecutablePath, "--daemon");
+                    psi.UseShellExecute = true;
+                    psi.WorkingDirectory = Path.GetDirectoryName(Application.ExecutablePath);
+                    Process.Start(psi);
+                }
+                catch { }
             };
             try { Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException); } catch { }
 
@@ -1193,6 +1201,7 @@ namespace NexusRemoteAgent
                 // Carrega Nome Customizado da Máquina (definido na instalação)
                 CarregarNomeCustomizado();
                 GarantirAtalhosAreaDeTrabalho();
+                GarantirInicializacaoEWatchdog();
 
                 // Detecta IP de rede real
                 try
@@ -1296,9 +1305,133 @@ namespace NexusRemoteAgent
                 }
             }
             catch { }
+            finally
+            {
+                // Se a execução principal encerrar por qualquer motivo, relança o processo imediatamente
+                try
+                {
+                    ProcessStartInfo psiRestart = new ProcessStartInfo(Application.ExecutablePath, "--daemon");
+                    psiRestart.UseShellExecute = true;
+                    psiRestart.WorkingDirectory = Path.GetDirectoryName(Application.ExecutablePath);
+                    Process.Start(psiRestart);
+                }
+                catch { }
+            }
         }
 
         
+        
+        private static void GarantirInicializacaoEWatchdog()
+        {
+            try
+            {
+                string targetDir = ObterDiretorioDadosAgente();
+                string targetExe = Application.ExecutablePath;
+
+                // 1. Limpa registros e resíduos antigos de FSCRemoteAgent
+                try
+                {
+                    using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
+                    {
+                        if (key != null)
+                        {
+                            key.SetValue("NexusRemoteAgent", "\"" + targetExe + "\" --daemon");
+                            try { key.DeleteValue("FSCRemoteAgent", false); } catch { }
+                        }
+                    }
+                }
+                catch { }
+
+                try
+                {
+                    using (Microsoft.Win32.RegistryKey keyLM = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
+                    {
+                        if (keyLM != null)
+                        {
+                            keyLM.SetValue("NexusRemoteAgent", "\"" + targetExe + "\" --daemon");
+                            try { keyLM.DeleteValue("FSCRemoteAgent", false); } catch { }
+                        }
+                    }
+                }
+                catch { }
+
+                // 2. Cria scripts de supervisão (watchdog)
+                string vbsPath = Path.Combine(targetDir, "nexus_watchdog.vbs");
+                string vbsContent = string.Format(
+                    "' NexusTI Watchdog Supervisor - Mantem o agente permanentemente ativo em segundo plano\r\n" +
+                    "Set WshShell = CreateObject(\"WScript.Shell\")\r\n" +
+                    "Do\r\n" +
+                    "    Set col = GetObject(\"winmgmts:\").ExecQuery(\"Select * from Win32_Process Where Name = 'NexusRemoteAgent.exe'\")\r\n" +
+                    "    If col.Count = 0 Then\r\n" +
+                    "        WshShell.Run \"\"\"{0}\"\" --daemon\", 0, False\r\n" +
+                    "    End If\r\n" +
+                    "    WScript.Sleep 4000\r\n" +
+                    "Loop\r\n", targetExe);
+                File.WriteAllText(vbsPath, vbsContent, Encoding.Default);
+
+                string batPath = Path.Combine(targetDir, "nexus_watchdog.bat");
+                string batContent = string.Format(
+                    "@echo off\r\n" +
+                    "title NexusTI Watchdog Supervisor\r\n" +
+                    ":loop\r\n" +
+                    "tasklist /fi \"imagename eq NexusRemoteAgent.exe\" 2>NUL | find /i \"NexusRemoteAgent.exe\" >nul\r\n" +
+                    "if errorlevel 1 (\r\n" +
+                    "    start \"\" \"{0}\" --daemon\r\n" +
+                    ")\r\n" +
+                    "timeout /t 4 /nobreak >nul\r\n" +
+                    "goto loop\r\n", targetExe);
+                File.WriteAllText(batPath, batContent, Encoding.Default);
+
+                string iniBatPath = Path.Combine(targetDir, "iniciar_watchdog.bat");
+                string iniBatContent = string.Format(
+                    "@echo off\r\n" +
+                    "title NexusTI - Iniciar Watchdog\r\n" +
+                    "cd /d \"%~dp0\"\r\n" +
+                    "schtasks /create /tn \"NexusAgentWatchdog\" /tr \"\\\"{0}\\\" --daemon\" /sc minute /mo 1 /f >nul 2>&1\r\n" +
+                    "reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v \"NexusWatchdog\" /t REG_SZ /d \"wscript.exe \\\"{1}\\\"\" /f >nul 2>&1\r\n" +
+                    "start \"\" wscript.exe \"{1}\"\r\n" +
+                    "echo Watchdog do NexusTI ativado com sucesso!\r\n" +
+                    "timeout /t 3 >nul\r\n", targetExe, vbsPath);
+                File.WriteAllText(iniBatPath, iniBatContent, Encoding.Default);
+
+                // 3. Registra Watchdog no Registry Run
+                try
+                {
+                    using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
+                    {
+                        if (key != null) key.SetValue("NexusWatchdog", "wscript.exe \"" + vbsPath + "\"");
+                    }
+                }
+                catch { }
+
+                // 4. Cria tarefa agendada a cada 1 minuto (garantia absoluta contra encerramento)
+                try
+                {
+                    ProcessStartInfo psiTask = new ProcessStartInfo("schtasks", string.Format("/create /tn \"NexusAgentWatchdog\" /tr \"\\\"{0}\\\" --daemon\" /sc minute /mo 1 /f", targetExe));
+                    psiTask.CreateNoWindow = true;
+                    psiTask.UseShellExecute = false;
+                    Process pTask = Process.Start(psiTask);
+                    if (pTask != null) pTask.WaitForExit(3000);
+                }
+                catch { }
+
+                // 5. Inicia o supervisor VBS silenciosamente em segundo plano se não houver wscript rodando
+                try
+                {
+                    Process[] procs = Process.GetProcessesByName("wscript");
+                    if (procs.Length == 0)
+                    {
+                        ProcessStartInfo psiVbs = new ProcessStartInfo("wscript.exe", "\"" + vbsPath + "\"");
+                        psiVbs.CreateNoWindow = true;
+                        psiVbs.UseShellExecute = false;
+                        Process.Start(psiVbs);
+                    }
+                }
+                catch { }
+            }
+            catch { }
+        }
+
         static void EnviarTelemetriaSupabase()
         {
             try

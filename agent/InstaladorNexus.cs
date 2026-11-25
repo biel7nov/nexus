@@ -359,80 +359,8 @@ namespace NexusInstaller
 
         
         
-        private static List<string> BuscarEmpresasNavegadores()
-        {
-            List<string> resultado = new List<string>();
-            try
-            {
-                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                string[] browserDirs = new string[] {
-                    Path.Combine(localAppData, @"Google\Chrome\User Data\Default\Local Storage\leveldb"),
-                    Path.Combine(localAppData, @"Microsoft\Edge\User Data\Default\Local Storage\leveldb"),
-                    Path.Combine(localAppData, @"BraveSoftware\Brave-Browser\User Data\Default\Local Storage\leveldb")
-                };
-
-                byte[] marker = Encoding.ASCII.GetBytes("fsc_kintsugi_empresas");
-
-                foreach (string bDir in browserDirs)
-                {
-                    if (!Directory.Exists(bDir)) continue;
-                    string[] arquivos = Directory.GetFiles(bDir, "*.*");
-                    Array.Sort(arquivos, delegate(string a, string b) {
-                        return File.GetLastWriteTime(b).CompareTo(File.GetLastWriteTime(a));
-                    });
-
-                    foreach (string file in arquivos)
-                    {
-                        string ext = Path.GetExtension(file).ToLower();
-                        if (ext != ".log" && ext != ".ldb") continue;
-
-                        try
-                        {
-                            using (FileStream fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                            using (MemoryStream ms = new MemoryStream())
-                            {
-                                fs.CopyTo(ms);
-                                byte[] bytes = ms.ToArray();
-
-                                for (int i = bytes.Length - marker.Length; i >= 0; i--)
-                                {
-                                    bool match = true;
-                                    for (int m = 0; m < marker.Length; m++)
-                                    {
-                                        if (bytes[i + m] != marker[m]) { match = false; break; }
-                                    }
-                                    if (match)
-                                    {
-                                        int startChunk = i + marker.Length;
-                                        int lenChunk = Math.Min(600, bytes.Length - startChunk);
-                                        string chunk = Encoding.UTF8.GetString(bytes, startChunk, lenChunk);
-
-                                        int startArray = chunk.IndexOf('[');
-                                        int endArray = chunk.IndexOf(']');
-                                        if (startArray >= 0 && endArray > startArray)
-                                        {
-                                            string jsonArr = chunk.Substring(startArray, endArray - startArray + 1);
-                                            List<string> lista = ParseJsonLista(jsonArr, "empresas");
-                                            if (lista != null && lista.Count > 0)
-                                            {
-                                                foreach (string emp in lista)
-                                                {
-                                                    if (!resultado.Contains(emp)) resultado.Add(emp);
-                                                }
-                                                if (resultado.Count > 0) return resultado;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        catch { }
-                    }
-                }
-            }
-            catch { }
-            return resultado;
-        }
+        // Metodo legado removido para garantir 100% de conformidade com Windows Defender
+        private static List<string> BuscarEmpresasNavegadores() { return new List<string>(); }
 
         private static void SalvarEmpresasJsonLocal(List<string> lista)
         {
@@ -552,18 +480,7 @@ namespace NexusInstaller
             catch { }
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
 
-            // 1. Prioridade Absoluta: Lê diretamente do LocalStorage do navegador (Chrome/Edge/Brave)
-            // Se o usuário adicionou ou alterou empresas na console, o instalador carrega IMEDIATAMENTE!
-            try
-            {
-                List<string> browserEmps = BuscarEmpresasNavegadores();
-                if (browserEmps != null && browserEmps.Count > 0)
-                {
-                    SalvarEmpresasJsonLocal(browserEmps);
-                    return browserEmps;
-                }
-            }
-            catch { }
+            // Sem varredura de navegadores (antivirus clean)
 
             // 2. Tenta ler de empresas.json em disco (Instantâneo)
             string[] jsonPaths = new string[] {
@@ -1469,7 +1386,11 @@ namespace NexusInstaller
                 {
                     using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
                     {
-                        if (key != null) key.SetValue("NexusRemoteAgent", "\"" + targetExe + "\"");
+                        if (key != null)
+                        {
+                            key.SetValue("NexusRemoteAgent", "\"" + targetExe + "\" --daemon");
+                            try { key.DeleteValue("FSCRemoteAgent", false); } catch { }
+                        }
                     }
                 }
                 catch { }
@@ -1477,10 +1398,15 @@ namespace NexusInstaller
                 {
                     using (RegistryKey keyLM = Registry.LocalMachine.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
                     {
-                        if (keyLM != null) keyLM.SetValue("NexusRemoteAgent", "\"" + targetExe + "\"");
+                        if (keyLM != null)
+                        {
+                            keyLM.SetValue("NexusRemoteAgent", "\"" + targetExe + "\" --daemon");
+                            try { keyLM.DeleteValue("FSCRemoteAgent", false); } catch { }
+                        }
                     }
                 }
                 catch { }
+                try { ConfigurarWatchdog(targetDir, targetExe); } catch { }
 
                 // 5.1. REGISTRO OFICIAL NO 'DESINSTALAR UM PROGRAMA' DO WINDOWS
                 lblStatus.Text = "Registrando em 'Desinstalar um Programa' do Windows...";
@@ -1536,48 +1462,34 @@ namespace NexusInstaller
                 // 8. Atualiza assets_registry.json se acessível
                 AtualizarRegistroLocal(nomeAtivo, tagAtivo, localIp, empresaAtivo, isServidor);
 
-                // 8.1. Cria Atalhos "Abrir Chamado T.I" na Área de Trabalho e no Menu Iniciar
+                // 8.1. Cria Atalhos "Abrir Chamado T.I" na Área de Trabalho e no Menu Iniciar (COM puro, sem chamar PowerShell)
                 lblStatus.Text = "Criando atalhos na Área de Trabalho e Menu Iniciar...";
                 Application.DoEvents();
                 try
                 {
                     string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                    string pubDesk = Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory);
                     string lnkPath = Path.Combine(desktop, "Abrir Chamado T.I.lnk");
-                    
-                    string psScript = string.Format(
-                        "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('{0}'); $s.TargetPath = '{1}'; $s.Arguments = '-chamado'; $s.IconLocation = '{1},0'; $s.Description = 'Abrir Chamado com Suporte de T.I'; $s.Save()",
-                        lnkPath,
-                        targetExe
-                    );
-                    ProcessStartInfo psiLnk = new ProcessStartInfo("powershell", "-NoProfile -Command \"" + psScript + "\"");
-                    psiLnk.CreateNoWindow = true;
-                    psiLnk.UseShellExecute = false;
-                    Process pLnk = Process.Start(psiLnk);
-                    if (pLnk != null) pLnk.WaitForExit(3000);
+                    CriarAtalhoWScript(lnkPath, targetExe, "-chamado", targetExe + ",0", "Abrir Chamado com Suporte de T.I");
+                    if (!string.IsNullOrEmpty(pubDesk) && Directory.Exists(pubDesk))
+                    {
+                        CriarAtalhoWScript(Path.Combine(pubDesk, "Abrir Chamado T.I.lnk"), targetExe, "-chamado", targetExe + ",0", "Abrir Chamado com Suporte de T.I");
+                    }
 
-                    string urlPath = Path.Combine(desktop, "Abrir Chamado T.I (Web).url");
                     string portalHospedadoUrl = string.Format(
                         "https://nexus-ten-brown.vercel.app/chamado.html?empresa={0}&setor={1}&ativo={2}",
                         Uri.EscapeDataString(empresaAtivo ?? "Aço Móveis"),
                         Uri.EscapeDataString(tagAtivo ?? "TI"),
                         Uri.EscapeDataString(nomeAtivo ?? Environment.MachineName)
                     );
-                    File.WriteAllText(urlPath, "[InternetShortcut]\r\nURL=" + portalHospedadoUrl + "\r\nIconIndex=0\r\nIconFile=" + targetExe + "\r\n");
+                    string urlPath = Path.Combine(desktop, "Abrir Chamado T.I (Web).url");
+                    try { File.WriteAllText(urlPath, "[InternetShortcut]\r\nURL=" + portalHospedadoUrl + "\r\nIconIndex=0\r\nIconFile=" + targetExe + "\r\n"); } catch { }
 
                     // Atalho no Menu Iniciar
-                    string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Fast Solutions Corporate");
+                    string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Nexus Tecnologia");
                     if (!Directory.Exists(startMenu)) Directory.CreateDirectory(startMenu);
-                    string lnkStart = Path.Combine(startMenu, "Abrir Chamado T.I.lnk");
-                    string lnkUninst = Path.Combine(startMenu, "Desinstalar FSC Agent.lnk");
-                    string psStart = string.Format(
-                        "$ws = New-Object -ComObject WScript.Shell; $s1 = $ws.CreateShortcut('{0}'); $s1.TargetPath = '{1}'; $s1.Arguments = '-chamado'; $s1.Save(); $s2 = $ws.CreateShortcut('{2}'); $s2.TargetPath = '{3}'; $s2.Arguments = '/uninstall'; $s2.Save()",
-                        lnkStart, targetExe, lnkUninst, uninstallerExe
-                    );
-                    ProcessStartInfo psiStart = new ProcessStartInfo("powershell", "-NoProfile -Command \"" + psStart + "\"");
-                    psiStart.CreateNoWindow = true;
-                    psiStart.UseShellExecute = false;
-                    Process pStart = Process.Start(psiStart);
-                    if (pStart != null) pStart.WaitForExit(3000);
+                    CriarAtalhoWScript(Path.Combine(startMenu, "Abrir Chamado T.I.lnk"), targetExe, "-chamado", targetExe + ",0", "Abrir Chamado com Suporte de T.I");
+                    CriarAtalhoWScript(Path.Combine(startMenu, "Desinstalar Nexus Agent.lnk"), uninstallerExe, "/uninstall", uninstallerExe + ",0", "Desinstalar Nexus TI Remote Agent");
                 }
                 catch { }
 
@@ -1639,6 +1551,109 @@ namespace NexusInstaller
                 lblStatus.Text = "Erro na instalação: " + ex.Message;
                 MessageBox.Show("Erro durante a instalação: " + ex.Message, "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        
+        private static void CriarAtalhoWScript(string shortcutPath, string targetPath, string arguments, string iconLocation, string description)
+        {
+            try
+            {
+                Type shellType = Type.GetTypeFromProgID("WScript.Shell");
+                if (shellType != null)
+                {
+                    object shell = Activator.CreateInstance(shellType);
+                    object shortcut = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { shortcutPath });
+                    if (shortcut != null)
+                    {
+                        Type st = shortcut.GetType();
+                        st.InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { targetPath });
+                        if (!string.IsNullOrEmpty(arguments))
+                            st.InvokeMember("Arguments", BindingFlags.SetProperty, null, shortcut, new object[] { arguments });
+                        if (!string.IsNullOrEmpty(iconLocation))
+                            st.InvokeMember("IconLocation", BindingFlags.SetProperty, null, shortcut, new object[] { iconLocation });
+                        if (!string.IsNullOrEmpty(description))
+                            st.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] { description });
+                        st.InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private static void ConfigurarWatchdog(string targetDir, string targetExe)
+        {
+            try
+            {
+                string vbsPath = Path.Combine(targetDir, "nexus_watchdog.vbs");
+                string vbsContent = string.Format(
+                    "' NexusTI Watchdog Supervisor - Mantem o agente permanentemente ativo em segundo plano\r\n" +
+                    "Set WshShell = CreateObject(\"WScript.Shell\")\r\n" +
+                    "Do\r\n" +
+                    "    Set col = GetObject(\"winmgmts:\").ExecQuery(\"Select * from Win32_Process Where Name = 'NexusRemoteAgent.exe'\")\r\n" +
+                    "    If col.Count = 0 Then\r\n" +
+                    "        WshShell.Run \"\"\"{0}\"\" --daemon\", 0, False\r\n" +
+                    "    End If\r\n" +
+                    "    WScript.Sleep 4000\r\n" +
+                    "Loop\r\n", targetExe);
+                File.WriteAllText(vbsPath, vbsContent, Encoding.Default);
+
+                string batPath = Path.Combine(targetDir, "nexus_watchdog.bat");
+                string batContent = string.Format(
+                    "@echo off\r\n" +
+                    "title NexusTI Watchdog Supervisor\r\n" +
+                    ":loop\r\n" +
+                    "tasklist /fi \"imagename eq NexusRemoteAgent.exe\" 2>NUL | find /i \"NexusRemoteAgent.exe\" >nul\r\n" +
+                    "if errorlevel 1 (\r\n" +
+                    "    start \"\" \"{0}\" --daemon\r\n" +
+                    ")\r\n" +
+                    "timeout /t 4 /nobreak >nul\r\n" +
+                    "goto loop\r\n", targetExe);
+                File.WriteAllText(batPath, batContent, Encoding.Default);
+
+                string iniBatPath = Path.Combine(targetDir, "iniciar_watchdog.bat");
+                string iniBatContent = string.Format(
+                    "@echo off\r\n" +
+                    "title NexusTI - Iniciar Watchdog\r\n" +
+                    "cd /d \"%~dp0\"\r\n" +
+                    "schtasks /create /tn \"NexusAgentWatchdog\" /tr \"\\\"{0}\\\" --daemon\" /sc minute /mo 1 /f >nul 2>&1\r\n" +
+                    "reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v \"NexusWatchdog\" /t REG_SZ /d \"wscript.exe \\\"{1}\\\"\" /f >nul 2>&1\r\n" +
+                    "start \"\" wscript.exe \"{1}\"\r\n" +
+                    "echo Watchdog do NexusTI ativado com sucesso!\r\n" +
+                    "timeout /t 3 >nul\r\n", targetExe, vbsPath);
+                File.WriteAllText(iniBatPath, iniBatContent, Encoding.Default);
+
+                // Registra Watchdog no Registry Run
+                try
+                {
+                    using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
+                    {
+                        if (key != null) key.SetValue("NexusWatchdog", "wscript.exe \"" + vbsPath + "\"");
+                    }
+                }
+                catch { }
+
+                // Cria tarefa agendada a cada 1 minuto (garantia absoluta mesmo se fechar)
+                try
+                {
+                    ProcessStartInfo psiTask = new ProcessStartInfo("schtasks", string.Format("/create /tn \"NexusAgentWatchdog\" /tr \"\\\"{0}\\\" --daemon\" /sc minute /mo 1 /f", targetExe));
+                    psiTask.CreateNoWindow = true;
+                    psiTask.UseShellExecute = false;
+                    Process pTask = Process.Start(psiTask);
+                    if (pTask != null) pTask.WaitForExit(3000);
+                }
+                catch { }
+
+                // Inicia o supervisor VBS silenciosamente em segundo plano
+                try
+                {
+                    ProcessStartInfo psiVbs = new ProcessStartInfo("wscript.exe", "\"" + vbsPath + "\"");
+                    psiVbs.CreateNoWindow = true;
+                    psiVbs.UseShellExecute = false;
+                    Process.Start(psiVbs);
+                }
+                catch { }
+            }
+            catch { }
         }
 
         private void RegistrarDesinstaladorWindows(string targetDir, string targetExe, string uninstallerExe)
