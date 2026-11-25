@@ -658,9 +658,44 @@ namespace NexusInstaller
 
         private static List<string> CarregarSetoresDisponiveis()
         {
+            // 0. Prioridade Máxima: Busca os setores em tempo real direto do Supabase Cloud (sincronizado com o site)
+            try
+            {
+                List<string> supaSetores = BuscarSetoresSupabase();
+                if (supaSetores != null && supaSetores.Count > 0)
+                {
+                    try
+                    {
+                        var js = new System.Web.Script.Serialization.JavaScriptSerializer();
+                        string json = js.Serialize(supaSetores);
+                        File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "setores.json"), json, Encoding.UTF8);
+                    }
+                    catch { }
+                    return supaSetores;
+                }
+            }
+            catch { }
+
+            // 1. Tenta ler do recurso embutido (offline)
+            try
+            {
+                using (Stream st = Assembly.GetExecutingAssembly().GetManifestResourceStream("setores.json"))
+                {
+                    if (st != null)
+                    {
+                        using (StreamReader sr = new StreamReader(st, Encoding.UTF8))
+                        {
+                            var lista = ParseJsonSetores(sr.ReadToEnd());
+                            if (lista != null && lista.Count > 0) return lista;
+                        }
+                    }
+                }
+            }
+            catch { }
+
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
 
-            // 1. Tenta ler de arquivo local setores.json (Instantâneo)
+            // 2. Tenta ler de arquivo local setores.json (Instantâneo)
             string[] caminhos = new string[] {
                 Path.Combine(baseDir, "setores.json"),
                 Path.Combine(baseDir, "..\\setores.json"),

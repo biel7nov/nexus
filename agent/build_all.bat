@@ -14,7 +14,7 @@ if errorlevel 1 (
 echo NexusRemoteAgent.exe compilado com sucesso!
 
 echo Compilando Instalador-Nexus-Agent.exe...
-%CSC% /nologo /target:winexe /out:agent\Instalador-Nexus-Agent.exe /optimize+ /win32manifest:agent\installer.manifest /win32icon:agent\logo_nexus.ico /resource:viewer.html,viewer.html /resource:chamado.html,chamado.html /resource:agent\NexusRemoteAgent.exe,FSCInstaller.NexusRemoteAgent.exe /reference:System.Windows.Forms.dll,System.Drawing.dll,System.Web.Extensions.dll agent\AssemblyInfoInstaller.cs agent\InstaladorFSC.cs
+%CSC% /nologo /target:winexe /out:agent\Instalador-Nexus-Agent.exe /optimize+ /win32manifest:agent\installer.manifest /win32icon:agent\logo_nexus.ico /resource:viewer.html,viewer.html /resource:chamado.html,chamado.html /resource:setores.json,setores.json /resource:agent\NexusRemoteAgent.exe,FSCInstaller.NexusRemoteAgent.exe /reference:System.Windows.Forms.dll,System.Drawing.dll,System.Web.Extensions.dll agent\AssemblyInfoInstaller.cs agent\InstaladorNexus.cs
 if errorlevel 1 (
     echo ERRO ao compilar Instalador-Nexus-Agent.exe
     exit /b 1

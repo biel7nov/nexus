@@ -1580,18 +1580,12 @@
             </div>
           </div>
 
-          <!-- Painel de Indicadores por Empresa (TMA, SLA Cumprido, Categorias, Técnicos e Avaliação CSAT) -->
-          <div id="painel-indicadores-empresa" class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <!-- Painel de Indicadores por Empresa (SLA Cumprido, Categorias, Técnicos e Avaliação CSAT) -->
+          <div id="painel-indicadores-empresa" class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-3">
             <div class="bg-white p-3.5 rounded-lg border border-slate-200/80">
               <div class="text-[10px] font-medium uppercase tracking-wider text-slate-400" id="kpi-emp-label-nome">Visão Global</div>
               <div class="text-base font-semibold font-mono text-slate-900 mt-1" id="kpi-emp-total-chamados">0 chamados</div>
               <div class="text-[11px] text-emerald-500 font-normal mt-0.5" id="kpi-emp-resolvidos">0 concluídos</div>
-            </div>
-
-            <div class="bg-white p-3.5 rounded-lg border border-slate-200/80">
-              <div class="text-[10px] font-medium uppercase tracking-wider text-slate-400">Tempo Médio (TMA)</div>
-              <div class="text-base font-semibold font-mono text-slate-900 mt-1" id="kpi-emp-tma">18 min</div>
-              <div class="text-[11px] text-slate-500 mt-0.5" id="kpi-emp-tma-sub">Meta SLA: &lt; 4h</div>
             </div>
 
             <div class="bg-white p-3.5 rounded-lg border border-slate-200/80">
@@ -1605,8 +1599,6 @@
               <div class="text-xs font-semibold text-slate-900 mt-1.5 truncate" id="kpi-emp-top-cat">Hardware / Desktop</div>
               <div class="text-[11px] text-slate-500 mt-0.5 truncate" id="kpi-emp-top-tec">Téc: Gabriel Novaes</div>
             </div>
-
-            
           </div>
 
           <!-- Barra de Busca e Filtros Rápidos de Chamados -->
@@ -5290,11 +5282,11 @@
         }
       }, 80);
 
-      // Consulta de telemetria ao vivo enviada pelo software e chamados
-      setInterval(atualizarDadosDoAgenteEmTempoReal, 5000);
-      setInterval(sincronizarChamados, 3000); // Polling contínuo de chamados
-      setInterval(verificarStatusRedeAtivos, 6000);
-      setInterval(() => carregarAtivosDinamicos(false), 4000); // Polling de novos ativos
+      // Consulta de telemetria ao vivo enviada pelo software e chamados (2 em 2 minutos)
+      setInterval(atualizarDadosDoAgenteEmTempoReal, 120000);
+      setInterval(sincronizarChamados, 4000); // Polling contínuo de chamados
+      setInterval(verificarStatusRedeAtivos, 120000);
+      setInterval(() => carregarAtivosDinamicos(false), 120000); // Polling de ativos a cada 2 minutos
     });
 
     // =========================================================================
@@ -9645,11 +9637,13 @@
       // Polling contínuo de segurança para o Chat aberto e Chamados na Nuvem
       if (!window._supabaseChatPollingStarted) {
         window._supabaseChatPollingStarted = true;
-        setInterval(sincronizarChatAbertoSupabaseTecnico, 1500);
+        setInterval(sincronizarChatAbertoSupabaseTecnico, 2500);
         setInterval(() => {
           carregarChamadosDoSupabase(false);
+        }, 5000);
+        setInterval(() => {
           sincronizarComputadoresDoSupabase();
-        }, 4000);
+        }, 120000); // Atualização das máquinas a cada 2 minutos
       }
     }
 
@@ -10504,10 +10498,17 @@
     function renderizarEstacoesVisaoGeral() {
       const tbody = document.getElementById('tbody-estacoes-conectadas-visao-geral');
       if (!tbody) return;
-      tbody.innerHTML = '';
       const restricaoTec = obterEmpresaPermitidaUsuarioAtual();
       const filtroAtivo = restricaoTec !== 'todas' ? restricaoTec : (window.filtroEmpresaGlobal || 'todas');
       const ativos = (listaAtivos || []).filter(a => registroCorrespondeFiltroEmpresa(a, filtroAtivo));
+
+      // Anti-flicker: evita limpar e recriar o DOM quando os dados não foram modificados
+      const sigVisao = `${filtroAtivo}::` + ativos.map(a => `${a.host}|${a.ip}|${a.online}|${a.cpuUsedPct}|${a.ramUsedPct}`).join(';');
+      if (window._lastSigEstacoesVisaoGeral === sigVisao && tbody.children.length > 0) {
+        return;
+      }
+      window._lastSigEstacoesVisaoGeral = sigVisao;
+      tbody.innerHTML = '';
 
       const elContador = document.getElementById('contador-estacoes-visao-geral');
       if (elContador) elContador.textContent = `${ativos.length} ${ativos.length === 1 ? 'ativo' : 'ativos'}`;
@@ -11496,18 +11497,18 @@
 
       if (badgeEmp) {
         if (podeEmpresa) {
-          badgeEmp.className = 'p-3 rounded-xl bg-emerald-50/90 border border-emerald-200 text-emerald-900 flex items-center justify-between text-xs transition shadow-2xs';
+          badgeEmp.className = 'p-3.5 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-100 flex items-center justify-between text-xs transition shadow-sm';
           badgeEmp.innerHTML = `
-            <div class="flex items-center gap-2.5">
-              <div class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <div class="flex items-center gap-3">
+              <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold shrink-0">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
               </div>
               <div>
-                <span class="font-bold text-emerald-950">Permissão de Gestor Ativa:</span>
-                <span class="text-emerald-800 ml-1">Sua conta possui autorização para editar o nome da organização, e-mail corporativo e gerenciar os setores cadastrados.</span>
+                <span class="font-bold text-white text-xs">Permissão de Gestor Ativa:</span>
+                <span class="text-emerald-200/90 text-xs ml-1 font-normal">Sua conta possui autorização para editar o nome da organização, e-mail corporativo e gerenciar os setores cadastrados.</span>
               </div>
             </div>
-            <span class="px-2.5 py-0.5 rounded-full bg-emerald-200/80 text-emerald-900 font-bold text-[10px] border border-emerald-300 shrink-0">Gestor do Setup</span>
+            <span class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[11px] border border-emerald-500/40 shrink-0">Gestor do Setup</span>
           `;
           if (elEmpNome) elEmpNome.removeAttribute('readonly');
           if (elEmpEmail) elEmpEmail.removeAttribute('readonly');
@@ -11519,18 +11520,18 @@
       if (inputNovaEmp) inputNovaEmp.removeAttribute('readonly');
       if (btnAddEmp) { btnAddEmp.disabled = false; btnAddEmp.classList.remove('opacity-50', 'cursor-not-allowed'); }
         } else {
-          badgeEmp.className = 'p-3 rounded-xl bg-amber-50/90 border border-amber-200 text-amber-900 flex items-center justify-between text-xs transition shadow-2xs';
+          badgeEmp.className = 'p-3.5 rounded-xl bg-amber-950/70 border border-amber-500/40 text-amber-100 flex items-center justify-between text-xs transition shadow-sm';
           badgeEmp.innerHTML = `
-            <div class="flex items-center gap-2.5">
-              <div class="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
-                <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-600"></i>
+            <div class="flex items-center gap-3">
+              <div class="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold shrink-0">
+                <i data-lucide="lock" class="w-4 h-4 text-amber-400"></i>
               </div>
               <div>
-                <span class="font-bold text-amber-950">Modo Somente Leitura:</span>
-                <span class="text-amber-800 ml-1">Apenas usuários com permissão de <strong>Administrador da Empresa</strong> podem alterar o nome corporativo e setores.</span>
+                <span class="font-bold text-white text-xs">Modo Somente Leitura:</span>
+                <span class="text-amber-200/90 text-xs ml-1 font-normal">Apenas usuários com permissão de <strong class="text-amber-300">Administrador da Empresa</strong> podem alterar o nome corporativo e setores.</span>
               </div>
             </div>
-            <span class="px-2.5 py-0.5 rounded-full bg-amber-200/80 text-amber-900 font-bold text-[10px] border border-amber-300 shrink-0">Acesso Restrito</span>
+            <span class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-[11px] border border-amber-500/40 shrink-0">Acesso Restrito</span>
           `;
           if (elEmpNome) elEmpNome.setAttribute('readonly', 'true');
           if (elEmpEmail) elEmpEmail.setAttribute('readonly', 'true');
