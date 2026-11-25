@@ -1,4 +1,4 @@
-using System.Media;
+﻿using System.Media;
 using System;
 using System.IO;
 using System.Diagnostics;
@@ -2064,7 +2064,7 @@ namespace NexusRemoteAgent
                                 sw.Restart();
                                 int activeScreen = (sIdx >= 0) ? screenReq : currentScreenIndex;
                                 byte[] imgBytes = CapturaTelaBytes(activeScreen, drawCursor, scaleFactor, quality);
-                                if (imgBytes == null || imgBytes.Length == 0) continue;
+                                if (imgBytes == null || imgBytes.Length == 0) { Thread.Sleep(100); continue; }
 
                                 string frameHdr = "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " + imgBytes.Length + "\r\n\r\n";
                                 byte[] frameHdrBytes = Encoding.ASCII.GetBytes(frameHdr);

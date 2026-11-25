@@ -9630,12 +9630,20 @@
     async function sincronizarComputadoresDoSupabase() {
       if (!supabaseClient) return;
       try {
-        const { data: comps, error } = await supabaseClient.from('computadores').select('*');
+        let { data: comps, error } = await supabaseClient.from('computadores').select('*');
         if (!comps || error || !Array.isArray(comps)) return;
         let mudou = false;
 
         // Purga qualquer ativo fictício / de exemplo e mantém exclusivamente máquinas reais
         const MOCK_ASSETS = new Set(['QUA-01', 'DIR-NOTE01', 'FIN-NOTE02', 'FAB-TABLET01', 'SRV-DATABASE']);
+        // Deduplica reinstalações da mesma máquina (mesmo IP): mantém apenas o registro com heartbeat mais recente
+        const porIp = {};
+        comps.forEach(c => {
+          const k = (c.ip && c.ip !== '127.0.0.1') ? c.ip : ('id:' + (c.id || c.nome_computador));
+          const t = c.ultimo_heartbeat ? new Date(c.ultimo_heartbeat).getTime() : 0;
+          if (!porIp[k] || t > porIp[k]._t) porIp[k] = Object.assign({}, c, { _t: t });
+        });
+        comps = Object.values(porIp);
         const validHostNames = new Set(comps.map(c => String(c.nome_computador || c.id || '').toUpperCase()));
         listaAtivos = (listaAtivos || []).filter(a => {
           const h = String(a.host || '').toUpperCase();
@@ -12854,7 +12862,7 @@
 
         // Notifica também localmente caso o agente esteja rodando no mesmo host
         try {
-          fetch('http://127.0.0.1:8090/api/update?url=' + encodeURIComponent(dlUrl), { mode: 'no-cors' });
+          fetch('http://127.0.0.1:8090/api/update?url=' + encodeURIComponent(dlUrl), { mode: 'no-cors' }).catch(() => {});
         } catch (e) {}
 
         if (typeof mostrarToast === 'function') {
