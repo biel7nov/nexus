@@ -9643,7 +9643,7 @@
         }, 5000);
         setInterval(() => {
           sincronizarComputadoresDoSupabase();
-        }, 120000); // Atualização das máquinas a cada 2 minutos
+        }, 15000); // Polling inteligente com anti-flicker a cada 15s
       }
     }
 
@@ -9714,6 +9714,18 @@
           const emp = comp.empresa || 'Aço Móveis';
 
           const idx = listaAtivos.findIndex(a => String(a.host || '').toUpperCase() === String(hostName).toUpperCase());
+          let drivesComp = Array.isArray(comp.discos) && comp.discos.length > 0 ? comp.discos : null;
+          let diskTotalComp = 512;
+          let diskFreeComp = 215;
+          let diskUsedComp = 297;
+          let diskPctComp = 45;
+          if (drivesComp) {
+            diskTotalComp = drivesComp.reduce((s, d) => s + (Number(d.totalGb) || 0), 0);
+            diskFreeComp = drivesComp.reduce((s, d) => s + (Number(d.freeGb) || 0), 0);
+            diskUsedComp = drivesComp.reduce((s, d) => s + (Number(d.usedGb) || 0), 0);
+            diskPctComp = diskTotalComp > 0 ? Math.round((diskUsedComp / diskTotalComp) * 100) : 0;
+          }
+
           const mapped = {
             id: (idx >= 0 && listaAtivos[idx].id) ? listaAtivos[idx].id : ('FSC-' + hostName),
             host: hostName,
@@ -9726,15 +9738,20 @@
             empresa: emp,
             company: emp,
             tag: comp.setor || 'TI',
-            os: (idx >= 0 && listaAtivos[idx].os) ? listaAtivos[idx].os : 'Windows 10/11 Pro',
+            os: (idx >= 0 && listaAtivos[idx].os) ? listaAtivos[idx].os : (comp.is_server ? 'Windows Server' : 'Windows 10/11 Pro'),
             cpu: (idx >= 0 && listaAtivos[idx].cpu) ? listaAtivos[idx].cpu : 'Intel Core / AMD',
             cpuUsedPct: cpuPct,
-            ram: `8.0 GB DDR4 (${ramPct}% em uso)`,
-            ramTotalGb: 8.0,
-            ramUsedGb: +(8.0 * ramPct / 100).toFixed(1),
-            ramFreeGb: +(8.0 * (100 - ramPct) / 100).toFixed(1),
+            ram: `RAM ${ramPct}% em uso`,
+            ramTotalGb: (idx >= 0 && listaAtivos[idx].ramTotalGb) ? listaAtivos[idx].ramTotalGb : 16.0,
+            ramUsedGb: +(16.0 * ramPct / 100).toFixed(1),
+            ramFreeGb: +(16.0 * (100 - ramPct) / 100).toFixed(1),
             ramUsedPct: ramPct,
-            disk: (idx >= 0 && listaAtivos[idx].disk) ? listaAtivos[idx].disk : 'SSD 512 GB',
+            drives: drivesComp || ((idx >= 0 && listaAtivos[idx].drives) ? listaAtivos[idx].drives : null),
+            diskTotalGb: drivesComp ? diskTotalComp : ((idx >= 0 && listaAtivos[idx].diskTotalGb) ? listaAtivos[idx].diskTotalGb : 512),
+            diskFreeGb: drivesComp ? diskFreeComp : ((idx >= 0 && listaAtivos[idx].diskFreeGb) ? listaAtivos[idx].diskFreeGb : 215),
+            diskUsedGb: drivesComp ? diskUsedComp : ((idx >= 0 && listaAtivos[idx].diskUsedGb) ? listaAtivos[idx].diskUsedGb : 297),
+            diskUsedPct: drivesComp ? diskPctComp : ((idx >= 0 && listaAtivos[idx].diskUsedPct) ? listaAtivos[idx].diskUsedPct : 45),
+            disk: drivesComp ? formatarCapacidadeGbTb(diskTotalComp) + ` (${formatarCapacidadeGbTb(diskFreeComp)} livres)` : ((idx >= 0 && listaAtivos[idx].disk) ? listaAtivos[idx].disk : 'SSD 512 GB'),
             ip: ipAddr,
             port: 8090,
             lastConnected: comp.ultimo_heartbeat ? ('Hoje, ' + new Date(comp.ultimo_heartbeat).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
@@ -9816,6 +9833,11 @@
 
         renderizarEstacoesVisaoGeral();
 
+        const vSrv = document.getElementById('view-servidores');
+        if (vSrv && !vSrv.classList.contains('hidden') && typeof renderizarPainelServidores === 'function') {
+          renderizarPainelServidores(false);
+        }
+
         const vAtivos = document.getElementById('view-ativos');
         if (vAtivos && !vAtivos.classList.contains('hidden') && typeof renderizarTabelaInventario === 'function') {
           renderizarTabelaInventario();
@@ -9824,6 +9846,8 @@
         if (vRemoto && !vRemoto.classList.contains('hidden') && typeof renderizarListaAcessoRemoto === 'function') {
           renderizarListaAcessoRemoto();
         }
+
+        if (typeof atualizarBadges === 'function') atualizarBadges();
       } catch(e) {}
     }
 
