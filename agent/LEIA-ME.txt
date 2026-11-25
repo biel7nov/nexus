@@ -1,0 +1,25 @@
+========================================================================
+                 NEXUS TI — AGENTE CORPORATIVO DE SUPORTE
+========================================================================
+
+COMO INSTALAR:
+
+Opção 1 (Recomendada - Interface Gráfica):
+1. Dê dois cliques em "Instalador-Nexus-Agent.exe".
+2. Se o Windows SmartScreen exibir a tela azul "O Windows protegeu o computador":
+   - Clique em "Mais informações"
+   - Em seguida, clique em "Executar assim mesmo"
+   (Isso ocorre em qualquer software empresarial novo e seguro que não possui
+    certificado pago da Microsoft).
+3. Selecione a empresa e clique em "Instalar Agente Agora".
+
+Opção 2 (Instalação Direta via Script - Sem avisos do Windows):
+1. Clique com o botão direito em "Instalar-Nexus.bat".
+2. Selecione "Executar como Administrador".
+3. Digite o nome do ativo/empresa e pronto! O agente será configurado em 2 segundos.
+
+------------------------------------------------------------------------
+COMO DESINSTALAR:
+Execute "Desinstalar-Nexus.bat" como Administrador ou abra o Menu Iniciar
+e selecione "Desinstalar FSC Agent".
+========================================================================
