@@ -10292,6 +10292,14 @@
       }
     }
 
+    function normalizarCoordenadas(lat, lon) {
+      let lt = parseFloat(lat) || 0;
+      let ln = parseFloat(lon) || 0;
+      while (Math.abs(lt) > 90.0) lt /= 10.0;
+      while (Math.abs(ln) > 180.0) ln /= 10.0;
+      return { lat: lt, lon: ln };
+    }
+
     function preencherCardDetalhesAtivo(atv) {
       if (!atv) return;
 
@@ -10383,12 +10391,13 @@
       if (elGeoPublicIp) elGeoPublicIp.textContent = atv.publicIp || 'IP Dinâmico';
       if (elGeoIsp) elGeoIsp.textContent = atv.isp || 'Provedor de Acesso';
       
-      const hasCoords = (typeof atv.lat === 'number' && typeof atv.lon === 'number' && (atv.lat !== 0 || atv.lon !== 0));
+      const normGeo = normalizarCoordenadas(atv.lat, atv.lon);
+      const hasCoords = (normGeo.lat !== 0 || normGeo.lon !== 0);
       if (elGeoCoords) {
-        elGeoCoords.textContent = hasCoords ? `${atv.lat.toFixed(4)}, ${atv.lon.toFixed(4)}` : 'Detectando GPS/IP...';
+        elGeoCoords.textContent = hasCoords ? `${normGeo.lat.toFixed(4)}, ${normGeo.lon.toFixed(4)}` : 'Detectando GPS/IP...';
       }
       if (elGeoMapsBtn) {
-        const mUrl = atv.mapsUrl || (hasCoords ? `https://www.google.com/maps?q=${atv.lat},${atv.lon}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cidadeStr + ' Brasil')}`);
+        const mUrl = hasCoords ? `https://www.google.com/maps?q=${normGeo.lat.toFixed(4)},${normGeo.lon.toFixed(4)}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cidadeStr + ' Brasil')}`;
         elGeoMapsBtn.href = mUrl;
       }
     }
@@ -11077,7 +11086,10 @@
             </div>
             <div class="text-[11px] font-semibold text-slate-500 mt-0.5 flex items-center gap-1">
               <span>${atv.city ? (atv.city + (atv.region ? ', ' + atv.region : '')) : (atv.location ? atv.location.replace(/^Aço Móveis - |^JPL - /, '') : (atv.tag || 'Setor TI'))}</span>
-              ${(atv.lat && atv.lon) ? `<a href="${atv.mapsUrl || ('https://www.google.com/maps?q=' + atv.lat + ',' + atv.lon)}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center text-[10px] text-emerald-600 hover:text-emerald-700 font-bold ml-1 hover:underline" title="Ver localização geográfica da máquina no Google Maps">📍 Ver no Mapa</a>` : ''}
+              ${(() => {
+                const nG = normalizarCoordenadas(atv.lat, atv.lon);
+                return (nG.lat !== 0 || nG.lon !== 0) ? `<a href="https://www.google.com/maps?q=${nG.lat.toFixed(4)},${nG.lon.toFixed(4)}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center text-[10px] text-emerald-600 hover:text-emerald-700 font-bold ml-1 hover:underline" title="Ver localização geográfica da máquina no Google Maps">📍 Ver no Mapa</a>` : '';
+              })()}
             </div>
           </td>
 
