@@ -820,20 +820,94 @@
       if (window.lucide && lucide.createIcons) lucide.createIcons();
     }
 
-    // Carrega e renderiza o histórico de chamados salvos diretamente do Supabase Cloud
+    // Identificação confiável da máquina atual (Hostname / Ativo)
+    async function obterMaquinaAtual() {
+      // 1. URL Query param (?ativo=TI-0001)
+      const params = new URLSearchParams(window.location.search);
+      let host = params.get('ativo') || params.get('host') || params.get('maquina');
+      if (host && host.trim()) {
+        host = host.trim();
+        window._maquinaAtual = host;
+        try { localStorage.setItem('fsc_maquina_nome', host); } catch(e) {}
+        return host;
+      }
+
+      // 2. Memória da sessão
+      if (window._maquinaAtual && window._maquinaAtual.trim()) {
+        return window._maquinaAtual.trim();
+      }
+
+      // 3. Campo hidden caso já preenchido
+      const cAtv = document.getElementById('campo-ativo');
+      if (cAtv && cAtv.value && cAtv.value !== 'auto') {
+        host = cAtv.value.trim();
+        window._maquinaAtual = host;
+        try { localStorage.setItem('fsc_maquina_nome', host); } catch(e) {}
+        return host;
+      }
+
+      // 4. Consulta ao Agente Local (http://127.0.0.1:8090/api/status)
+      try {
+        const agentHost = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') && window.location.port === '8090' ? '' : 'http://127.0.0.1:8090';
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 1200);
+        const r = await fetch(agentHost + '/api/status', { signal: ctrl.signal, cache: 'no-cache' });
+        clearTimeout(tid);
+        if (r.ok) {
+          const st = await r.json();
+          if (st && (st.customName || st.hostname)) {
+            host = (st.customName || st.hostname).trim();
+            window._maquinaAtual = host;
+            try { localStorage.setItem('fsc_maquina_nome', host); } catch(e) {}
+            return host;
+          }
+        }
+      } catch(e) {}
+
+      // 5. Fallback localStorage
+      try {
+        host = localStorage.getItem('fsc_maquina_nome');
+        if (host && host.trim()) {
+          window._maquinaAtual = host.trim();
+          return host.trim();
+        }
+      } catch(e) {}
+
+      return '';
+    }
+
+    // Carrega e renderiza o histórico de chamados EXCLUSIVOS desta máquina
     async function carregarHistoricoChamados() {
       const container = document.getElementById('lista-historico-chamados');
       if (!container) return;
 
+      // Limpeza única para zerar resíduos antigos de testes cruzados entre máquinas
+      try {
+        if (!localStorage.getItem('fsc_historico_zerado_v4')) {
+          localStorage.removeItem('fsc_kintsugi_chamados');
+          localStorage.setItem('fsc_historico_zerado_v4', 'true');
+          window._historicoChamadosLocais = [];
+        }
+      } catch(e) {}
+
+      const maquinaAlvo = await obterMaquinaAtual();
+      const mNorm = (maquinaAlvo || '').trim().toLowerCase();
+
       let chamados = [];
-      // 1. Prioridade Máxima: busca chamados reais diretamente do Supabase Cloud
+
+      // 1. Prioridade Máxima: busca chamados reais do Supabase Cloud filtrados estritamente por esta máquina
       if (supabaseClient) {
         try {
-          const { data, error } = await supabaseClient
+          let query = supabaseClient
             .from('chamados')
             .select('*')
-            .order('criado_em', { ascending: false })
-            .limit(10);
+            .order('criado_em', { ascending: false });
+
+          if (mNorm) {
+            query = query.ilike('maquina_nome', mNorm);
+          }
+
+          const { data, error } = await query.limit(20);
           if (data && data.length > 0) {
             let locaisAtuais = [];
             try {
@@ -858,7 +932,7 @@
                 solicitante: ch.solicitante,
                 empresa: ch.empresa,
                 setor: ch.setor,
-                ativo: ch.maquina_nome || 'auto',
+                ativo: ch.maquina_nome || maquinaAlvo || 'auto',
                 ip: ch.maquina_ip || 'auto',
                 urgencia: ch.urgencia || 'Média',
                 status: ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : ch.status)),
@@ -877,19 +951,38 @@
         }
       }
 
-      // 2. Fallback no cache do localStorage caso esteja sem conexão
+      // 2. Fallback no cache do localStorage filtrado EXCLUSIVAMENTE por esta máquina
       if (chamados.length === 0) {
         try {
           const salvo = localStorage.getItem('fsc_kintsugi_chamados');
-          if (salvo) chamados = JSON.parse(salvo);
+          if (salvo) {
+            const arr = JSON.parse(salvo);
+            if (Array.isArray(arr)) {
+              chamados = arr.filter(ch => {
+                if (!mNorm) return false;
+                const atv = (ch.ativo || ch.maquina_nome || '').trim().toLowerCase();
+                return atv === mNorm;
+              });
+            }
+          }
         } catch(e) {}
       }
 
+      // Adiciona chamados recém-criados localmente apenas se pertencerem a esta máquina
       if (window._historicoChamadosLocais && Array.isArray(window._historicoChamadosLocais)) {
         window._historicoChamadosLocais.forEach(loc => {
-          if (!chamados.some(x => String(x.id) === String(loc.id))) {
+          const atv = (loc.ativo || loc.maquina_nome || '').trim().toLowerCase();
+          if ((!mNorm || atv === mNorm) && !chamados.some(x => String(x.id) === String(loc.id))) {
             chamados.unshift(loc);
           }
+        });
+      }
+
+      // Filtro rigoroso final: NUNCA exibir chamados de outras máquinas
+      if (mNorm) {
+        chamados = chamados.filter(ch => {
+          const atv = (ch.ativo || ch.maquina_nome || '').trim().toLowerCase();
+          return atv === mNorm;
         });
       }
 
@@ -900,7 +993,7 @@
               <i data-lucide="inbox" class="w-5 h-5"></i>
             </div>
             <p class="text-xs font-semibold text-slate-300">Nenhum chamado aberto ainda</p>
-            <p class="text-[10px] text-slate-400 max-w-[200px] mx-auto">Suas solicitações de suporte registradas aparecerão listadas aqui em tempo real.</p>
+            <p class="text-[10px] text-slate-400 max-w-[220px] mx-auto">${maquinaAlvo ? ('Os chamados abertos nesta estação (' + maquinaAlvo + ') aparecerão listados aqui.') : 'Suas solicitações de suporte registradas nesta estação aparecerão aqui.'}</p>
           </div>
         `;
         if (window.lucide && lucide.createIcons) lucide.createIcons();
@@ -1110,7 +1203,14 @@
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
-      // 1. Carrega dinamicamente empresas e setores vinculados às configurações
+      // 1. Identifica antecipadamente a máquina local antes de carregar o histórico
+      const maquinaIdentificada = await obterMaquinaAtual();
+      const campoAtv = document.getElementById('campo-ativo');
+      if (campoAtv && maquinaIdentificada) {
+        campoAtv.value = maquinaIdentificada;
+      }
+
+      // 2. Carrega dinamicamente empresas, setores e histórico da máquina
       await carregarEmpresasWeb();
       await carregarSetoresWeb();
       await carregarHistoricoChamados();
@@ -1272,7 +1372,10 @@
       if (window.lucide && lucide.createIcons) lucide.createIcons();
 
       const empresa = document.getElementById('campo-empresa').value.trim() || 'Aço Móveis';
-      const ativo = (document.getElementById('campo-ativo') && document.getElementById('campo-ativo').value.trim()) || 'auto';
+      let ativo = (document.getElementById('campo-ativo') && document.getElementById('campo-ativo').value.trim()) || 'auto';
+      if (ativo === 'auto' || !ativo) {
+        ativo = window._maquinaAtual || (await obterMaquinaAtual()) || 'auto';
+      }
       const ip = 'auto'; // Anexado diretamente pelo Agente Local no backend
       const solicitante = document.getElementById('campo-solicitante').value.trim() || 'Colaborador';
       const setor = document.getElementById('campo-setor').value;

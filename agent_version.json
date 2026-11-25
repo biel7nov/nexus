@@ -1,10 +1,10 @@
 {
-  "version": "1.2.8",
-  "build": 128,
+  "version": "1.2.9",
+  "build": 129,
   "releaseDate": "2026-11-25",
   "downloadUrl": "https://raw.githubusercontent.com/biel7nov/nexus/main/agent/NexusRemoteAgent.exe",
   "fallbackUrl": "https://nexus-ten-brown.vercel.app/agent/NexusRemoteAgent.exe",
   "installerUrl": "https://nexus-ten-brown.vercel.app/Instalador-Nexus-Agent.exe",
   "zipUrl": "https://nexus-ten-brown.vercel.app/Nexus-Agent-Instalador.zip",
-  "changelog": "Mapeamento completo de hardware (placa-mãe, processador, RAM, GPU, MAC e rede) e geolocalizacao GPS/IP em tempo real integrada ao mapa."
+  "changelog": "Filtro estrito de historico de chamados por maquina (exclusivo para estacao visualizada) e reset do historico antigo."
 }
