@@ -1,10 +1,11 @@
 {
-  "version": "1.3.0",
-  "build": 130,
+  "version": "1.3.2",
+  "build": 132,
   "releaseDate": "2026-11-25",
   "downloadUrl": "https://raw.githubusercontent.com/biel7nov/nexus/main/agent/NexusRemoteAgent.exe",
   "fallbackUrl": "https://nexus-ten-brown.vercel.app/agent/NexusRemoteAgent.exe",
   "installerUrl": "https://nexus-ten-brown.vercel.app/Instalador-Nexus-Agent.exe",
   "zipUrl": "https://nexus-ten-brown.vercel.app/Nexus-Agent-Instalador.zip",
-  "changelog": "Sincronizacao dinamica de setores e empresas no instalador direto do Supabase, ajuste de contraste nas configuracoes, remocao do card TMA e anti-flicker no dashboard a cada 2 minutos."
+  "changelog": "Sincronizacao dinamica de setores e empresas no instalador direto do Supabase, ajuste de contraste nas configuracoes, remocao do card TMA e anti-flicker no dashboard a cada 2 minutos.",
+  "description": "Captura de tela resiliente para Windows Server 2025/RDP console e cache de telemetria de discos."
 }

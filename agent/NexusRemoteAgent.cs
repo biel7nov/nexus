@@ -237,8 +237,28 @@ namespace NexusRemoteAgent
             return 24;
         }
 
+        static long _lastDisksCacheTicks = 0;
+        static string _cachedDisksJson = "[]";
+        static double _cachedTotalAllGb = 0;
+        static double _cachedFreeAllGb = 0;
+        static double _cachedUsedAllGb = 0;
+        static int _cachedUsedAllPct = 0;
+        static readonly object _disksLock = new object();
+
         static string ObterDetalhesDiscosJson(out double totalAllGb, out double freeAllGb, out double usedAllGb, out int usedAllPct)
         {
+            lock (_disksLock)
+            {
+                long now = DateTime.UtcNow.Ticks;
+                if (_lastDisksCacheTicks > 0 && (now - _lastDisksCacheTicks) < TimeSpan.FromSeconds(30).Ticks)
+                {
+                    totalAllGb = _cachedTotalAllGb;
+                    freeAllGb = _cachedFreeAllGb;
+                    usedAllGb = _cachedUsedAllGb;
+                    usedAllPct = _cachedUsedAllPct;
+                    return _cachedDisksJson;
+                }
+            }
             totalAllGb = 0;
             freeAllGb = 0;
             usedAllGb = 0;
@@ -296,7 +316,17 @@ namespace NexusRemoteAgent
             usedAllGb = Math.Round(usedAllGb, 1);
             usedAllPct = totalAllGb > 0 ? (int)Math.Round((usedAllGb / totalAllGb) * 100.0) : 0;
 
-            return sb.ToString();
+            string resJson = sb.ToString();
+            lock (_disksLock)
+            {
+                _cachedTotalAllGb = totalAllGb;
+                _cachedFreeAllGb = freeAllGb;
+                _cachedUsedAllGb = usedAllGb;
+                _cachedUsedAllPct = usedAllPct;
+                _cachedDisksJson = resJson;
+                _lastDisksCacheTicks = DateTime.UtcNow.Ticks;
+            }
+            return resJson;
         }
 
         static string DetectarTipoDispositivo()
@@ -1099,8 +1129,8 @@ namespace NexusRemoteAgent
         static long clipboardVersion = 1;
 
         // Versão oficial do Agente NexusTI & Build para Atualizações Silenciosas OTA
-        public const string AGENT_VERSION = "1.3.1";
-        public const int AGENT_BUILD = 131;
+        public const string AGENT_VERSION = "1.3.2";
+        public const int AGENT_BUILD = 132;
         public static bool isAtualizando = false;
 
         [STAThread]
@@ -3271,6 +3301,15 @@ namespace NexusRemoteAgent
         // ---------------------------------------------------------------------
         
         [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr OpenWindowStation(string lpszWinSta, bool fInherit, uint dwDesiredAccess);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool SetProcessWindowStation(IntPtr hWinSta);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr OpenDesktop(string lpszDesktop, uint dwFlags, bool fInherit, uint dwDesiredAccess);
+
+        [DllImport("user32.dll", SetLastError = true)]
         static extern IntPtr OpenInputDesktop(uint dwFlags, bool fInherit, uint dwDesiredAccess);
 
         [DllImport("user32.dll", SetLastError = true)]
@@ -3279,6 +3318,11 @@ namespace NexusRemoteAgent
         [DllImport("user32.dll", SetLastError = true)]
         static extern bool CloseDesktop(IntPtr hDesktop);
 
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr GetDesktopWindow();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr GetWindowDC(IntPtr hWnd);
 
         [DllImport("user32.dll", SetLastError = true)]
         static extern IntPtr GetDC(IntPtr hWnd);
@@ -3286,21 +3330,30 @@ namespace NexusRemoteAgent
         [DllImport("user32.dll", SetLastError = true)]
         static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
 
+        [DllImport("gdi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        static extern IntPtr CreateDC(string lpszDriver, string lpszDevice, string lpszOutput, IntPtr lpInitData);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        static extern bool DeleteDC(IntPtr hdc);
+
         [DllImport("gdi32.dll", SetLastError = true)]
         static extern bool BitBlt(IntPtr hObject, int nXDest, int nYDest, int nWidth, int nHeight, IntPtr hObjSource, int nXSrc, int nYSrc, int dwRop);
 
         static byte[] CapturaTelaBytes(int screenIdx, bool drawCursor, float scaleFactor = 1.0f, int quality = 45)
         {
+            IntPtr hDesk = IntPtr.Zero;
             try
             {
+                // Anexa à estação de janela e desktop ativos (essencial para Windows Server e RDP)
                 try
                 {
-                    IntPtr hDesk = OpenInputDesktop(0, false, 0x01FF);
-                    if (hDesk != IntPtr.Zero)
-                    {
-                        SetThreadDesktop(hDesk);
-                        CloseDesktop(hDesk);
-                    }
+                    IntPtr hwinsta = OpenWindowStation("winsta0", false, 0x037F);
+                    if (hwinsta != IntPtr.Zero) SetProcessWindowStation(hwinsta);
+
+                    hDesk = OpenInputDesktop(0, false, 0x01FF);
+                    if (hDesk == IntPtr.Zero) hDesk = OpenDesktop("Default", 0, false, 0x01FF);
+                    if (hDesk == IntPtr.Zero) hDesk = OpenDesktop("Winlogon", 0, false, 0x01FF);
+                    if (hDesk != IntPtr.Zero) SetThreadDesktop(hDesk);
                 }
                 catch { }
 
@@ -3313,6 +3366,8 @@ namespace NexusRemoteAgent
                     using (Graphics g = Graphics.FromImage(rawBmp))
                     {
                         bool capturou = false;
+
+                        // Camada 1: CopyFromScreen padrão
                         try
                         {
                             g.CopyFromScreen(bounds.X, bounds.Y, 0, 0, bounds.Size, CopyPixelOperation.SourceCopy);
@@ -3320,6 +3375,44 @@ namespace NexusRemoteAgent
                         }
                         catch { }
 
+                        // Camada 2: CreateDC("DISPLAY") com CAPTUREBLT (ideal para Server 2025 e sessões virtuais)
+                        if (!capturou)
+                        {
+                            try
+                            {
+                                IntPtr hdcDisplay = CreateDC("DISPLAY", null, null, IntPtr.Zero);
+                                if (hdcDisplay != IntPtr.Zero)
+                                {
+                                    IntPtr hdcDest = g.GetHdc();
+                                    BitBlt(hdcDest, 0, 0, bounds.Width, bounds.Height, hdcDisplay, bounds.X, bounds.Y, 0x00CC0020 | 0x40000000);
+                                    g.ReleaseHdc(hdcDest);
+                                    DeleteDC(hdcDisplay);
+                                    capturou = true;
+                                }
+                            }
+                            catch { }
+                        }
+
+                        // Camada 3: Desktop Window DC
+                        if (!capturou)
+                        {
+                            try
+                            {
+                                IntPtr hDesktopWnd = GetDesktopWindow();
+                                IntPtr hdcDesk = GetWindowDC(hDesktopWnd);
+                                if (hdcDesk != IntPtr.Zero)
+                                {
+                                    IntPtr hdcDest = g.GetHdc();
+                                    BitBlt(hdcDest, 0, 0, bounds.Width, bounds.Height, hdcDesk, bounds.X, bounds.Y, 0x00CC0020 | 0x40000000);
+                                    g.ReleaseHdc(hdcDest);
+                                    ReleaseDC(hDesktopWnd, hdcDesk);
+                                    capturou = true;
+                                }
+                            }
+                            catch { }
+                        }
+
+                        // Camada 4: GetDC(IntPtr.Zero) legado
                         if (!capturou)
                         {
                             try
@@ -3362,14 +3455,8 @@ namespace NexusRemoteAgent
                                             }
 
                                             IntPtr hdc = g.GetHdc();
-                                            try
-                                            {
-                                                DrawIcon(hdc, posX, posY, pci.hCursor);
-                                            }
-                                            finally
-                                            {
-                                                g.ReleaseHdc(hdc);
-                                            }
+                                            try { DrawIcon(hdc, posX, posY, pci.hCursor); }
+                                            finally { g.ReleaseHdc(hdc); }
                                         }
                                     }
                                 }
@@ -3404,7 +3491,8 @@ namespace NexusRemoteAgent
                                 }
                                 using (MemoryStream ms = new MemoryStream())
                                 {
-                                    if (jpgEncoder != null) { scaledBmp.Save(ms, jpgEncoder, ep); } else { scaledBmp.Save(ms, ImageFormat.Jpeg); }
+                                    if (jpgEncoder != null) scaledBmp.Save(ms, jpgEncoder, ep);
+                                    else scaledBmp.Save(ms, ImageFormat.Jpeg);
                                     return ms.ToArray();
                                 }
                             }
@@ -3413,7 +3501,8 @@ namespace NexusRemoteAgent
                         {
                             using (MemoryStream ms = new MemoryStream())
                             {
-                                if (jpgEncoder != null) { rawBmp.Save(ms, jpgEncoder, ep); } else { rawBmp.Save(ms, ImageFormat.Jpeg); }
+                                if (jpgEncoder != null) rawBmp.Save(ms, jpgEncoder, ep);
+                                else rawBmp.Save(ms, ImageFormat.Jpeg);
                                 return ms.ToArray();
                             }
                         }
@@ -3434,7 +3523,7 @@ namespace NexusRemoteAgent
                         using (SolidBrush b = new SolidBrush(Color.White))
                         {
                             gp.DrawString("NexusTI Remote Access — Sessão Conectada", f, b, 40, 40);
-                            gp.DrawString("Display operacional: " + ex.Message, SystemFonts.DefaultFont, Brushes.LightGray, 40, 80);
+                            gp.DrawString("Console operacional Windows Server: " + ex.Message, SystemFonts.DefaultFont, Brushes.LightGray, 40, 80);
                         }
                         placeholder.Save(ms, ImageFormat.Jpeg);
                         return ms.ToArray();
@@ -3442,6 +3531,13 @@ namespace NexusRemoteAgent
                 }
                 catch { }
                 return new byte[0];
+            }
+            finally
+            {
+                if (hDesk != IntPtr.Zero)
+                {
+                    try { CloseDesktop(hDesk); } catch { }
+                }
             }
         }
 
