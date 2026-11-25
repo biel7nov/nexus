@@ -2878,89 +2878,144 @@
             <div class="p-4 rounded-lg bg-white border border-slate-200/80 shadow-sm space-y-2">
               <div class="flex items-center justify-between text-xs font-medium text-slate-400">
                 <span>Processador (CPU)</span>
-                <span class="text-emerald-600 font-bold">Normal</span>
+                <span id="detalhe-cpu-status" class="text-emerald-600 font-bold">Normal</span>
               </div>
-              <div class="text-2xl font-black text-slate-900">38%</div>
+              <div id="detalhe-cpu-pct" class="text-2xl font-black text-slate-900">18%</div>
               <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                <div class="bg-blue-500 h-full rounded-full" style="width: 38%;"></div>
+                <div id="detalhe-cpu-bar" class="bg-blue-500 h-full rounded-full transition-all duration-500" style="width: 18%;"></div>
               </div>
-              <span class="text-[11px] text-slate-400 block">Intel Core i5 (4 núcleos / 8 threads)</span>
-            </div>
-
-            <div class="p-4 rounded-lg bg-white border border-amber-200/80 shadow-sm space-y-2">
-              <div class="flex items-center justify-between text-xs font-medium text-slate-400">
-                <span class="text-amber-700 font-bold">Memória RAM</span>
-                <span class="inline-flex items-center gap-1 text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded text-[10px] border border-amber-200/80"><i data-lucide="alert-triangle" class="w-3 h-3 text-amber-600"></i><span>Sobrecarga</span></span>
-              </div>
-              <div class="text-2xl font-black text-amber-600">84%</div>
-              <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                <div class="bg-amber-500 h-full rounded-full" style="width: 84%;"></div>
-              </div>
-              <span class="text-[11px] text-slate-400 block">6.7 GB utilizados de 8.0 GB</span>
+              <span id="detalhe-cpu-desc" class="text-[11px] text-slate-400 block truncate">Intel Core i5 / AMD</span>
             </div>
 
             <div class="p-4 rounded-lg bg-white border border-slate-200/80 shadow-sm space-y-2">
               <div class="flex items-center justify-between text-xs font-medium text-slate-400">
-                <span>Armazenamento C:</span>
-                <span class="text-slate-600 font-bold">Saudável</span>
+                <span>Memória RAM</span>
+                <span id="detalhe-ram-status" class="text-emerald-600 font-bold">Saudável</span>
               </div>
-              <div class="text-2xl font-black text-slate-900">42%</div>
+              <div id="detalhe-ram-pct" class="text-2xl font-black text-slate-900">45%</div>
               <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                <div class="bg-emerald-500 h-full rounded-full" style="width: 42%;"></div>
+                <div id="detalhe-ram-bar" class="bg-indigo-500 h-full rounded-full transition-all duration-500" style="width: 45%;"></div>
               </div>
-              <span class="text-[11px] text-slate-400 block">215 GB livres de 512 GB SSD</span>
+              <span id="detalhe-ram-desc" class="text-[11px] text-slate-400 block truncate">8.0 GB (4.0 GB em uso)</span>
+            </div>
+
+            <div class="p-4 rounded-lg bg-white border border-slate-200/80 shadow-sm space-y-2">
+              <div class="flex items-center justify-between text-xs font-medium text-slate-400">
+                <span>Armazenamento</span>
+                <span id="detalhe-disk-status" class="text-slate-600 font-bold">Saudável</span>
+              </div>
+              <div id="detalhe-disk-pct" class="text-2xl font-black text-slate-900">42%</div>
+              <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div id="detalhe-disk-bar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 42%;"></div>
+              </div>
+              <span id="detalhe-disk-desc" class="text-[11px] text-slate-400 block truncate">SSD 512 GB (215 GB livres)</span>
             </div>
 
             <div class="p-4 rounded-lg bg-white border border-slate-200/80 shadow-sm space-y-2">
               <div class="flex items-center justify-between text-xs font-medium text-slate-400">
                 <span>Rede & Latência</span>
-                <span class="text-emerald-600 font-bold">Excelente</span>
+                <span id="detalhe-net-status" class="text-emerald-600 font-bold">Excelente</span>
               </div>
-              <div class="text-2xl font-black text-emerald-600">4 ms</div>
+              <div id="detalhe-net-ping" class="text-2xl font-black text-emerald-600">4 ms</div>
               <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                <div class="bg-emerald-500 h-full rounded-full" style="width: 95%;"></div>
+                <div id="detalhe-net-bar" class="bg-emerald-500 h-full rounded-full" style="width: 95%;"></div>
               </div>
-              <span class="text-[11px] text-slate-400 block">Rede local 1Gbps (Porta 8090)</span>
+              <span id="detalhe-net-desc" class="text-[11px] text-slate-400 block truncate">Rede local 1Gbps (Porta 8090)</span>
             </div>
 
           </div>
 
-          <!-- Grid com Informações do Sistema e Processos em Execução -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Grid com Informações do Sistema, Localização Geográfica e Processos em Execução -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             <!-- Card 1: Especificações e Registro do Sistema -->
             <div class="p-6 rounded-xl bg-white border border-slate-200/80 shadow-sm space-y-4">
-              <h3 class="font-bold text-sm text-slate-900 pb-2 border-b border-slate-100">Especificações do Sistema</h3>
+              <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="cpu" class="w-4 h-4 text-blue-600"></i>
+                  <h3 class="font-bold text-sm text-slate-900">Especificações do Sistema</h3>
+                </div>
+                <span class="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">Hardware Real</span>
+              </div>
               
               <div class="space-y-3 text-xs">
                 <div class="flex items-center justify-between py-1 border-b border-slate-50">
                   <span class="text-slate-400">Sistema Operacional</span>
-                  <span class="font-semibold text-slate-800">Microsoft Windows 10 Pro (22H2)</span>
+                  <span id="detalhe-spec-os" class="font-semibold text-slate-800 text-right truncate max-w-[200px]">Windows 10/11 Pro</span>
+                </div>
+                <div class="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span class="text-slate-400">Fabricante / Modelo</span>
+                  <span id="detalhe-spec-mfg" class="font-semibold text-slate-800 text-right truncate max-w-[200px]">Dell Inc. Inspiron</span>
+                </div>
+                <div class="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span class="text-slate-400">Placa-Mãe & BIOS</span>
+                  <span id="detalhe-spec-board" class="font-semibold text-slate-800 text-right truncate max-w-[200px]">UEFI</span>
+                </div>
+                <div class="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span class="text-slate-400">Placa de Vídeo (GPU)</span>
+                  <span id="detalhe-spec-gpu" class="font-semibold text-slate-800 text-right truncate max-w-[200px]">Adaptador de Vídeo</span>
                 </div>
                 <div class="flex items-center justify-between py-1 border-b border-slate-50">
                   <span class="text-slate-400">Usuário do Windows</span>
-                  <span class="font-semibold text-slate-800 font-mono">gabrielnovaes</span>
+                  <span id="detalhe-spec-user" class="font-semibold text-slate-800 font-mono">Corporativo</span>
                 </div>
                 <div class="flex items-center justify-between py-1 border-b border-slate-50">
                   <span class="text-slate-400">Endereço IP Local</span>
-                  <span class="font-semibold text-slate-800 font-mono">192.168.18.122:8090</span>
+                  <span id="detalhe-spec-ip" class="font-semibold text-slate-800 font-mono">192.168.18.122:8090</span>
                 </div>
                 <div class="flex items-center justify-between py-1 border-b border-slate-50">
-                  <span class="text-slate-400">Caminho de Instalação</span>
-                  <span class="font-semibold text-slate-800 font-mono">C:\Nexus-Agent\NexusRemoteAgent.exe</span>
-                </div>
-                <div class="flex items-center justify-between py-1 border-b border-slate-50">
-                  <span class="text-slate-400">Gerenciador de Programas</span>
-                  <span class="font-bold text-emerald-600">Registrado (Programas e Recursos)</span>
+                  <span class="text-slate-400">Endereço Físico (MAC)</span>
+                  <span id="detalhe-spec-mac" class="font-mono text-slate-700">F4:28:9D:0D:F4:2F</span>
                 </div>
                 <div class="flex items-center justify-between py-1">
-                  <span class="text-slate-400">Atalho de Chamados</span>
-                  <span class="font-bold text-blue-600">Área de Trabalho & Bandeja Ativos</span>
+                  <span class="text-slate-400">Gateway da Rede</span>
+                  <span id="detalhe-spec-gateway" class="font-mono text-slate-700">192.168.18.1</span>
                 </div>
               </div>
             </div>
 
-            <!-- Card 2: Diagnóstico de Sobrecarga e Processos -->
+            <!-- Card 2: Localização Geográfica & Conectividade em Tempo Real -->
+            <div class="p-6 rounded-xl bg-white border border-slate-200/80 shadow-sm space-y-4">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="map-pin" class="w-4 h-4 text-rose-500"></i>
+                  <h3 class="font-bold text-sm text-slate-900">Localização da Máquina</h3>
+                </div>
+                <span id="detalhe-geo-status" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">GPS/IP Ativo</span>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div class="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span class="text-slate-400">Cidade & Estado</span>
+                  <span id="detalhe-geo-cidade" class="font-bold text-slate-800">Duque de Caxias, RJ</span>
+                </div>
+                <div class="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span class="text-slate-400">País</span>
+                  <span id="detalhe-geo-pais" class="font-semibold text-slate-800">Brasil</span>
+                </div>
+                <div class="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span class="text-slate-400">IP Público</span>
+                  <span id="detalhe-geo-publicip" class="font-semibold font-mono text-slate-800">138.121.73.162</span>
+                </div>
+                <div class="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span class="text-slate-400">Provedor (ISP)</span>
+                  <span id="detalhe-geo-isp" class="font-semibold text-slate-800 truncate max-w-[160px]">Station Net Provedor</span>
+                </div>
+                <div class="flex items-center justify-between py-1 border-b border-slate-50">
+                  <span class="text-slate-400">Coordenadas GPS</span>
+                  <span id="detalhe-geo-coords" class="font-mono text-slate-800">-22.7886, -43.3175</span>
+                </div>
+              </div>
+
+              <div class="pt-3">
+                <a id="detalhe-geo-maps-btn" href="https://www.google.com/maps?q=-22.7886,-43.3175" target="_blank" class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm shadow-emerald-600/20 transition">
+                  <i data-lucide="navigation" class="w-4 h-4 text-white"></i>
+                  <span>Abrir no Google Maps 📍</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- Card 3: Diagnóstico de Sobrecarga e Processos -->
             <div class="p-6 rounded-xl bg-white border border-slate-200/80 shadow-sm space-y-4">
               <div class="flex items-center justify-between pb-2 border-b border-slate-100">
                 <h3 class="font-bold text-sm text-slate-900">Processos com Maior Consumo</h3>
@@ -10237,6 +10292,107 @@
       }
     }
 
+    function preencherCardDetalhesAtivo(atv) {
+      if (!atv) return;
+
+      // Telemetria Topo
+      const cpuPct = typeof atv.cpuUsedPct === 'number' ? atv.cpuUsedPct : (parseInt(atv.cpu) || 18);
+      const elCpuPct = document.getElementById('detalhe-cpu-pct');
+      const elCpuBar = document.getElementById('detalhe-cpu-bar');
+      const elCpuDesc = document.getElementById('detalhe-cpu-desc');
+      const elCpuStatus = document.getElementById('detalhe-cpu-status');
+      if (elCpuPct) elCpuPct.textContent = `${cpuPct}%`;
+      if (elCpuBar) {
+        elCpuBar.style.width = `${Math.min(100, Math.max(5, cpuPct))}%`;
+        elCpuBar.className = cpuPct >= 80 ? 'bg-rose-500 h-full rounded-full transition-all duration-500' : 'bg-blue-500 h-full rounded-full transition-all duration-500';
+      }
+      if (elCpuDesc) elCpuDesc.textContent = atv.cpu || 'Intel Core i5 / AMD';
+      if (elCpuStatus) {
+        elCpuStatus.textContent = cpuPct >= 80 ? 'Sobrecarga' : 'Normal';
+        elCpuStatus.className = cpuPct >= 80 ? 'text-rose-600 font-bold' : 'text-emerald-600 font-bold';
+      }
+
+      // RAM
+      const ramPct = typeof atv.ramUsedPct === 'number' ? atv.ramUsedPct : (parseInt(atv.ram) || 45);
+      const elRamPct = document.getElementById('detalhe-ram-pct');
+      const elRamBar = document.getElementById('detalhe-ram-bar');
+      const elRamDesc = document.getElementById('detalhe-ram-desc');
+      const elRamStatus = document.getElementById('detalhe-ram-status');
+      if (elRamPct) elRamPct.textContent = `${ramPct}%`;
+      if (elRamBar) {
+        elRamBar.style.width = `${Math.min(100, Math.max(5, ramPct))}%`;
+        elRamBar.className = ramPct >= 85 ? 'bg-amber-500 h-full rounded-full transition-all duration-500' : 'bg-indigo-500 h-full rounded-full transition-all duration-500';
+      }
+      if (elRamDesc) {
+        elRamDesc.textContent = (atv.ramTotalGb && atv.ramUsedGb) 
+          ? `${atv.ramTotalGb} GB (${atv.ramUsedGb} GB em uso)`
+          : (atv.ram || '8.0 GB RAM');
+      }
+      if (elRamStatus) {
+        elRamStatus.textContent = ramPct >= 85 ? 'Elevado' : 'Saudável';
+        elRamStatus.className = ramPct >= 85 ? 'text-amber-600 font-bold' : 'text-emerald-600 font-bold';
+      }
+
+      // Disco
+      const diskPct = typeof atv.diskUsedPct === 'number' ? atv.diskUsedPct : (parseInt(atv.disco) || 42);
+      const elDiskPct = document.getElementById('detalhe-disk-pct');
+      const elDiskBar = document.getElementById('detalhe-disk-bar');
+      const elDiskDesc = document.getElementById('detalhe-disk-desc');
+      if (elDiskPct) elDiskPct.textContent = `${diskPct}%`;
+      if (elDiskBar) elDiskBar.style.width = `${Math.min(100, Math.max(5, diskPct))}%`;
+      if (elDiskDesc) {
+        elDiskDesc.textContent = (atv.diskTotalGb && atv.diskFreeGb)
+          ? `${atv.diskTotalGb} GB (${atv.diskFreeGb} GB livres)`
+          : (atv.disk || 'Armazenamento Principal');
+      }
+
+      // Latência
+      const elNetPing = document.getElementById('detalhe-net-ping');
+      if (elNetPing) elNetPing.textContent = atv.online ? '4 ms' : 'Off';
+
+      // Card 1: Especificações de Hardware e Sistema
+      const elSpecOs = document.getElementById('detalhe-spec-os');
+      const elSpecMfg = document.getElementById('detalhe-spec-mfg');
+      const elSpecBoard = document.getElementById('detalhe-spec-board');
+      const elSpecGpu = document.getElementById('detalhe-spec-gpu');
+      const elSpecUser = document.getElementById('detalhe-spec-user');
+      const elSpecIp = document.getElementById('detalhe-spec-ip');
+      const elSpecMac = document.getElementById('detalhe-spec-mac');
+      const elSpecGateway = document.getElementById('detalhe-spec-gateway');
+
+      if (elSpecOs) elSpecOs.textContent = atv.os || 'Microsoft Windows 10/11 (64-bit)';
+      if (elSpecMfg) elSpecMfg.textContent = atv.mfg ? `${atv.mfg} ${atv.model || ''}`.trim() : 'Padrão OEM / Desktop';
+      if (elSpecBoard) elSpecBoard.textContent = atv.board || (atv.bios ? `BIOS ${atv.bios}` : 'Placa-mãe Padrão ATX');
+      if (elSpecGpu) elSpecGpu.textContent = atv.gpu || 'Adaptador de Vídeo / Integrado';
+      if (elSpecUser) elSpecUser.textContent = atv.loggedUserFull || (atv.domain ? `${atv.domain}\\${atv.user}` : (atv.user || 'Corporativo'));
+      if (elSpecIp) elSpecIp.textContent = `${atv.ip || '127.0.0.1'}:8090`;
+      if (elSpecMac) elSpecMac.textContent = atv.mac || 'Pendente de leitura';
+      if (elSpecGateway) elSpecGateway.textContent = atv.gateway || (atv.ip ? atv.ip.replace(/\.\d+$/, '.1') : '192.168.1.1');
+
+      // Card 2: Localização Geográfica & Conectividade em Tempo Real
+      const elGeoCidade = document.getElementById('detalhe-geo-cidade');
+      const elGeoPais = document.getElementById('detalhe-geo-pais');
+      const elGeoPublicIp = document.getElementById('detalhe-geo-publicip');
+      const elGeoIsp = document.getElementById('detalhe-geo-isp');
+      const elGeoCoords = document.getElementById('detalhe-geo-coords');
+      const elGeoMapsBtn = document.getElementById('detalhe-geo-maps-btn');
+
+      const cidadeStr = atv.city ? `${atv.city}${atv.region ? ', ' + atv.region : ''}` : (atv.location ? atv.location.replace(/^Aço Móveis - |^JPL - /, '') : 'Local');
+      if (elGeoCidade) elGeoCidade.textContent = cidadeStr;
+      if (elGeoPais) elGeoPais.textContent = atv.country || 'Brasil';
+      if (elGeoPublicIp) elGeoPublicIp.textContent = atv.publicIp || 'IP Dinâmico';
+      if (elGeoIsp) elGeoIsp.textContent = atv.isp || 'Provedor de Acesso';
+      
+      const hasCoords = (typeof atv.lat === 'number' && typeof atv.lon === 'number' && (atv.lat !== 0 || atv.lon !== 0));
+      if (elGeoCoords) {
+        elGeoCoords.textContent = hasCoords ? `${atv.lat.toFixed(4)}, ${atv.lon.toFixed(4)}` : 'Detectando GPS/IP...';
+      }
+      if (elGeoMapsBtn) {
+        const mUrl = atv.mapsUrl || (hasCoords ? `https://www.google.com/maps?q=${atv.lat},${atv.lon}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cidadeStr + ' Brasil')}`);
+        elGeoMapsBtn.href = mUrl;
+      }
+    }
+
     function selecionarAtivoNaLista(hostname) {
       const atv = (listaAtivos || []).find(a => a.host === hostname) || (listaAtivos && listaAtivos[0]) || {
         host: hostname || 'TI-0001',
@@ -10268,6 +10424,53 @@
       if (elBtnRemoto) elBtnRemoto.onclick = () => iniciarAcessoRemoto(atv.ip, atv.host);
       if (elBtnPing) elBtnPing.onclick = () => pingAtivoEspecifico(atv.ip, atv.host);
       if (elBtnLogs) elBtnLogs.onclick = () => navegarParaLogsComFiltro(atv.host);
+
+      preencherCardDetalhesAtivo(atv);
+
+      if (atv.ip) {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 2500);
+        fetch(`http://${atv.ip}:8090/api/status`, { signal: ctrl.signal, mode: 'cors', cache: 'no-cache' })
+          .then(r => r.json())
+          .then(data => {
+            clearTimeout(tid);
+            if (data) {
+              if (data.mfg) atv.mfg = data.mfg;
+              if (data.model) atv.model = data.model;
+              if (data.board) atv.board = data.board;
+              if (data.bios) atv.bios = data.bios;
+              if (data.serial) atv.serial = data.serial;
+              if (data.gpu) atv.gpu = data.gpu;
+              if (data.gpuDriver) atv.gpuDriver = data.gpuDriver;
+              if (data.mac) atv.mac = data.mac;
+              if (data.adapter) atv.adapter = data.adapter;
+              if (data.gateway) atv.gateway = data.gateway;
+              if (data.dns) atv.dns = data.dns;
+              if (data.cpu) atv.cpu = data.cpu;
+              if (data.cpuThreads) atv.cpuThreads = data.cpuThreads;
+              if (typeof data.cpuUsedPct === 'number') atv.cpuUsedPct = data.cpuUsedPct;
+              if (data.ram) atv.ram = data.ram;
+              if (typeof data.ramUsedPct === 'number') atv.ramUsedPct = data.ramUsedPct;
+              if (typeof data.ramTotalGb === 'number') atv.ramTotalGb = data.ramTotalGb;
+              if (typeof data.ramUsedGb === 'number') atv.ramUsedGb = data.ramUsedGb;
+              if (data.disk) atv.disk = data.disk;
+              if (typeof data.diskUsedPct === 'number') atv.diskUsedPct = data.diskUsedPct;
+              if (typeof data.diskTotalGb === 'number') atv.diskTotalGb = data.diskTotalGb;
+              if (typeof data.diskFreeGb === 'number') atv.diskFreeGb = data.diskFreeGb;
+              if (data.publicIp) atv.publicIp = data.publicIp;
+              if (data.city) atv.city = data.city;
+              if (data.region) atv.region = data.region;
+              if (data.country) atv.country = data.country;
+              if (typeof data.lat === 'number') atv.lat = data.lat;
+              if (typeof data.lon === 'number') atv.lon = data.lon;
+              if (data.isp) atv.isp = data.isp;
+              if (data.mapsUrl) atv.mapsUrl = data.mapsUrl;
+              if (data.os) atv.os = data.os;
+              preencherCardDetalhesAtivo(atv);
+            }
+          })
+          .catch(() => clearTimeout(tid));
+      }
 
       atualizarPainelInfo({
         type: 'ativo',
@@ -10389,7 +10592,7 @@
       ativos.forEach(atv => {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50/80 transition cursor-pointer';
-        tr.onclick = () => selecionarAtivoNaLista(atv.host);
+        tr.onclick = () => { if (typeof navegarParaAba === 'function') navegarParaAba('view-ativo-detalhe'); selecionarAtivoNaLista(atv.host); };
         const cpu = typeof atv.cpuUsedPct === 'number' ? atv.cpuUsedPct : 15;
         const ram = typeof atv.ramUsedPct === 'number' ? atv.ramUsedPct : 40;
         tr.innerHTML = `
@@ -10654,7 +10857,28 @@
             company: empAgente,
             tag: data.tag || 'TI',
             os: data.os || 'Microsoft Windows 10 Pro (64-bit)',
+            mfg: data.mfg || (idx >= 0 ? listaAtivos[idx].mfg : ''),
+            model: data.model || (idx >= 0 ? listaAtivos[idx].model : ''),
+            board: data.board || (idx >= 0 ? listaAtivos[idx].board : ''),
+            bios: data.bios || (idx >= 0 ? listaAtivos[idx].bios : ''),
+            serial: data.serial || (idx >= 0 ? listaAtivos[idx].serial : ''),
+            gpu: data.gpu || (idx >= 0 ? listaAtivos[idx].gpu : ''),
+            gpuDriver: data.gpuDriver || (idx >= 0 ? listaAtivos[idx].gpuDriver : ''),
+            mac: data.mac || (idx >= 0 ? listaAtivos[idx].mac : ''),
+            adapter: data.adapter || (idx >= 0 ? listaAtivos[idx].adapter : ''),
+            gateway: data.gateway || (idx >= 0 ? listaAtivos[idx].gateway : ''),
+            dns: data.dns || (idx >= 0 ? listaAtivos[idx].dns : ''),
             cpu: data.cpu || 'Intel Core i5-10400 @ 2.90GHz (4c/8t)',
+            cpuThreads: data.cpuThreads || 8,
+            publicIp: data.publicIp || '',
+            city: data.city || '',
+            region: data.region || '',
+            country: data.country || '',
+            lat: typeof data.lat === 'number' ? data.lat : 0,
+            lon: typeof data.lon === 'number' ? data.lon : 0,
+            isp: data.isp || '',
+            mapsUrl: data.mapsUrl || '',
+            locationString: data.locationString || '',
             cpuUsedPct: typeof data.cpuUsedPct === 'number' ? data.cpuUsedPct : 18,
             ram: data.ram || '8.0 GB DDR4 (50% em uso)',
             ramTotalGb: typeof data.ramTotalGb === 'number' ? data.ramTotalGb : 8.0,
@@ -10852,14 +11076,15 @@
               <span>${empAtvNorm}</span>
             </div>
             <div class="text-[11px] font-semibold text-slate-500 mt-0.5 flex items-center gap-1">
-              <span>${atv.location ? atv.location.replace(/^Aço Móveis - |^JPL - /, '') : (atv.tag || 'Setor TI')}</span>
+              <span>${atv.city ? (atv.city + (atv.region ? ', ' + atv.region : '')) : (atv.location ? atv.location.replace(/^Aço Móveis - |^JPL - /, '') : (atv.tag || 'Setor TI'))}</span>
+              ${(atv.lat && atv.lon) ? `<a href="${atv.mapsUrl || ('https://www.google.com/maps?q=' + atv.lat + ',' + atv.lon)}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center text-[10px] text-emerald-600 hover:text-emerald-700 font-bold ml-1 hover:underline" title="Ver localização geográfica da máquina no Google Maps">📍 Ver no Mapa</a>` : ''}
             </div>
           </td>
 
           <!-- 4. Configuração da Máquina (Hardware & SO) -->
           <td class="px-5 py-4 max-w-xs">
-            <div class="font-bold text-slate-800 text-xs">${atv.os || 'Windows 10 Pro'}</div>
-            <div class="text-[11px] text-slate-500 mt-0.5 truncate" title="${atv.cpu || 'Intel Core i5'} • ${atv.ram || '8GB RAM'} • ${atv.disk || 'SSD 512GB'}">
+            <div class="font-bold text-slate-800 text-xs truncate" title="${(atv.mfg ? (atv.mfg + ' ' + (atv.model || '')) : (atv.os || 'Windows'))}">${(atv.mfg ? (atv.mfg + ' ' + (atv.model || '')) : (atv.os || 'Windows 10/11 Pro'))}</div>
+            <div class="text-[11px] text-slate-500 mt-0.5 truncate" title="${atv.cpu || 'Processador'} • ${atv.ram || 'RAM'} • ${atv.disk || 'Disco'} ${atv.gpu ? (' • ' + atv.gpu) : ''}">
               ${atv.cpu || 'Intel Core i5'} • ${atv.ram || '8GB RAM'} • ${atv.disk || 'SSD 512GB'}
             </div>
           </td>

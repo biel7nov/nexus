@@ -386,12 +386,237 @@ namespace NexusRemoteAgent
             return Environment.OSVersion.VersionString;
         }
 
-        static string ObterLocalizacao()
+        // =====================================================================
+        // GEOLOCALIZAÇÃO EM TEMPO REAL & MAPEAMENTO DE HARDWARE / SISTEMA
+        // =====================================================================
+        static string geoCity = "";
+        static string geoRegion = "";
+        static string geoCountry = "";
+        static double geoLat = 0.0;
+        static double geoLon = 0.0;
+        static string geoIsp = "";
+        static string geoPublicIp = "";
+        static string geoMapsUrl = "";
+        static string geoLabel = "";
+        static DateTime lastGeoUpdateUtc = DateTime.MinValue;
+
+        static void CarregarGeolocalizacaoCache()
         {
             try
             {
+                string geoFile = Path.Combine(ObterDiretorioDadosAgente(), "machine_geolocation.json");
+                if (File.Exists(geoFile))
+                {
+                    string txt = File.ReadAllText(geoFile, Encoding.UTF8).Trim();
+                    var js = new System.Web.Script.Serialization.JavaScriptSerializer();
+                    var dict = js.Deserialize<Dictionary<string, object>>(txt);
+                    if (dict != null)
+                    {
+                        if (dict.ContainsKey("city")) geoCity = Convert.ToString(dict["city"]);
+                        if (dict.ContainsKey("region")) geoRegion = Convert.ToString(dict["region"]);
+                        if (dict.ContainsKey("country")) geoCountry = Convert.ToString(dict["country"]);
+                        if (dict.ContainsKey("isp")) geoIsp = Convert.ToString(dict["isp"]);
+                        if (dict.ContainsKey("publicIp")) geoPublicIp = Convert.ToString(dict["publicIp"]);
+                        if (dict.ContainsKey("lat")) double.TryParse(Convert.ToString(dict["lat"]), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out geoLat);
+                        if (dict.ContainsKey("lon")) double.TryParse(Convert.ToString(dict["lon"]), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out geoLon);
+                        if (dict.ContainsKey("mapsUrl")) geoMapsUrl = Convert.ToString(dict["mapsUrl"]);
+                        if (dict.ContainsKey("label")) geoLabel = Convert.ToString(dict["label"]);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        static void AtualizarGeolocalizacao()
+        {
+            if ((DateTime.UtcNow - lastGeoUpdateUtc).TotalMinutes < 20 && !string.IsNullOrEmpty(geoCity))
+            {
+                return;
+            }
+
+            try
+            {
+                ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+                string json = null;
+
+                // 1. Provedor Primário: ip-api.com
+                try
+                {
+                    using (WebClient wc = new WebClient())
+                    {
+                        wc.Headers["User-Agent"] = "NexusTI-Agent/" + AGENT_VERSION;
+                        json = wc.DownloadString("http://ip-api.com/json/?fields=status,message,country,countryCode,region,regionName,city,lat,lon,isp,query");
+                    }
+                }
+                catch { }
+
+                // 2. Provedor Secundário (Fallback): ipwho.is
+                if (string.IsNullOrEmpty(json) || !json.Contains("\"city\""))
+                {
+                    try
+                    {
+                        using (WebClient wc = new WebClient())
+                        {
+                            wc.Headers["User-Agent"] = "NexusTI-Agent/" + AGENT_VERSION;
+                            json = wc.DownloadString("https://ipwho.is/");
+                        }
+                    }
+                    catch { }
+                }
+
+                if (!string.IsNullOrEmpty(json))
+                {
+                    var js = new System.Web.Script.Serialization.JavaScriptSerializer();
+                    var dict = js.Deserialize<Dictionary<string, object>>(json);
+                    if (dict != null)
+                    {
+                        string c = dict.ContainsKey("city") ? Convert.ToString(dict["city"]) : "";
+                        string reg = dict.ContainsKey("region") ? Convert.ToString(dict["region"]) : (dict.ContainsKey("regionName") ? Convert.ToString(dict["regionName"]) : "");
+                        string ctry = dict.ContainsKey("country") ? Convert.ToString(dict["country"]) : "";
+                        string q = dict.ContainsKey("query") ? Convert.ToString(dict["query"]) : (dict.ContainsKey("ip") ? Convert.ToString(dict["ip"]) : "");
+                        string prov = dict.ContainsKey("isp") ? Convert.ToString(dict["isp"]) : (dict.ContainsKey("connection") ? Convert.ToString(dict["connection"]) : "");
+                        double lt = 0, ln = 0;
+
+                        if (dict.ContainsKey("lat")) double.TryParse(Convert.ToString(dict["lat"]), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out lt);
+                        else if (dict.ContainsKey("latitude")) double.TryParse(Convert.ToString(dict["latitude"]), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out lt);
+
+                        if (dict.ContainsKey("lon")) double.TryParse(Convert.ToString(dict["lon"]), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out ln);
+                        else if (dict.ContainsKey("longitude")) double.TryParse(Convert.ToString(dict["longitude"]), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out ln);
+
+                        if (!string.IsNullOrEmpty(c))
+                        {
+                            geoCity = c;
+                            geoRegion = reg;
+                            geoCountry = ctry;
+                            geoPublicIp = q;
+                            geoIsp = prov;
+                            geoLat = lt;
+                            geoLon = ln;
+                            geoMapsUrl = string.Format(System.Globalization.CultureInfo.InvariantCulture, "https://www.google.com/maps?q={0},{1}", lt, ln);
+                            geoLabel = c + (string.IsNullOrEmpty(reg) ? "" : ", " + reg) + (string.IsNullOrEmpty(ctry) ? "" : " - " + ctry);
+                            lastGeoUpdateUtc = DateTime.UtcNow;
+
+                            try
+                            {
+                                var cacheObj = new Dictionary<string, object>
+                                {
+                                    { "city", geoCity },
+                                    { "region", geoRegion },
+                                    { "country", geoCountry },
+                                    { "publicIp", geoPublicIp },
+                                    { "isp", geoIsp },
+                                    { "lat", geoLat },
+                                    { "lon", geoLon },
+                                    { "mapsUrl", geoMapsUrl },
+                                    { "label", geoLabel },
+                                    { "updatedAt", DateTime.UtcNow.ToString("o") }
+                                };
+                                string cacheJson = js.Serialize(cacheObj);
+                                File.WriteAllText(Path.Combine(ObterDiretorioDadosAgente(), "machine_geolocation.json"), cacheJson, Encoding.UTF8);
+                                File.WriteAllText(Path.Combine(ObterDiretorioDadosAgente(), "machine_location.txt"), geoLabel, Encoding.UTF8);
+                            }
+                            catch { }
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        static void ObterFabricanteEModelo(out string mfg, out string model, out string board, out string bios, out string serial)
+        {
+            mfg = "Computador Corporativo";
+            model = "Estação de Trabalho";
+            board = "Placa-Mãe Padrão";
+            bios = "UEFI/BIOS";
+            serial = "";
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\BIOS"))
+                {
+                    if (key != null)
+                    {
+                        object vMfg = key.GetValue("SystemManufacturer");
+                        object vMod = key.GetValue("SystemProductName");
+                        object vBrd = key.GetValue("BaseBoardProduct");
+                        object vBio = key.GetValue("BIOSVersion");
+                        object vSer = key.GetValue("SystemSerialNumber");
+                        if (vMfg != null && !string.IsNullOrEmpty(vMfg.ToString())) mfg = vMfg.ToString().Trim();
+                        if (vMod != null && !string.IsNullOrEmpty(vMod.ToString())) model = vMod.ToString().Trim();
+                        if (vBrd != null && !string.IsNullOrEmpty(vBrd.ToString())) board = vBrd.ToString().Trim();
+                        if (vBio != null && !string.IsNullOrEmpty(vBio.ToString())) bios = vBio.ToString().Trim();
+                        if (vSer != null && !string.IsNullOrEmpty(vSer.ToString())) serial = vSer.ToString().Trim();
+                    }
+                }
+            }
+            catch { }
+        }
+
+        static void ObterPlacaDeVideo(out string gpuName, out string gpuDriver)
+        {
+            gpuName = "Adaptador de Vídeo Padrão";
+            gpuDriver = "WDDM";
+            try
+            {
+                using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000"))
+                {
+                    if (key != null)
+                    {
+                        object vName = key.GetValue("DriverDesc");
+                        object vDrv = key.GetValue("DriverVersion");
+                        if (vName != null) gpuName = vName.ToString().Trim();
+                        if (vDrv != null) gpuDriver = vDrv.ToString().Trim();
+                    }
+                }
+            }
+            catch { }
+        }
+
+        static void ObterDetalhesRede(out string mac, out string adapter, out string gateway, out string dns)
+        {
+            mac = "";
+            adapter = "Ethernet";
+            gateway = "";
+            dns = "";
+            try
+            {
+                foreach (var ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (ni.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up &&
+                        ni.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+                    {
+                        var ipProps = ni.GetIPProperties();
+                        if (ipProps != null && ipProps.UnicastAddresses.Count > 0)
+                        {
+                            byte[] bytes = ni.GetPhysicalAddress().GetAddressBytes();
+                            if (bytes != null && bytes.Length == 6)
+                            {
+                                mac = string.Format("{0:X2}:{1:X2}:{2:X2}:{3:X2}:{4:X2}:{5:X2}", bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]);
+                                adapter = ni.Description;
+                                if (ipProps.GatewayAddresses.Count > 0)
+                                    gateway = ipProps.GatewayAddresses[0].Address.ToString();
+                                if (ipProps.DnsAddresses.Count > 0)
+                                    dns = ipProps.DnsAddresses[0].Address.ToString();
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        static string ObterLocalizacao()
+        {
+            if (!string.IsNullOrEmpty(geoLabel)) return geoLabel;
+            try
+            {
                 string locFile = Path.Combine(ObterDiretorioDadosAgente(), "machine_location.txt");
-                if (File.Exists(locFile)) return File.ReadAllText(locFile).Trim();
+                if (File.Exists(locFile))
+                {
+                    string l = File.ReadAllText(locFile).Trim();
+                    if (!string.IsNullOrEmpty(l)) return l;
+                }
             }
             catch { }
             return customEmpresa + " - " + customMachineTag.Replace("#", "").Trim();
@@ -845,8 +1070,8 @@ namespace NexusRemoteAgent
         static long clipboardVersion = 1;
 
         // Versão oficial do Agente NexusTI & Build para Atualizações Silenciosas OTA
-        public const string AGENT_VERSION = "1.2.6";
-        public const int AGENT_BUILD = 126;
+        public const string AGENT_VERSION = "1.2.7";
+        public const int AGENT_BUILD = 127;
         public static bool isAtualizando = false;
 
         [STAThread]
@@ -994,6 +1219,9 @@ namespace NexusRemoteAgent
                     try { File.WriteAllText(configPath, sessionToken, Encoding.UTF8); } catch { }
                 }
 
+                // Carrega Geolocalização em Cache imediatamente
+                CarregarGeolocalizacaoCache();
+
                 // Auto-registro do ativo, telemetria contínua, comunicados e auto-atualização silenciosa OTA
                 ThreadPool.QueueUserWorkItem(_ => {
                     int tick = 0;
@@ -1001,6 +1229,11 @@ namespace NexusRemoteAgent
                     {
                         try
                         {
+                            if (tick == 0 || tick % 120 == 0) // Atualiza localização na inicialização e a cada 10 min
+                            {
+                                AtualizarGeolocalizacao();
+                            }
+
                             VerificarComunicadosSupabase();
                             if (tick % 6 == 0)
                             {
@@ -1060,11 +1293,19 @@ namespace NexusRemoteAgent
                 try { cpu = ObterUsoCpuPercent(); } catch { }
                 try { double tg; ObterMemoriaRam(out tg, out ram); } catch { }
 
+                double dTot, dFre, dUsd; int dPct;
+                string drivesJson = ObterDetalhesDiscosJson(out dTot, out dFre, out dUsd, out dPct);
+                if (string.IsNullOrEmpty(drivesJson)) drivesJson = "[]";
+
                 string safeId = (idComp ?? "").Replace("\"", "'");
                 string safeEmp = (empComp ?? "").Replace("\"", "'");
                 string safeSet = (setComp ?? "").Replace("\"", "'");
+                if (!string.IsNullOrEmpty(geoCity) && !safeSet.Contains(geoCity))
+                {
+                    safeSet = safeSet + " (" + geoCity + ", " + geoRegion + ")";
+                }
 
-                string json = "{\"id\":\"" + safeId + "\",\"empresa\":\"" + safeEmp + "\",\"nome_computador\":\"" + safeId + "\",\"setor\":\"" + safeSet + "\",\"ip\":\"" + ipComp + "\",\"is_server\":" + (isServerMachine ? "true" : "false") + ",\"cpu_usage\":" + cpu + ",\"ram_usage\":" + ram + ",\"status\":\"online\",\"ultimo_heartbeat\":\"" + DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ") + "\"}";
+                string json = "{\"id\":\"" + safeId + "\",\"empresa\":\"" + safeEmp + "\",\"nome_computador\":\"" + safeId + "\",\"setor\":\"" + safeSet + "\",\"ip\":\"" + ipComp + "\",\"is_server\":" + (isServerMachine ? "true" : "false") + ",\"cpu_usage\":" + cpu + ",\"ram_usage\":" + ram + ",\"discos\":" + drivesJson + ",\"status\":\"online\",\"ultimo_heartbeat\":\"" + DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ") + "\"}";
 
                 byte[] buffer = Encoding.UTF8.GetBytes(json);
                 req.ContentLength = buffer.Length;
@@ -2236,8 +2477,8 @@ namespace NexusRemoteAgent
                         continue;
                     }
 
-                    // 1. STATUS E INVENTÁRIO (Com o Nome Customizado da Instalação)
-                    if (path.StartsWith("/api/ping") || path.StartsWith("/api/status") || path.StartsWith("/api/screens"))
+                    // 1. STATUS E INVENTÁRIO (Com o Nome Customizado da Instalação, Hardware Completo e Geolocalização)
+                    if (path.StartsWith("/api/ping") || path.StartsWith("/api/status") || path.StartsWith("/api/screens") || path.StartsWith("/api/system") || path.StartsWith("/api/hardware"))
                     {
                         Screen[] allScreens = Screen.AllScreens;
                         StringBuilder sbScreens = new StringBuilder();
@@ -2281,15 +2522,26 @@ namespace NexusRemoteAgent
                         int diskUsedPct;
                         string drivesJson = ObterDetalhesDiscosJson(out diskTotalGb, out diskFreeGb, out diskUsedGb, out diskUsedPct);
 
-                        string json = string.Format(
+                        string mfg, model, board, bios, serial;
+                        ObterFabricanteEModelo(out mfg, out model, out board, out bios, out serial);
+
+                        string gpuName, gpuDriver;
+                        ObterPlacaDeVideo(out gpuName, out gpuDriver);
+
+                        string macAddr, adapterName, gatewayIp, dnsIp;
+                        ObterDetalhesRede(out macAddr, out adapterName, out gatewayIp, out dnsIp);
+
+                        int cpuThreads = Environment.ProcessorCount;
+
+                        string jsonBase = string.Format(
                             System.Globalization.CultureInfo.InvariantCulture,
-                            "{{\"status\":\"online\",\"hostname\":\"{0}\",\"computerName\":\"{1}\",\"customName\":\"{0}\",\"deviceType\":\"{2}\",\"isServer\":{24},\"user\":\"{3}\",\"domain\":\"{4}\",\"loggedUserFull\":\"{4}\\\\{3}\",\"location\":\"{5}\",\"tag\":\"{6}\",\"ip\":\"{7}\",\"port\":{8},\"os\":\"{9}\",\"cpu\":\"{10}\",\"cpuUsedPct\":{25},\"ram\":\"{11}\",\"ramTotalGb\":{12},\"ramUsedGb\":{26},\"ramFreeGb\":{27},\"ramUsedPct\":{13},\"disk\":\"{14}\",\"diskTotalGb\":{28},\"diskFreeGb\":{29},\"diskUsedGb\":{30},\"diskUsedPct\":{31},\"drives\":{32},\"uptime\":\"{33}\",\"activeConnections\":{34},\"lastConnected\":\"Hoje, {15}\",\"lastSeen\":\"Conectado agora\",\"screenWidth\":{16},\"screenHeight\":{17},\"token\":\"{18}\",\"version\":\"" + AGENT_VERSION + "\",\"build\":" + AGENT_BUILD + ",\"screens\":{19},\"currentScreen\":{20},\"virtualScreen\":{{\"width\":{21},\"height\":{22}}},\"empresa\":\"{23}\",\"company\":\"{23}\"}}",
+                            "{{\"status\":\"online\",\"hostname\":\"{0}\",\"computerName\":\"{1}\",\"customName\":\"{0}\",\"deviceType\":\"{2}\",\"isServer\":{24},\"user\":\"{3}\",\"domain\":\"{4}\",\"loggedUserFull\":\"{4}\\\\{3}\",\"location\":\"{5}\",\"tag\":\"{6}\",\"ip\":\"{7}\",\"port\":{8},\"os\":\"{9}\",\"cpu\":\"{10}\",\"cpuUsedPct\":{25},\"ram\":\"{11}\",\"ramTotalGb\":{12},\"ramUsedGb\":{26},\"ramFreeGb\":{27},\"ramUsedPct\":{13},\"disk\":\"{14}\",\"diskTotalGb\":{28},\"diskFreeGb\":{29},\"diskUsedGb\":{30},\"diskUsedPct\":{31},\"drives\":{32},\"uptime\":\"{33}\",\"activeConnections\":{34},\"lastConnected\":\"Hoje, {15}\",\"lastSeen\":\"Conectado agora\",\"screenWidth\":{16},\"screenHeight\":{17},\"token\":\"{18}\",\"version\":\"" + AGENT_VERSION + "\",\"build\":" + AGENT_BUILD + ",\"screens\":{19},\"currentScreen\":{20},\"virtualScreen\":{{\"width\":{21},\"height\":{22}}},\"empresa\":\"{23}\",\"company\":\"{23}\"",
                             customMachineName,
                             Environment.MachineName,
                             devType,
                             Environment.UserName,
                             Environment.UserDomainName,
-                            locDesc,
+                            locDesc.Replace("\"", "'"),
                             customMachineTag,
                             localIpAddress,
                             port,
@@ -2320,6 +2572,34 @@ namespace NexusRemoteAgent
                             uptimeStr,
                             tcpConns
                         );
+
+                        string jsonExtra = string.Format(
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            ",\"mfg\":\"{0}\",\"model\":\"{1}\",\"board\":\"{2}\",\"bios\":\"{3}\",\"serial\":\"{4}\",\"gpu\":\"{5}\",\"gpuDriver\":\"{6}\",\"mac\":\"{7}\",\"adapter\":\"{8}\",\"gateway\":\"{9}\",\"dns\":\"{10}\",\"cpuThreads\":{11},\"publicIp\":\"{12}\",\"city\":\"{13}\",\"region\":\"{14}\",\"country\":\"{15}\",\"lat\":{16},\"lon\":{17},\"isp\":\"{18}\",\"mapsUrl\":\"{19}\",\"locationString\":\"{20}\"}}",
+                            mfg.Replace("\\", "/").Replace("\"", "'"),
+                            model.Replace("\\", "/").Replace("\"", "'"),
+                            board.Replace("\\", "/").Replace("\"", "'"),
+                            bios.Replace("\\", "/").Replace("\"", "'"),
+                            serial.Replace("\\", "/").Replace("\"", "'"),
+                            gpuName.Replace("\\", "/").Replace("\"", "'"),
+                            gpuDriver.Replace("\\", "/").Replace("\"", "'"),
+                            macAddr,
+                            adapterName.Replace("\\", "/").Replace("\"", "'"),
+                            gatewayIp,
+                            dnsIp,
+                            cpuThreads,
+                            geoPublicIp,
+                            geoCity.Replace("\"", "'"),
+                            geoRegion.Replace("\"", "'"),
+                            geoCountry.Replace("\"", "'"),
+                            geoLat.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                            geoLon.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                            geoIsp.Replace("\\", "/").Replace("\"", "'"),
+                            geoMapsUrl,
+                            (string.IsNullOrEmpty(geoLabel) ? locDesc : geoLabel).Replace("\"", "'")
+                        );
+
+                        string json = jsonBase + jsonExtra;
                         EnviarRespostaCors(stream, 200, "OK", "application/json", Encoding.UTF8.GetBytes(json), keepAlive);
                         if (!keepAlive) break;
                     }
@@ -3740,7 +4020,15 @@ namespace NexusRemoteAgent
                                                     item["empresa"] = empNorm;
                                                     item["company"] = empNorm;
                                                     item["tag"] = tagNorm;
-                                                    item["location"] = empNorm + " - " + tagNorm;
+                                                    item["location"] = !string.IsNullOrEmpty(geoLabel) ? geoLabel : (empNorm + " - " + tagNorm);
+                                                    if (!string.IsNullOrEmpty(geoCity)) item["city"] = geoCity;
+                                                    if (!string.IsNullOrEmpty(geoRegion)) item["region"] = geoRegion;
+                                                    if (!string.IsNullOrEmpty(geoCountry)) item["country"] = geoCountry;
+                                                    if (geoLat != 0.0) item["lat"] = geoLat;
+                                                    if (geoLon != 0.0) item["lon"] = geoLon;
+                                                    if (!string.IsNullOrEmpty(geoMapsUrl)) item["mapsUrl"] = geoMapsUrl;
+                                                    if (!string.IsNullOrEmpty(geoPublicIp)) item["publicIp"] = geoPublicIp;
+                                                    if (!string.IsNullOrEmpty(geoIsp)) item["isp"] = geoIsp;
                                                     if (!string.IsNullOrEmpty(ip)) item["ip"] = ip;
                                                     if (!string.IsNullOrEmpty(user)) item["user"] = user;
                                                     if (!string.IsNullOrEmpty(os)) item["os"] = os;
