@@ -3339,8 +3339,38 @@ namespace NexusRemoteAgent
         [DllImport("gdi32.dll", SetLastError = true)]
         static extern bool BitBlt(IntPtr hObject, int nXDest, int nYDest, int nWidth, int nHeight, IntPtr hObjSource, int nXSrc, int nYSrc, int dwRop);
 
+        [DllImport("kernel32.dll")]
+        static extern uint WTSGetActiveConsoleSessionId();
+
+        static long _lastConsoleAttachTicks = 0;
+        public static void GarantirSessaoConsoleAtiva()
+        {
+            try
+            {
+                long now = DateTime.UtcNow.Ticks;
+                if ((now - _lastConsoleAttachTicks) < TimeSpan.FromSeconds(3).Ticks) return;
+                _lastConsoleAttachTicks = now;
+
+                int mySessionId = Process.GetCurrentProcess().SessionId;
+                uint consoleSessionId = WTSGetActiveConsoleSessionId();
+                if (mySessionId != (int)consoleSessionId && mySessionId > 0)
+                {
+                    ProcessStartInfo psi = new ProcessStartInfo("tscon.exe", mySessionId + " /dest:console");
+                    psi.WindowStyle = ProcessWindowStyle.Hidden;
+                    psi.CreateNoWindow = true;
+                    psi.UseShellExecute = false;
+                    using (Process p = Process.Start(psi))
+                    {
+                        p.WaitForExit(1200);
+                    }
+                }
+            }
+            catch { }
+        }
+
         static byte[] CapturaTelaBytes(int screenIdx, bool drawCursor, float scaleFactor = 1.0f, int quality = 45)
         {
+            GarantirSessaoConsoleAtiva();
             IntPtr hDesk = IntPtr.Zero;
             try
             {
