@@ -845,8 +845,8 @@ namespace NexusRemoteAgent
         static long clipboardVersion = 1;
 
         // Versão oficial do Agente NexusTI & Build para Atualizações Silenciosas OTA
-        public const string AGENT_VERSION = "1.2.5";
-        public const int AGENT_BUILD = 125;
+        public const string AGENT_VERSION = "1.2.6";
+        public const int AGENT_BUILD = 126;
         public static bool isAtualizando = false;
 
         [STAThread]
@@ -2342,21 +2342,20 @@ namespace NexusRemoteAgent
                         EnviarRespostaCors(stream, 200, "OK", "application/json", Encoding.UTF8.GetBytes("{\"ok\":true,\"name\":\"" + customMachineName + "\"}"), keepAlive);
                         if (!keepAlive) break;
                     }
-                    // 3. MUDANÇA DE TELA
-                    else if (path.StartsWith("/api/screen/set") || path.StartsWith("/api/setscreen"))
+                    // 3. MUDANÇA DE TELA (MULTI-MONITORES TELA 1 / TELA 2 / TODAS AS TELAS)
+                    else if (path == "/api/screen/set" || path.StartsWith("/api/screen/set") || path == "/api/setscreen" || path.StartsWith("/api/setscreen"))
                     {
                         int targetScreen = 0;
-                        int idx = path.IndexOf("id=");
-                        if (idx >= 0)
+                        string qId = ObterQueryParam(rawUrl, "id") ?? ObterQueryParam(rawUrl, "screen");
+                        if (!string.IsNullOrEmpty(qId))
                         {
-                            int.TryParse(path.Substring(idx + 3).Split('&')[0], out targetScreen);
+                            int.TryParse(qId, out targetScreen);
                         }
                         currentScreenIndex = targetScreen;
 
                         EnviarRespostaCors(stream, 200, "OK", "application/json", Encoding.UTF8.GetBytes("{\"ok\":true,\"currentScreen\":" + currentScreenIndex + "}"), keepAlive);
                         if (!keepAlive) break;
                     }
-                    // 4. STREAMING MJPEG ULTRA FLUIDO COM ESCALA SELECIONÁVEL
                     // 3.1 VISUALIZADOR WEB INTEGRADO DO AGENTE (ZERO MIXED CONTENT)
                     else if (path == "/viewer.html" || path == "/viewer" || path == "/remote")
                     {
@@ -2366,37 +2365,35 @@ namespace NexusRemoteAgent
                         continue;
                     }
                     // 3.2 CAPTURA DE QUADRO ÚNICO JPEG (PARA THUMBNAIL, DIAGNÓSTICO E FALLBACK ULTRA-RÁPIDO)
-                    else if (path == "/api/screen" || path == "/screen" || path.StartsWith("/api/screen?") || path.StartsWith("/screen?"))
+                    else if (path == "/api/screen" || path == "/screen")
                     {
                         int screenReq = currentScreenIndex;
-                        int sIdx = path.IndexOf("screen=");
-                        if (sIdx >= 0)
+                        string qScreen = ObterQueryParam(rawUrl, "screen") ?? ObterQueryParam(rawUrl, "id");
+                        if (!string.IsNullOrEmpty(qScreen))
                         {
-                            int.TryParse(path.Substring(sIdx + 7).Split('&')[0], out screenReq);
+                            int.TryParse(qScreen, out screenReq);
                         }
 
                         bool drawCursor = false;
-                        int cIdx = path.IndexOf("drawcursor=");
-                        if (cIdx >= 0)
+                        string qDraw = ObterQueryParam(rawUrl, "drawcursor");
+                        if (!string.IsNullOrEmpty(qDraw))
                         {
-                            string cVal = path.Substring(cIdx + 11).Split('&')[0];
-                            drawCursor = (cVal == "1" || cVal == "true");
+                            drawCursor = (qDraw == "1" || qDraw.Equals("true", StringComparison.OrdinalIgnoreCase));
                         }
 
                         float scaleFactor = 1.0f;
-                        int scIdx = path.IndexOf("scale=");
-                        if (scIdx >= 0)
+                        string qScale = ObterQueryParam(rawUrl, "scale");
+                        if (!string.IsNullOrEmpty(qScale))
                         {
-                            string scVal = path.Substring(scIdx + 6).Split('&')[0];
-                            float.TryParse(scVal, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out scaleFactor);
+                            float.TryParse(qScale, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out scaleFactor);
                             if (scaleFactor <= 0.1f || scaleFactor > 1.0f) scaleFactor = 1.0f;
                         }
 
                         int quality = 50;
-                        int qIdx = path.IndexOf("quality=");
-                        if (qIdx >= 0)
+                        string qQuality = ObterQueryParam(rawUrl, "quality");
+                        if (!string.IsNullOrEmpty(qQuality))
                         {
-                            int.TryParse(path.Substring(qIdx + 8).Split('&')[0], out quality);
+                            int.TryParse(qQuality, out quality);
                             if (quality < 20 || quality > 95) quality = 50;
                         }
 
@@ -2413,39 +2410,39 @@ namespace NexusRemoteAgent
                             break;
                         }
                     }
-                    else if (path.StartsWith("/api/stream"))
+                    // 4. STREAMING MJPEG ULTRA FLUIDO COM ESCALA SELECIONÁVEL E TROCA DINÂMICA DE TELAS
+                    else if (path == "/api/stream" || path == "/stream")
                     {
-                        int screenReq = currentScreenIndex;
-                        int sIdx = path.IndexOf("screen=");
-                        if (sIdx >= 0)
+                        string qScreen = ObterQueryParam(rawUrl, "screen") ?? ObterQueryParam(rawUrl, "id");
+                        bool hasExplicitScreen = !string.IsNullOrEmpty(qScreen);
+                        int explicitScreen = currentScreenIndex;
+                        if (hasExplicitScreen)
                         {
-                            int.TryParse(path.Substring(sIdx + 7).Split('&')[0], out screenReq);
+                            int.TryParse(qScreen, out explicitScreen);
                         }
 
                         bool drawCursor = false;
-                        int cIdx = path.IndexOf("drawcursor=");
-                        if (cIdx >= 0)
+                        string qDraw = ObterQueryParam(rawUrl, "drawcursor");
+                        if (!string.IsNullOrEmpty(qDraw))
                         {
-                            string cVal = path.Substring(cIdx + 11).Split('&')[0];
-                            drawCursor = (cVal == "1" || cVal == "true");
+                            drawCursor = (qDraw == "1" || qDraw.Equals("true", StringComparison.OrdinalIgnoreCase));
                         }
 
                         // Escala: se scale=0.75 ou 0.67 para turbo mode
                         float scaleFactor = 1.0f;
-                        int scIdx = path.IndexOf("scale=");
-                        if (scIdx >= 0)
+                        string qScale = ObterQueryParam(rawUrl, "scale");
+                        if (!string.IsNullOrEmpty(qScale))
                         {
-                            string scVal = path.Substring(scIdx + 6).Split('&')[0];
-                            float.TryParse(scVal, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out scaleFactor);
+                            float.TryParse(qScale, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out scaleFactor);
                             if (scaleFactor <= 0.1f || scaleFactor > 1.0f) scaleFactor = 1.0f;
                         }
 
                         // Qualidade JPEG selecionável (ex: 40 no modo turbo para latência zero)
                         int quality = 45;
-                        int qIdx = path.IndexOf("quality=");
-                        if (qIdx >= 0)
+                        string qQuality = ObterQueryParam(rawUrl, "quality");
+                        if (!string.IsNullOrEmpty(qQuality))
                         {
-                            int.TryParse(path.Substring(qIdx + 8).Split('&')[0], out quality);
+                            int.TryParse(qQuality, out quality);
                             if (quality < 20 || quality > 95) quality = 45;
                         }
 
@@ -2466,7 +2463,7 @@ namespace NexusRemoteAgent
                             while (client.Connected)
                             {
                                 sw.Restart();
-                                int activeScreen = (sIdx >= 0) ? screenReq : currentScreenIndex;
+                                int activeScreen = hasExplicitScreen ? explicitScreen : currentScreenIndex;
                                 byte[] imgBytes = CapturaTelaBytes(activeScreen, drawCursor, scaleFactor, quality);
                                 if (imgBytes == null || imgBytes.Length == 0) { Thread.Sleep(100); continue; }
 
@@ -2688,6 +2685,26 @@ namespace NexusRemoteAgent
                 stream.Write(data, 0, data.Length);
             }
             stream.Flush();
+        }
+
+        static string ObterQueryParam(string url, string key)
+        {
+            if (string.IsNullOrEmpty(url) || !url.Contains("?")) return null;
+            try
+            {
+                string q = url.Substring(url.IndexOf('?') + 1);
+                string[] pairs = q.Split('&');
+                foreach (string p in pairs)
+                {
+                    string[] kv = p.Split('=');
+                    if (kv.Length >= 2 && kv[0].Trim().Equals(key, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return Uri.UnescapeDataString(kv[1].Trim());
+                    }
+                }
+            }
+            catch { }
+            return null;
         }
 
         static string ExtrairCorpoRequisicao(string headerStr, string[] lines, byte[] buffer, int bytesRead, NetworkStream stream = null)

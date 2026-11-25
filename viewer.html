@@ -596,6 +596,11 @@
     function recarregarStreamTela(screenIdx) {
       const streamImg = document.getElementById('remote-stream-img');
       if (!streamImg) return;
+
+      // Interrompe qualquer fallback loop rodando para recomeçar limpo
+      fallbackLoopRodando = false;
+      clearTimeout(frameLoopTimer);
+
       const drawCursorParam = modoMouseSemLag ? '0' : '1';
       const scaleParam = modoTurbo ? '0.75' : '1.0';
       const qualityParam = modoTurbo ? '40' : '65';
@@ -606,21 +611,24 @@
         document.getElementById('loading-overlay')?.classList.add('hidden');
       };
 
-      // Inicia stream nativo MJPEG na porta 8090
-      streamImg.src = `${agentUrl}/api/stream?screen=${screenIdx}&drawcursor=${drawCursorParam}&scale=${scaleParam}&quality=${qualityParam}&t=${Date.now()}`;
+      // Limpa imagem para forçar reset do socket MJPEG no Chrome e impedir travamento
+      streamImg.src = '';
+      setTimeout(() => {
+        // Inicia stream nativo MJPEG na porta 8090 com a tela selecionada
+        streamImg.src = `${agentUrl}/api/stream?screen=${screenIdx}&drawcursor=${drawCursorParam}&scale=${scaleParam}&quality=${qualityParam}&t=${Date.now()}`;
+      }, 30);
 
       // Watchdog de Imagem: se o stream MJPEG demorar mais de 1000ms para renderizar o primeiro quadro,
       // ativa automaticamente o loop contínuo de quadros ultra-rápido (/api/screen)
-      clearTimeout(frameLoopTimer);
       frameLoopTimer = setTimeout(() => {
         if (!frameCarregou && sessaoAtiva) {
           console.warn('Stream MJPEG pendente. Ativando loop contínuo de quadros (/api/screen)...');
-          iniciarFrameLoopFallback(screenIdx);
+          iniciarFrameLoopFallback();
         }
       }, 1000);
     }
 
-    function iniciarFrameLoopFallback(screenIdx) {
+    function iniciarFrameLoopFallback() {
       if (fallbackLoopRodando) return;
       fallbackLoopRodando = true;
 
@@ -636,18 +644,20 @@
         const drawCursorParam = modoMouseSemLag ? '0' : '1';
         const scaleParam = modoTurbo ? '0.75' : '1.0';
         const qualityParam = modoTurbo ? '40' : '65';
+        // Sempre usa a tela atual em tempo real (permite alternar tela instantaneamente)
+        const targetScreen = currentScreenIndex;
 
         fetcher.onload = () => {
-          if (streamImg) streamImg.src = fetcher.src;
+          if (streamImg && fallbackLoopRodando) streamImg.src = fetcher.src;
           document.getElementById('loading-overlay')?.classList.add('hidden');
           busy = false;
-          requestAnimationFrame(proximoQuadro);
+          if (fallbackLoopRodando) requestAnimationFrame(proximoQuadro);
         };
         fetcher.onerror = () => {
           busy = false;
-          setTimeout(proximoQuadro, 100);
+          if (fallbackLoopRodando) setTimeout(proximoQuadro, 100);
         };
-        fetcher.src = `${agentUrl}/api/screen?screen=${screenIdx}&drawcursor=${drawCursorParam}&scale=${scaleParam}&quality=${qualityParam}&t=${Date.now()}`;
+        fetcher.src = `${agentUrl}/api/screen?screen=${targetScreen}&drawcursor=${drawCursorParam}&scale=${scaleParam}&quality=${qualityParam}&t=${Date.now()}`;
       }
 
       proximoQuadro();
