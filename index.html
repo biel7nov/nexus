@@ -5927,174 +5927,20 @@
       } catch(e) {}
     });
 
+    const MOCK_TICKETS_OBSOLETOS = new Set([
+      'TICK-2679', 'TICK-8990', 'TICK-106', 'TICK-101', 'TICK-1046',
+      'TICK-9575', 'TICK-8116', 'TICK-3134', 'TICK-102', 'TICK-7018',
+      'TICK-2891', 'TICK-TESTE-CHAT', 'TICK-VERIFY-1795550608', 'TICK-3114',
+      'TICK-7643', 'TICK-4414', 'TICK-9094'
+    ]);
+
     async function sincronizarChamados(notificar = false) {
-      let chamadosObtidos = [];
-
-      // 0. Sincronização LocalStorage (resiliência imediata entre abas do navegador)
-      try {
-        const salvosStorage = localStorage.getItem('fsc_kintsugi_chamados');
-        if (salvosStorage) {
-          const parsedStorage = JSON.parse(salvosStorage);
-          if (Array.isArray(parsedStorage) && parsedStorage.length > 0) {
-            chamadosObtidos.push(...parsedStorage);
-          }
-        }
-      } catch (e) { }
-
-      // 1. Tenta carregar do arquivo central da console web (chamados.json)
-      try {
-        const respCentral = await fetch('chamados.json?t=' + Date.now());
-        if (respCentral.ok) {
-          const dadosCentral = await respCentral.json();
-          if (Array.isArray(dadosCentral)) chamadosObtidos.push(...dadosCentral);
-        }
-      } catch (e) { }
-
-      // 2. Tenta consultar a API do FSC Agent local e console central
-      const srvSalvo = localStorage.getItem('fsc_central_ip') || '127.0.0.1:8090';
-      const endpointsLocais = [
-        'http://127.0.0.1:8090/api/chamados',
-        'http://localhost:8090/api/chamados',
-        'http://127.0.0.1:8090/chamados.json',
-        'http://localhost:8090/chamados.json'
-      ];
-      if (srvSalvo && !srvSalvo.includes('127.0.0.1') && !srvSalvo.includes('localhost')) {
-        const hostLimpo = srvSalvo.replace('http://', '').replace('/', '');
-        endpointsLocais.push(`http://${hostLimpo}/api/chamados`);
+      if (typeof carregarChamadosDoSupabase === 'function' && supabaseClient) {
+        await carregarChamadosDoSupabase(notificar);
+        return;
       }
-
-      for (const ep of endpointsLocais) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 2000);
-          const resp = await fetch(ep, {
-            mode: 'cors',
-            cache: 'no-cache',
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-          if (resp.ok) {
-            const dadosLocal = await resp.json();
-            if (Array.isArray(dadosLocal)) chamadosObtidos.push(...dadosLocal);
-          }
-        } catch (e) { }
-      }
-
-      // 3. Consulta as máquinas ativas no inventário EM PARALELO (sem travar por timeouts)
-      if (Array.isArray(listaAtivos) && listaAtivos.length > 0) {
-        const promessas = listaAtivos
-          .filter(atv => atv && atv.ip && atv.ip !== '127.0.0.1' && !srvSalvo.includes(atv.ip))
-          .map(async (atv) => {
-            try {
-              const ctrl = new AbortController();
-              const tid = setTimeout(() => ctrl.abort(), 1800);
-              const r = await fetch(`http://${atv.ip}:8090/api/chamados`, {
-                mode: 'cors',
-                cache: 'no-cache',
-                signal: ctrl.signal
-              });
-              clearTimeout(tid);
-              if (r.ok) {
-                const tickets = await r.json();
-                if (Array.isArray(tickets)) return tickets;
-              }
-            } catch (e) { }
-            return [];
-          });
-
-        const resultados = await Promise.allSettled(promessas);
-        resultados.forEach(res => {
-          if (res.status === 'fulfilled' && Array.isArray(res.value)) {
-            chamadosObtidos.push(...res.value);
-          }
-        });
-      }
-
-      // 4. Unifica e mescla sem duplicar por ID, com suporte a empresa, setor e mensagens
-      let teveNovo = false;
-      if (chamadosObtidos.length > 0) {
-        chamadosObtidos.forEach(c => {
-          if (!c || !c.id) return;
-          const normalizado = {
-            id: c.id,
-            titulo: c.titulo || 'Problema no Computador',
-            empresa: c.empresa || 'Aço Móveis',
-            setor: c.setor || 'Qualidade',
-            desc: c.descricao || c.desc || 'Sem detalhes adicionais',
-            descricao: c.descricao || c.desc || 'Sem detalhes adicionais',
-            ativo: c.ativo || 'Estação Corporativa',
-            solicitante: c.solicitante || 'Usuário',
-            categoria: c.categoria || 'Hardware / Desktop',
-            urgencia: c.urgencia || 'Média',
-            status: c.status || 'Active',
-            data: c.horario || c.data || 'Hoje',
-            horario: c.horario || c.data || 'Hoje',
-            ip: c.ip || '127.0.0.1',
-            responsavel: c.responsavel || '',
-            tecnico: c.tecnico || '',
-            tecnicosAtribuidos: Array.isArray(c.tecnicosAtribuidos) ? c.tecnicosAtribuidos : [],
-            mensagens: Array.isArray(c.mensagens) ? c.mensagens : []
-          };
-
-          const existIdx = listaChamados.findIndex(item => String(item.id) === String(normalizado.id));
-          if (existIdx === -1) {
-            listaChamados.unshift(normalizado);
-            teveNovo = true;
-            if (typeof sincronizarChamadoNoSupabase === 'function') sincronizarChamadoNoSupabase(normalizado);
-            adicionarLog(normalizado.ip, normalizado.ativo, 'Novo Chamado', `${normalizado.id}: ${normalizado.titulo} (${normalizado.solicitante})`, 'text-rose-600 font-bold');
-            adicionarNotificacao('chamado', `Novo Chamado #${normalizado.id}`, `${normalizado.solicitante || 'Usuário'} (${normalizado.empresa || 'Empresa'}): ${normalizado.titulo || 'Sem título'}`, { chamadoId: normalizado.id, linkAba: 'view-chamados' });
-          } else {
-            // Atualiza com dados ricos recebidos se a versão atual contiver dados genéricos
-            if (normalizado.titulo && normalizado.titulo !== 'Problema no Computador') {
-              listaChamados[existIdx].titulo = normalizado.titulo;
-            }
-            if (normalizado.empresa && normalizado.empresa !== 'Fast Solutions Corporate') {
-              listaChamados[existIdx].empresa = normalizado.empresa;
-            }
-            if (normalizado.solicitante && normalizado.solicitante !== 'Usuário') {
-              listaChamados[existIdx].solicitante = normalizado.solicitante;
-            }
-            if (normalizado.setor) {
-              listaChamados[existIdx].setor = normalizado.setor;
-            }
-            if (normalizado.desc && normalizado.desc !== 'Chamado registrado via endpoint web.' && normalizado.desc !== 'Sem detalhes adicionais') {
-              listaChamados[existIdx].desc = normalizado.desc;
-              listaChamados[existIdx].descricao = normalizado.desc;
-            }
-            if (Array.isArray(normalizado.mensagens) && normalizado.mensagens.length > 0) {
-              listaChamados[existIdx].mensagens = deduplicarMensagens([
-                ...(listaChamados[existIdx].mensagens || []),
-                ...normalizado.mensagens
-              ]);
-            }
-
-            // Preserva integralmente o status gerenciado pelo técnico no console!
-            if (listaChamados[existIdx].status === 'Active' && normalizado.status && normalizado.status !== 'Active') {
-              listaChamados[existIdx].status = normalizado.status;
-            }
-            if (normalizado.ip && (!listaChamados[existIdx].ip || listaChamados[existIdx].ip === '127.0.0.1')) {
-              listaChamados[existIdx].ip = normalizado.ip;
-            }
-          }
-        });
-
-        salvarDadosLocais();
-        if (teveNovo) tocarAlertaSonoroChamado();
-      }
-
-      // 5. Atualiza elementos visuais apenas se estiver na aba de chamados ou se houve alteração de dados
-      const viewChamadosEl = document.getElementById('view-chamados');
-      const sigChamados = `${window.filtroEmpresaGlobal}::` + (listaChamados || []).map(c => `${c.id}|${c.status}|${c.responsavel || ''}|${c.avaliacaoNota || ''}|${(c.mensagens || []).length}`).join(';');
-      if (notificar || teveNovo || window._lastSigChamados !== sigChamados) {
-        window._lastSigChamados = sigChamados;
-        if (notificar || (viewChamadosEl && !viewChamadosEl.classList.contains('hidden'))) {
-          renderizarChamados();
-        }
-        atualizarBadges();
-        atualizarKpiChamadosVisaoGeral();
-      }
-
       if (notificar) {
+        renderizarChamados();
         mostrarToast(`Sincronização concluída! Total de chamados: ${listaChamados.length}`, 'sync', 'Chamados Atualizados');
       }
     }
@@ -6904,6 +6750,10 @@
     }
 
     function renderizarTabelaChamados(itens) {
+      if (!Array.isArray(itens)) {
+        const empFiltro = window.filtroEmpresaGlobal || 'todas';
+        itens = (listaChamados || []).filter(c => registroCorrespondeFiltroEmpresa(c, empFiltro));
+      }
       const tbody = document.getElementById('tabela-chamados-corpo');
       if (!tbody) return;
       tbody.innerHTML = '';
@@ -7044,6 +6894,7 @@
       const statusAnterior = item.status;
       item.status = novoStatus;
       item.gerenciadoManualmente = true;
+      item._lastLocalStatusTs = Date.now();
       const horaStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       item.ultimaAtualizacao = 'Hoje às ' + horaStr;
 
@@ -7065,17 +6916,36 @@
 
       // Grava mensagem de sistema no chat para o cliente acompanhar
       if (!Array.isArray(item.mensagens)) item.mensagens = [];
-      item.mensagens.push({
-        id: 'sys-status-' + Date.now(),
+      const sysMsg = {
+        id: 'sys-status-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
         autor: 'Sistema',
         tipo: 'sistema',
         texto: `Etapa do chamado atualizada para: "${nomeEtapa}" por ${userLogado.nome}`,
         horario: 'Hoje às ' + horaStr,
         timestamp: Date.now()
-      });
+      };
+      item.mensagens.push(sysMsg);
 
       adicionarLog(item.ip || '127.0.0.1', item.ativo, 'Movimentação no Funil', `${item.id} movido para ${nomeEtapa}`, 'text-blue-600 font-semibold', 'Push 0s', userLogado.nome, obterEmpresaNormalizadaRegistro(item));
       salvarDadosLocais();
+
+      // Broadcast instantâneo (<50ms) para o portal do cliente
+      try {
+        if (window._nexusLiveChatChannel) {
+          window._nexusLiveChatChannel.send({
+            type: 'broadcast',
+            event: 'status_sync',
+            payload: {
+              chamadoId: String(item.id),
+              status: item.status,
+              responsavel: item.responsavel || userLogado.nome,
+              tecnico: item.tecnico || item.responsavel || userLogado.nome,
+              mensagem: sysMsg,
+              mensagens: item.mensagens
+            }
+          });
+        }
+      } catch(e) {}
 
       // Persiste a mudança de status na base central e nuvem Supabase
       sincronizarChamadoNoSupabase(item);
@@ -7123,6 +6993,7 @@
       const anterior = c.responsavel || c.tecnico || 'Ninguém';
       c.responsavel = novoResponsavel;
       c.tecnico = novoResponsavel;
+      c._lastLocalStatusTs = Date.now();
       if (!Array.isArray(c.tecnicosAtribuidos)) c.tecnicosAtribuidos = [];
       c.tecnicosAtribuidos = c.tecnicosAtribuidos.filter(t => t.toLowerCase() !== novoResponsavel.toLowerCase());
 
@@ -7133,6 +7004,21 @@
       c.ultimaAtualizacao = 'Hoje às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' por ' + novoResponsavel;
 
       salvarDadosLocais();
+      try {
+        if (window._nexusLiveChatChannel) {
+          window._nexusLiveChatChannel.send({
+            type: 'broadcast',
+            event: 'status_sync',
+            payload: {
+              chamadoId: String(c.id),
+              status: c.status,
+              responsavel: c.responsavel,
+              tecnico: c.tecnico,
+              mensagens: c.mensagens
+            }
+          });
+        }
+      } catch(e) {}
       sincronizarChamadoNoSupabase(c);
       try {
         fetch('http://127.0.0.1:8090/api/chamados/atualizar', {
@@ -7538,19 +7424,22 @@
 
     function deduplicarMensagens(msgs) {
       if (!Array.isArray(msgs)) return [];
-      const mapa = new Map();
+      const seenIds = new Set();
+      const seenFallback = new Set();
       const unicas = [];
       msgs.forEach(m => {
         if (!m || !m.texto) return;
-        const txt = String(m.texto).trim();
-        const hr = String(m.horario || '').trim();
-        const kId = m.id ? String(m.id) : null;
-        const kContent = `${m.tipo || ''}_${m.autor || ''}_${txt}_${hr}`;
-        if (kId && mapa.has(kId)) return;
-        if (mapa.has(kContent)) return;
-        if (kId) mapa.set(kId, true);
-        mapa.set(kContent, true);
-        unicas.push(m);
+        if (m.id) {
+          const kId = String(m.id);
+          if (seenIds.has(kId)) return;
+          seenIds.add(kId);
+          unicas.push(m);
+        } else {
+          const kFb = `${m.tipo || ''}_${m.autor || ''}_${String(m.texto).trim()}_${m.timestamp || m.horario || ''}`;
+          if (seenFallback.has(kFb)) return;
+          seenFallback.add(kFb);
+          unicas.push(m);
+        }
       });
       return unicas;
     }
@@ -7694,11 +7583,12 @@
           c.status = 'Em Andamento';
         }
       }
+      c._lastLocalStatusTs = Date.now();
 
       if (!Array.isArray(c.mensagens)) c.mensagens = [];
 
       const novaMsg = {
-        id: 'msg-tec-' + Date.now(),
+        id: 'msg-tec-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
         autor: userLogado.nome,
         cargo: userLogado.cargo || 'Técnico de TI',
         tipo: 'tecnico',
@@ -7707,10 +7597,7 @@
         timestamp: Date.now()
       };
 
-      const jaExiste = c.mensagens.some(x => x.id === novaMsg.id || (x.texto === texto.trim() && x.tipo === 'tecnico' && Math.abs((x.timestamp || 0) - novaMsg.timestamp) < 3000));
-      if (!jaExiste) {
-        c.mensagens.push(novaMsg);
-      }
+      c.mensagens.push(novaMsg);
       c.ultimaAtualizacao = 'Hoje às ' + horaStr + ' por ' + userLogado.nome;
 
       if (input1) input1.value = '';
@@ -7720,40 +7607,67 @@
       renderizarChatModal(c);
       renderizarChamados();
 
-      // Sincroniza mensagem no Supabase Cloud em tempo real com merge seguro e upsert
-      if (supabaseClient && c && c.id) {
-        try {
-          const { data: rem } = await supabaseClient
-            .from('chamados')
-            .select('id, historico')
-            .eq('id', String(c.id))
-            .maybeSingle();
-
-          if (rem && Array.isArray(rem.historico)) {
-            c.mensagens = deduplicarMensagens([...rem.historico, ...c.mensagens]);
-          }
-
-          await supabaseClient.from('chamados').upsert({
-            id: String(c.id),
-            protocolo: String(c.id),
-            empresa: c.empresa || 'Aço Móveis',
-            solicitante: c.solicitante || 'Colaborador',
-            setor: c.setor || 'TI',
-            categoria: c.categoria || 'Geral',
-            urgencia: c.urgencia || 'Média',
-            descricao: c.descricao || c.desc || c.titulo || '',
-            status: c.status === 'Resolvido' ? 'Finalizados' : (c.status === 'Triagem' ? 'Em Triagem' : (c.status === 'Homologacao' ? 'Em Homologação' : (c.status === 'Active' ? 'Em Aberto' : c.status))),
-            maquina_nome: c.ativo || 'auto',
-            maquina_ip: c.ip || 'auto',
-            tecnico: c.tecnico || c.responsavel || 'Não atribuído',
-            historico: c.mensagens,
-            atualizado_em: new Date().toISOString()
+      // 1. Transmite instantaneamente (<50ms) via Supabase Broadcast para o cliente
+      try {
+        if (window._nexusLiveChatChannel) {
+          window._nexusLiveChatChannel.send({
+            type: 'broadcast',
+            event: 'chat_sync',
+            payload: {
+              chamadoId: String(c.id),
+              status: c.status,
+              responsavel: c.responsavel,
+              tecnico: c.tecnico,
+              mensagem: novaMsg,
+              mensagens: c.mensagens
+            }
           });
-          salvarDadosLocais();
-          renderizarChatModal(c);
-        } catch(err) {
-          console.warn('Supabase chat tec error:', err);
         }
+      } catch(e) {}
+
+      // 2. Sincroniza mensagem no banco Supabase Cloud em fila serializada (evita perda em envios rápidos)
+      if (supabaseClient && c && c.id) {
+        const targetId = String(c.id);
+        window._chatPersistChain = (window._chatPersistChain || Promise.resolve()).then(async () => {
+          try {
+            const { data: rem } = await supabaseClient
+              .from('chamados')
+              .select('id, historico')
+              .eq('id', targetId)
+              .maybeSingle();
+
+            const liveC = listaChamados.find(item => String(item.id) === targetId) || c;
+            const merged = deduplicarMensagens([
+              ...(rem && Array.isArray(rem.historico) ? rem.historico : []),
+              ...(Array.isArray(liveC.mensagens) ? liveC.mensagens : []),
+              novaMsg
+            ]);
+            liveC.mensagens = merged;
+
+            await supabaseClient.from('chamados').upsert({
+              id: targetId,
+              protocolo: targetId,
+              empresa: liveC.empresa || 'Aço Móveis',
+              solicitante: liveC.solicitante || 'Colaborador',
+              setor: liveC.setor || 'TI',
+              categoria: liveC.categoria || 'Geral',
+              urgencia: liveC.urgencia || 'Média',
+              descricao: liveC.descricao || liveC.desc || liveC.titulo || '',
+              status: liveC.status === 'Resolvido' ? 'Finalizados' : (liveC.status === 'Triagem' ? 'Em Triagem' : (liveC.status === 'Homologacao' ? 'Em Homologação' : (liveC.status === 'Active' ? 'Em Aberto' : liveC.status))),
+              maquina_nome: liveC.ativo || 'auto',
+              maquina_ip: liveC.ip || 'auto',
+              tecnico: liveC.tecnico || liveC.responsavel || 'Não atribuído',
+              historico: merged,
+              atualizado_em: new Date().toISOString()
+            });
+            salvarDadosLocais();
+            if (String(chamadoAbertoNoModalId) === targetId) {
+              renderizarChatModal(liveC);
+            }
+          } catch(err) {
+            console.warn('Supabase chat tec error:', err);
+          }
+        });
       }
 
       try {
@@ -9758,36 +9672,20 @@
         console.warn('Erro ao sincronizar usuários Supabase:', err);
       }
 
-      // 4. Inscrição em Tempo Real (Realtime Channel)
+      // 4. Inscrição em Tempo Real (Realtime Channel + Broadcast Instantâneo <50ms)
       try {
         supabaseClient.channel('nexus-painel-realtime')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, (payload) => {
             if (payload.eventType === 'INSERT') {
               const ch = payload.new;
-              const nv = {
-                id: ch.id,
-                titulo: ch.descricao ? (ch.descricao.length > 40 ? ch.descricao.substring(0, 40) + '...' : ch.descricao) : ('Chamado #' + ch.id),
-                descricao: ch.descricao,
-                desc: ch.descricao,
-                empresa: ch.empresa,
-                solicitante: ch.solicitante,
-                setor: ch.setor,
-                categoria: ch.categoria || 'Geral',
-                urgencia: ch.urgencia || 'Média',
-                status: ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : 'Active')),
-                data: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
-                horario: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
-                responsavel: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
-                tecnico: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
-                ip: ch.maquina_ip || 'auto',
-                ativo: ch.maquina_nome || 'auto',
-                mensagens: Array.isArray(ch.historico) ? ch.historico : []
-              };
-              if (!listaChamados.some(x => String(x.id) === String(nv.id))) {
+              if (!ch || MOCK_TICKETS_OBSOLETOS.has(String(ch.id))) return;
+              const nv = mapearRegistroChamadoSupabase(ch);
+              const existIdx = listaChamados.findIndex(x => String(x.id) === String(nv.id));
+              if (existIdx === -1) {
                 listaChamados.unshift(nv);
+                ordenarListaChamadosMaisRecentes();
                 salvarDadosLocais();
                 renderizarChamados();
-                if (typeof renderizarTabelaChamados === 'function') renderizarTabelaChamados();
                 if (typeof tocarAlertaSonoroChamado === 'function') tocarAlertaSonoroChamado();
                 if (typeof mostrarToast === 'function') {
                   mostrarToast(`Novo chamado #${nv.id} recebido de ${nv.solicitante} (${nv.empresa})!`, 'info', 'Novo Chamado em Tempo Real');
@@ -9795,28 +9693,43 @@
               }
             } else if (payload.eventType === 'UPDATE') {
               const ch = payload.new;
+              if (!ch || MOCK_TICKETS_OBSOLETOS.has(String(ch.id))) return;
               let idx = listaChamados.findIndex(x => String(x.id) === String(ch.id));
               if (idx >= 0) {
-                if (ch.status) listaChamados[idx].status = ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : (ch.status === 'Em Espera' ? 'Em Espera' : (ch.status === 'Em Homologação' ? 'Homologacao' : 'Active'))));
-                if (ch.tecnico && ch.tecnico !== 'Não atribuído') {
-                  listaChamados[idx].tecnico = ch.tecnico;
-                  listaChamados[idx].responsavel = ch.tecnico;
+                const item = listaChamados[idx];
+                const lockStatusRecente = item._lastLocalStatusTs && (Date.now() - item._lastLocalStatusTs < 8000);
+                if (!lockStatusRecente && ch.status) {
+                  item.status = ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : (ch.status === 'Em Espera' ? 'Em Espera' : (ch.status === 'Em Homologação' ? 'Homologacao' : 'Active'))));
                 }
+                if (!lockStatusRecente && ch.tecnico && ch.tecnico !== 'Não atribuído') {
+                  item.tecnico = ch.tecnico;
+                  item.responsavel = ch.tecnico;
+                }
+                const oldLen = Array.isArray(item.mensagens) ? item.mensagens.length : 0;
                 if (Array.isArray(ch.historico)) {
-                  listaChamados[idx].mensagens = deduplicarMensagens([
-                    ...(listaChamados[idx].mensagens || []),
+                  item.mensagens = deduplicarMensagens([
+                    ...(item.mensagens || []),
                     ...ch.historico
                   ]);
                 }
                 salvarDadosLocais();
-                renderizarChamados();
-                if (typeof renderizarTabelaChamados === 'function') renderizarTabelaChamados();
+                if (!window._arrastandoCardChamado) renderizarChamados();
                 if (typeof chamadoAbertoNoModalId !== 'undefined' && String(chamadoAbertoNoModalId) === String(ch.id)) {
-                  renderizarChatModal(listaChamados[idx]);
-                  if (typeof tocarAlertaSonoroChamado === 'function') tocarAlertaSonoroChamado();
+                  renderizarChatModal(item);
+                  if (item.mensagens.length > oldLen && typeof tocarAlertaSonoroChamado === 'function') {
+                    const ult = item.mensagens[item.mensagens.length - 1];
+                    if (ult && ult.tipo === 'cliente') tocarAlertaSonoroChamado();
+                  }
                 }
               } else {
                 carregarChamadosDoSupabase();
+              }
+            } else if (payload.eventType === 'DELETE') {
+              const oldRow = payload.old;
+              if (oldRow && oldRow.id) {
+                listaChamados = listaChamados.filter(x => String(x.id) !== String(oldRow.id));
+                salvarDadosLocais();
+                renderizarChamados();
               }
             }
           })
@@ -9859,6 +9772,50 @@
             }
           })
           .subscribe();
+
+        window._nexusLiveChatChannel = supabaseClient
+          .channel('nexus-live-chat-bus', { config: { broadcast: { self: false } } })
+          .on('broadcast', { event: 'novo_chamado' }, (payload) => {
+            const p = payload && payload.payload ? payload.payload : payload;
+            if (p && p.chamado && p.chamado.id) {
+              const nv = p.chamado;
+              nv.criadoMs = nv.criadoMs || Date.now();
+              if (!listaChamados.some(x => String(x.id) === String(nv.id))) {
+                listaChamados.unshift(nv);
+                ordenarListaChamadosMaisRecentes();
+                salvarDadosLocais();
+                renderizarChamados();
+                if (typeof tocarAlertaSonoroChamado === 'function') tocarAlertaSonoroChamado();
+                if (typeof mostrarToast === 'function') {
+                  mostrarToast(`Novo chamado #${nv.id} recebido de ${nv.solicitante} (${nv.empresa})!`, 'info', 'Novo Chamado em Tempo Real');
+                }
+              }
+            }
+          })
+          .on('broadcast', { event: 'chat_sync' }, (payload) => {
+            const p = payload && payload.payload ? payload.payload : payload;
+            if (!p || !p.chamadoId) return;
+            const idx = listaChamados.findIndex(x => String(x.id) === String(p.chamadoId));
+            if (idx >= 0) {
+              const item = listaChamados[idx];
+              const oldLen = Array.isArray(item.mensagens) ? item.mensagens.length : 0;
+              const incoming = [];
+              if (Array.isArray(p.mensagens)) incoming.push(...p.mensagens);
+              if (p.mensagem) incoming.push(p.mensagem);
+              item.mensagens = deduplicarMensagens([...(item.mensagens || []), ...incoming]);
+              if (item.mensagens.length !== oldLen) {
+                salvarDadosLocais();
+                if (typeof chamadoAbertoNoModalId !== 'undefined' && String(chamadoAbertoNoModalId) === String(p.chamadoId)) {
+                  renderizarChatModal(item);
+                }
+                if (!window._arrastandoCardChamado) renderizarChamados();
+                if (typeof tocarAlertaSonoroChamado === 'function') tocarAlertaSonoroChamado();
+              }
+            } else {
+              carregarChamadosDoSupabase();
+            }
+          })
+          .subscribe();
       } catch(err) {
         console.warn('Realtime Supabase init:', err);
       }
@@ -9866,11 +9823,11 @@
       // Polling contínuo de segurança para o Chat aberto e Chamados na Nuvem
       if (!window._supabaseChatPollingStarted) {
         window._supabaseChatPollingStarted = true;
-        setInterval(sincronizarChatAbertoSupabaseTecnico, 2500);
+        setInterval(sincronizarChatAbertoSupabaseTecnico, 1500);
         setInterval(() => {
-          carregarChamadosDoSupabase();
+          carregarChamadosDoSupabase(false);
           sincronizarComputadoresDoSupabase();
-        }, 5000);
+        }, 4000);
       }
     }
 
@@ -9982,51 +9939,106 @@
       } catch(e) {}
     }
 
-    async function carregarChamadosDoSupabase() {
+    function mapearRegistroChamadoSupabase(ch) {
+      const msgs = Array.isArray(ch.historico) ? deduplicarMensagens(ch.historico) : [];
+      const msgIni = msgs.length > 0 ? msgs[0] : null;
+      const tituloExtraido = (msgIni && msgIni.titulo) ? msgIni.titulo : (ch.descricao ? (ch.descricao.length > 45 ? ch.descricao.substring(0, 45) + '...' : ch.descricao) : ('Chamado #' + ch.id));
+      const criadoMs = ch.criado_em ? new Date(ch.criado_em).getTime() : ((msgIni && msgIni.timestamp) ? Number(msgIni.timestamp) : 0);
+      return {
+        id: ch.id,
+        titulo: tituloExtraido,
+        descricao: ch.descricao || '',
+        desc: ch.descricao || '',
+        empresa: ch.empresa || 'Aço Móveis',
+        solicitante: ch.solicitante || 'Colaborador',
+        setor: ch.setor || 'TI',
+        categoria: ch.categoria || 'Geral',
+        urgencia: ch.urgencia || 'Média',
+        status: ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : (ch.status === 'Em Espera' ? 'Em Espera' : (ch.status === 'Em Homologação' ? 'Homologacao' : 'Active')))),
+        data: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
+        horario: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
+        criadoMs: criadoMs,
+        responsavel: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
+        tecnico: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
+        ip: ch.maquina_ip || 'auto',
+        ativo: ch.maquina_nome || 'auto',
+        mensagens: msgs
+      };
+    }
+
+    function ordenarListaChamadosMaisRecentes() {
+      if (!Array.isArray(listaChamados)) return;
+      listaChamados = listaChamados.filter(c => c && c.id && !MOCK_TICKETS_OBSOLETOS.has(String(c.id)));
+      listaChamados.sort((a, b) => {
+        const tsA = a.criadoMs || (a.mensagens && a.mensagens[0] && a.mensagens[0].timestamp) || 0;
+        const tsB = b.criadoMs || (b.mensagens && b.mensagens[0] && b.mensagens[0].timestamp) || 0;
+        return tsB - tsA;
+      });
+    }
+
+    async function carregarChamadosDoSupabase(notificar = false) {
       if (!supabaseClient) return;
       try {
         const { data: chamData, error: chamErr } = await supabaseClient.from('chamados').select('*').order('criado_em', { ascending: false });
-        if (chamData && chamData.length > 0) {
-          const listaNuvem = chamData.map(ch => ({
-            id: ch.id,
-            titulo: ch.descricao ? (ch.descricao.length > 40 ? ch.descricao.substring(0, 40) + '...' : ch.descricao) : ('Chamado #' + ch.id),
-            descricao: ch.descricao,
-            desc: ch.descricao,
-            empresa: ch.empresa,
-            solicitante: ch.solicitante,
-            setor: ch.setor,
-            categoria: ch.categoria || 'Geral',
-            urgencia: ch.urgencia || 'Média',
-            status: ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : (ch.status === 'Em Espera' ? 'Em Espera' : (ch.status === 'Em Homologação' ? 'Homologacao' : 'Active')))),
-            data: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
-            horario: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
-            responsavel: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
-            tecnico: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
-            ip: ch.maquina_ip || 'auto',
-            ativo: ch.maquina_nome || 'auto',
-            mensagens: Array.isArray(ch.historico) ? ch.historico : []
-          }));
+        if (chamErr || !Array.isArray(chamData)) return;
 
-          listaNuvem.forEach(nv => {
-            const idx = listaChamados.findIndex(x => String(x.id) === String(nv.id));
-            if (idx >= 0) {
-              const mergedMsgs = deduplicarMensagens([
-                ...(listaChamados[idx].mensagens || []),
-                ...(nv.mensagens || [])
-              ]);
-              const oldLen = Array.isArray(listaChamados[idx].mensagens) ? listaChamados[idx].mensagens.length : 0;
-              listaChamados[idx] = Object.assign({}, listaChamados[idx], nv, { mensagens: mergedMsgs });
-              if (typeof chamadoAbertoNoModalId !== 'undefined' && String(chamadoAbertoNoModalId) === String(nv.id) && mergedMsgs.length !== oldLen) {
-                renderizarChatModal(listaChamados[idx]);
-              }
-            } else {
-              listaChamados.unshift(nv);
+        const listaNuvem = chamData
+          .filter(ch => ch && ch.id && !MOCK_TICKETS_OBSOLETOS.has(String(ch.id)))
+          .map(mapearRegistroChamadoSupabase);
+
+        const idsNuvem = new Set(listaNuvem.map(x => String(x.id)));
+        const novaLista = [];
+
+        listaNuvem.forEach(nv => {
+          const exist = listaChamados.find(x => String(x.id) === String(nv.id));
+          if (exist) {
+            const mergedMsgs = deduplicarMensagens([
+              ...(exist.mensagens || []),
+              ...(nv.mensagens || [])
+            ]);
+            const oldLen = Array.isArray(exist.mensagens) ? exist.mensagens.length : 0;
+            const lockStatusRecente = exist._lastLocalStatusTs && (Date.now() - exist._lastLocalStatusTs < 8000);
+            const itemUnificado = Object.assign({}, exist, nv, {
+              titulo: (exist.titulo && exist.titulo !== exist.descricao && !exist.titulo.startsWith('Chamado #')) ? exist.titulo : nv.titulo,
+              status: lockStatusRecente ? exist.status : nv.status,
+              responsavel: lockStatusRecente ? exist.responsavel : nv.responsavel,
+              tecnico: lockStatusRecente ? exist.tecnico : nv.tecnico,
+              mensagens: mergedMsgs
+            });
+            novaLista.push(itemUnificado);
+            if (typeof chamadoAbertoNoModalId !== 'undefined' && String(chamadoAbertoNoModalId) === String(nv.id) && mergedMsgs.length !== oldLen) {
+              renderizarChatModal(itemUnificado);
             }
-          });
+          } else {
+            novaLista.push(nv);
+          }
+        });
 
-          salvarDadosLocais();
+        // Preserva chamados criados localmente há menos de 15 segundos que ainda estão sendo gravados
+        (listaChamados || []).forEach(loc => {
+          if (loc && loc.id && !MOCK_TICKETS_OBSOLETOS.has(String(loc.id)) && !idsNuvem.has(String(loc.id))) {
+            const tsLoc = loc.criadoMs || (loc.mensagens && loc.mensagens[0] && loc.mensagens[0].timestamp) || 0;
+            if (Date.now() - tsLoc < 15000) {
+              novaLista.unshift(loc);
+            }
+          }
+        });
+
+        listaChamados = novaLista;
+        ordenarListaChamadosMaisRecentes();
+        salvarDadosLocais();
+
+        const sigChamados = `${window.filtroEmpresaGlobal}::` + (listaChamados || []).map(c => `${c.id}|${c.status}|${c.responsavel || ''}|${c.avaliacaoNota || ''}|${(c.mensagens || []).length}`).join(';');
+        const interagindoNoFunil = window._arrastandoCardChamado || (document.activeElement && document.activeElement.closest && document.activeElement.closest('#container-funis-chamados'));
+
+        if (notificar || (window._lastSigChamados !== sigChamados && !interagindoNoFunil)) {
+          window._lastSigChamados = sigChamados;
           renderizarChamados();
-          if (typeof renderizarTabelaChamados === 'function') renderizarTabelaChamados();
+          atualizarBadges();
+          atualizarKpiChamadosVisaoGeral();
+        }
+        if (notificar) {
+          mostrarToast(`Sincronização concluída! Total de chamados: ${listaChamados.length}`, 'sync', 'Chamados Atualizados');
         }
       } catch(err) {
         console.warn('Erro ao carregar chamados Supabase:', err);
@@ -10071,41 +10083,11 @@
         const c = localStorage.getItem('fsc_kintsugi_chamados');
         if (c) {
           const parsedC = JSON.parse(c);
-          if (Array.isArray(parsedC) && parsedC.length > 0) listaChamados = parsedC;
+          if (Array.isArray(parsedC) && parsedC.length > 0) {
+            listaChamados = parsedC.filter(ch => ch && ch.id && !MOCK_TICKETS_OBSOLETOS.has(String(ch.id)));
+          }
         }
-        // Garante que o chamado #TICK-2679 (Aço Móveis) sempre esteja na fila se ainda não foi arquivado
-        if (!listaChamados.some(ch => String(ch.id) === 'TICK-2679')) {
-          listaChamados.unshift({
-            id: 'TICK-2679',
-            titulo: 'Solicitação de Chamado - Aço Móveis',
-            empresa: 'Aço Móveis',
-            categoria: 'Acesso Remoto / Conectividade',
-            solicitante: 'Gabriel Novaes',
-            setor: 'Qualidade',
-            avatar: 'GN',
-            ativo: '192.168.13.199',
-            ip: '192.168.13.199',
-            urgencia: 'Média',
-            status: 'Active',
-            data: 'Hoje, 08:41',
-            horario: 'Hoje, 08:41',
-            responsavel: '',
-            tecnico: '',
-            tecnicosAtribuidos: [],
-            descricao: 'Abertura direta para suporte e acesso remoto da T.I.',
-            desc: 'Abertura direta para suporte e acesso remoto da T.I.',
-            mensagens: [
-              {
-                id: 'msg-ini-TICK-2679',
-                autor: 'Sistema',
-                tipo: 'sistema',
-                texto: 'Chamado registrado com sucesso sob protocolo #TICK-2679. Aguardando atendimento da equipe de T.I.',
-                horario: 'Hoje, 08:41',
-                timestamp: 1795174900000
-              }
-            ]
-          });
-        }
+        ordenarListaChamadosMaisRecentes();
         if (Array.isArray(listaChamados)) {
           listaChamados.forEach(item => {
             if (!item.responsavel && item.tecnico) item.responsavel = item.tecnico;

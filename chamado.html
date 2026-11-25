@@ -688,7 +688,55 @@
 
     // Interligação em tempo real (Storage Listener & BroadcastChannel entre abas)
     
-    // Inscrição em Tempo Real (Supabase Realtime)
+    // Inscrição em Tempo Real (Supabase Realtime + Broadcast Instantâneo <50ms)
+    function aplicarAtualizacaoRemotaChamadoCliente(chId, novosDados) {
+      if (!chId) return;
+      let chamados = [];
+      try {
+        const s = localStorage.getItem('fsc_kintsugi_chamados');
+        if (s) chamados = JSON.parse(s);
+      } catch(e){}
+      if (!Array.isArray(chamados)) chamados = [];
+
+      let c = chamados.find(item => String(item.id) === String(chId));
+      if (!c) {
+        c = { id: String(chId), titulo: novosDados.titulo || novosDados.descricao || ('Chamado #' + chId), mensagens: [] };
+        chamados.unshift(c);
+      }
+
+      const oldLen = Array.isArray(c.mensagens) ? c.mensagens.length : 0;
+      const incomingMsgs = [];
+      if (Array.isArray(novosDados.historico)) incomingMsgs.push(...novosDados.historico);
+      if (Array.isArray(novosDados.mensagens)) incomingMsgs.push(...novosDados.mensagens);
+      if (novosDados.mensagem) incomingMsgs.push(novosDados.mensagem);
+
+      if (incomingMsgs.length > 0) {
+        c.mensagens = deduplicarMensagens([...(c.mensagens || []), ...incomingMsgs]);
+      }
+      if (novosDados.status) {
+        c.status = novosDados.status === 'Finalizados' ? 'Resolvido' : (novosDados.status === 'Em Andamento' ? 'Em Andamento' : (novosDados.status === 'Em Triagem' ? 'Triagem' : novosDados.status));
+      }
+      if (novosDados.tecnico || novosDados.responsavel) {
+        const t = novosDados.tecnico || novosDados.responsavel;
+        if (t !== 'Não atribuído') {
+          c.responsavel = t;
+          c.tecnico = t;
+        }
+      }
+
+      try { localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados)); } catch(e){}
+
+      if (typeof chatClienteChamadoAbertoId !== 'undefined' && chatClienteChamadoAbertoId && String(chatClienteChamadoAbertoId) === String(chId)) {
+        if (typeof carregarDadosChatCliente === 'function') carregarDadosChatCliente(c);
+        if (typeof renderizarMensagensChatCliente === 'function') renderizarMensagensChatCliente(c);
+        if (c.mensagens.length > oldLen) {
+          const ult = c.mensagens[c.mensagens.length - 1];
+          if (ult && ult.tipo !== 'cliente' && typeof tocarSinoNotificacao === 'function') tocarSinoNotificacao();
+        }
+      }
+      if (typeof carregarHistoricoChamados === 'function') carregarHistoricoChamados();
+    }
+
     try {
       if (supabaseClient) {
         supabaseClient
@@ -700,33 +748,26 @@
             carregarSetoresWeb();
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, (payload) => {
-            carregarHistoricoChamados();
-            if (payload && payload.eventType === 'UPDATE' && payload.new) {
-              const ch = payload.new;
-              if (typeof chatClienteChamadoAbertoId !== 'undefined' && chatClienteChamadoAbertoId && String(chatClienteChamadoAbertoId) === String(ch.id)) {
-                let chamados = [];
-                try {
-                  const s = localStorage.getItem('fsc_kintsugi_chamados');
-                  if (s) chamados = JSON.parse(s);
-                } catch(e){}
-                let c = chamados.find(item => String(item.id) === String(ch.id));
-                if (!c) {
-                  c = { id: ch.id, titulo: ch.descricao || 'Chamado #' + ch.id, mensagens: [] };
-                  chamados.unshift(c);
-                }
-                c.mensagens = ch.historico || [];
-                c.status = ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : ch.status));
-                c.responsavel = ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '';
-                c.tecnico = ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '';
-                try { localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados)); } catch(e){}
-                if (typeof carregarDadosChatCliente === 'function') {
-                  carregarDadosChatCliente(c);
-                }
-                if (typeof renderizarMensagensChatCliente === 'function') {
-                  renderizarMensagensChatCliente(c);
-                  if (typeof tocarSinoNotificacao === 'function') tocarSinoNotificacao();
-                }
-              }
+            if (payload && payload.new) {
+              aplicarAtualizacaoRemotaChamadoCliente(payload.new.id, payload.new);
+            } else {
+              carregarHistoricoChamados();
+            }
+          })
+          .subscribe();
+
+        window._nexusLiveChatChannel = supabaseClient
+          .channel('nexus-live-chat-bus', { config: { broadcast: { self: false } } })
+          .on('broadcast', { event: 'chat_sync' }, (payload) => {
+            const p = payload && payload.payload ? payload.payload : payload;
+            if (p && p.chamadoId) {
+              aplicarAtualizacaoRemotaChamadoCliente(p.chamadoId, p);
+            }
+          })
+          .on('broadcast', { event: 'status_sync' }, (payload) => {
+            const p = payload && payload.payload ? payload.payload : payload;
+            if (p && p.chamadoId) {
+              aplicarAtualizacaoRemotaChamadoCliente(p.chamadoId, p);
             }
           })
           .subscribe();
@@ -794,24 +835,41 @@
             .order('criado_em', { ascending: false })
             .limit(10);
           if (data && data.length > 0) {
-            chamados = data.map(ch => ({
-              id: ch.id,
-              titulo: ch.descricao ? (ch.descricao.length > 40 ? ch.descricao.substring(0, 40) + '...' : ch.descricao) : ('Chamado #' + ch.id),
-              categoria: ch.categoria || 'Geral',
-              solicitante: ch.solicitante,
-              empresa: ch.empresa,
-              setor: ch.setor,
-              ativo: ch.maquina_nome || 'auto',
-              ip: ch.maquina_ip || 'auto',
-              urgencia: ch.urgencia || 'Média',
-              status: ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : ch.status)),
-              data: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
-              horario: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
-              descricao: ch.descricao || '',
-              responsavel: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
-              tecnico: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
-              mensagens: Array.isArray(ch.historico) ? ch.historico : []
-            }));
+            let locaisAtuais = [];
+            try {
+              const s = localStorage.getItem('fsc_kintsugi_chamados');
+              if (s) locaisAtuais = JSON.parse(s);
+            } catch(e) {}
+            if (!Array.isArray(locaisAtuais)) locaisAtuais = [];
+
+            chamados = data.map(ch => {
+              const msgsRem = Array.isArray(ch.historico) ? ch.historico : [];
+              const locMatch = locaisAtuais.find(x => String(x.id) === String(ch.id));
+              const msgsUnificadas = deduplicarMensagens([
+                ...(locMatch && Array.isArray(locMatch.mensagens) ? locMatch.mensagens : []),
+                ...msgsRem
+              ]);
+              const msgIni = msgsUnificadas.length > 0 ? msgsUnificadas[0] : null;
+              const tituloFinal = (msgIni && msgIni.titulo) || (locMatch && locMatch.titulo && locMatch.titulo !== locMatch.descricao ? locMatch.titulo : null) || (ch.descricao ? (ch.descricao.length > 40 ? ch.descricao.substring(0, 40) + '...' : ch.descricao) : ('Chamado #' + ch.id));
+              return {
+                id: ch.id,
+                titulo: tituloFinal,
+                categoria: ch.categoria || 'Geral',
+                solicitante: ch.solicitante,
+                empresa: ch.empresa,
+                setor: ch.setor,
+                ativo: ch.maquina_nome || 'auto',
+                ip: ch.maquina_ip || 'auto',
+                urgencia: ch.urgencia || 'Média',
+                status: ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : ch.status)),
+                data: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
+                horario: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
+                descricao: ch.descricao || '',
+                responsavel: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
+                tecnico: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
+                mensagens: msgsUnificadas
+              };
+            });
             try { localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados)); } catch(e){}
           }
         } catch(e) {
@@ -1155,10 +1213,10 @@
       });
 
       setInterval(verificarMudancasStatusChamados, 2000);
-      setInterval(sincronizarChatAbertoSupabaseCliente, 2500);
+      setInterval(sincronizarChatAbertoSupabaseCliente, 1500);
       setInterval(() => {
         if (!chatClienteChamadoAbertoId) carregarHistoricoChamados();
-      }, 5000);
+      }, 4000);
 
       if (window.lucide && lucide.createIcons) lucide.createIcons();
     });
@@ -1247,11 +1305,13 @@
         responsavel: '',
         tecnico: '',
         tecnicosAtribuidos: [],
+        criadoMs: Date.now(),
         mensagens: [
           {
             id: 'msg-ini-' + ticketId,
             autor: 'Sistema',
             tipo: 'sistema',
+            titulo: titulo,
             texto: `Chamado registrado com sucesso sob protocolo #${ticketId}. Aguardando atendimento da equipe de T.I.`,
             horario: dataStr,
             timestamp: Date.now()
@@ -1267,6 +1327,17 @@
       if (elEmpSuc) elEmpSuc.textContent = empresa;
       if (!window._historicoChamadosLocais) window._historicoChamadosLocais = [];
       window._historicoChamadosLocais.unshift(novoChamado);
+
+      // 0. Broadcast imediato (<50ms) para o Console TI
+      try {
+        if (window._nexusLiveChatChannel) {
+          window._nexusLiveChatChannel.send({
+            type: 'broadcast',
+            event: 'novo_chamado',
+            payload: { chamado: novoChamado }
+          });
+        }
+      } catch(e) {}
 
       // 1. Envia imediatamente para o Supabase Cloud
       if (supabaseClient) {
@@ -1865,19 +1936,22 @@
 
     function deduplicarMensagens(msgs) {
       if (!Array.isArray(msgs)) return [];
-      const mapa = new Map();
+      const seenIds = new Set();
+      const seenFallback = new Set();
       const unicas = [];
       msgs.forEach(m => {
         if (!m || !m.texto) return;
-        const txt = String(m.texto).trim();
-        const hr = String(m.horario || '').trim();
-        const kId = m.id ? String(m.id) : null;
-        const kContent = `${m.tipo || ''}_${m.autor || ''}_${txt}_${hr}`;
-        if (kId && mapa.has(kId)) return;
-        if (mapa.has(kContent)) return;
-        if (kId) mapa.set(kId, true);
-        mapa.set(kContent, true);
-        unicas.push(m);
+        if (m.id) {
+          const kId = String(m.id);
+          if (seenIds.has(kId)) return;
+          seenIds.add(kId);
+          unicas.push(m);
+        } else {
+          const kFb = `${m.tipo || ''}_${m.autor || ''}_${String(m.texto).trim()}_${m.timestamp || m.horario || ''}`;
+          if (seenFallback.has(kFb)) return;
+          seenFallback.add(kFb);
+          unicas.push(m);
+        }
       });
       return unicas;
     }
@@ -1999,7 +2073,7 @@
       if (!Array.isArray(c.mensagens)) c.mensagens = [];
 
       const novaMsg = {
-        id: 'msg-cli-' + Date.now(),
+        id: 'msg-cli-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
         autor: solicitanteNome,
         tipo: 'cliente',
         texto: texto,
@@ -2007,59 +2081,87 @@
         timestamp: Date.now()
       };
 
-      const jaExiste = c.mensagens.some(x => x.id === novaMsg.id || (x.texto === texto && x.tipo === 'cliente' && Math.abs((x.timestamp || 0) - novaMsg.timestamp) < 3000));
-      if (!jaExiste) {
-        c.mensagens.push(novaMsg);
-      }
+      c.mensagens.push(novaMsg);
       c.ultimaAtualizacao = 'Hoje às ' + horaStr + ' por ' + solicitanteNome;
 
       try {
         localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados));
       } catch(err) {}
 
-      // Limpa o campo e renderiza imediatamente na interface para resposta instantânea
+      // Limpa o campo e renderiza imediatamente na interface para resposta instantânea (0ms)
       input.value = '';
       renderizarMensagensChatCliente(c);
 
-      // Sincroniza mensagem no Supabase Cloud em tempo real (com merge seguro e upsert caso não exista)
-      if (supabaseClient && c && c.id) {
-        try {
-          const { data: rem } = await supabaseClient
-            .from('chamados')
-            .select('id, historico')
-            .eq('id', String(c.id))
-            .maybeSingle();
-
-          if (rem) {
-            const merged = deduplicarMensagens([...(Array.isArray(rem.historico) ? rem.historico : []), ...c.mensagens]);
-            c.mensagens = merged;
-            await supabaseClient.from('chamados').update({
-              historico: merged,
-              atualizado_em: new Date().toISOString()
-            }).eq('id', String(c.id));
-          } else {
-            await supabaseClient.from('chamados').upsert({
-              id: String(c.id),
-              protocolo: String(c.id),
-              empresa: c.empresa || empresaWebAtual || 'Aço Móveis',
-              solicitante: solicitanteNome,
-              setor: c.setor || 'TI',
-              categoria: c.categoria || 'Geral',
-              urgencia: c.urgencia || 'Média',
-              descricao: c.descricao || c.desc || c.titulo || 'Solicitação de Atendimento',
-              status: c.status === 'Resolvido' ? 'Finalizados' : (c.status === 'Em Andamento' ? 'Em Andamento' : 'Em Aberto'),
-              maquina_nome: c.ativo || 'auto',
-              maquina_ip: c.ip || 'auto',
-              tecnico: c.tecnico || c.responsavel || 'Não atribuído',
-              historico: c.mensagens,
-              atualizado_em: new Date().toISOString()
-            });
-          }
-          try { localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(chamados)); } catch(e) {}
-          renderizarMensagensChatCliente(c);
-        } catch(err) {
-          console.warn('Supabase chat cli error:', err);
+      // 1. Transmite via Supabase Realtime Broadcast (<50ms) para o Console do Técnico
+      try {
+        if (window._nexusLiveChatChannel) {
+          window._nexusLiveChatChannel.send({
+            type: 'broadcast',
+            event: 'chat_sync',
+            payload: {
+              chamadoId: String(c.id),
+              mensagem: novaMsg,
+              mensagens: c.mensagens
+            }
+          });
         }
+      } catch(e) {}
+
+      // 2. Persiste no banco Supabase Cloud em fila serializada (evita condição de corrida em mensagens rápidas)
+      if (supabaseClient && c && c.id) {
+        const targetId = String(c.id);
+        window._chatPersistChain = (window._chatPersistChain || Promise.resolve()).then(async () => {
+          try {
+            const { data: rem } = await supabaseClient
+              .from('chamados')
+              .select('id, historico')
+              .eq('id', targetId)
+              .maybeSingle();
+
+            let latestChamados = [];
+            try {
+              const s = localStorage.getItem('fsc_kintsugi_chamados');
+              if (s) latestChamados = JSON.parse(s);
+            } catch(e) {}
+            let latestC = latestChamados.find(item => String(item.id) === targetId) || c;
+            const merged = deduplicarMensagens([
+              ...(rem && Array.isArray(rem.historico) ? rem.historico : []),
+              ...(Array.isArray(latestC.mensagens) ? latestC.mensagens : []),
+              novaMsg
+            ]);
+            latestC.mensagens = merged;
+
+            if (rem) {
+              await supabaseClient.from('chamados').update({
+                historico: merged,
+                atualizado_em: new Date().toISOString()
+              }).eq('id', targetId);
+            } else {
+              await supabaseClient.from('chamados').upsert({
+                id: targetId,
+                protocolo: targetId,
+                empresa: latestC.empresa || empresaWebAtual || 'Aço Móveis',
+                solicitante: solicitanteNome,
+                setor: latestC.setor || 'TI',
+                categoria: latestC.categoria || 'Geral',
+                urgencia: latestC.urgencia || 'Média',
+                descricao: latestC.descricao || latestC.desc || latestC.titulo || 'Solicitação de Atendimento',
+                status: latestC.status === 'Resolvido' ? 'Finalizados' : (latestC.status === 'Em Andamento' ? 'Em Andamento' : 'Em Aberto'),
+                maquina_nome: latestC.ativo || 'auto',
+                maquina_ip: latestC.ip || 'auto',
+                tecnico: latestC.tecnico || latestC.responsavel || 'Não atribuído',
+                historico: merged,
+                atualizado_em: new Date().toISOString()
+              });
+            }
+            try { localStorage.setItem('fsc_kintsugi_chamados', JSON.stringify(latestChamados)); } catch(e) {}
+            if (String(chatClienteChamadoAbertoId) === targetId) {
+              renderizarMensagensChatCliente(latestC);
+            }
+          } catch(err) {
+            console.warn('Supabase chat cli error:', err);
+          }
+        });
       }
 
       // Dispara para o Agente local gravar no chamados.json com o mesmo ID
