@@ -5518,7 +5518,11 @@
       const elModo = document.getElementById('seletor-modo-remoto-topo');
       const modoEscolhido = modo || (elModo ? elModo.value : 'auto');
       const centralSrv = (configSistemaTi && configSistemaTi.servidorIp) ? configSistemaTi.servidorIp : '192.168.18.122:8090';
-      const viewerUrl = 'viewer.html?agent=' + encodeURIComponent('http://' + targetIp + ':8090') + 
+      let viewerBase = 'viewer.html';
+      if (window.location.protocol === 'https:') {
+        viewerBase = `http://${targetIp}:8090/viewer.html`;
+      }
+      const viewerUrl = viewerBase + '?agent=' + encodeURIComponent('http://' + targetIp + ':8090') + 
                         '&name=' + encodeURIComponent(targetName) + 
                         '&relay=' + encodeURIComponent('http://' + centralSrv) + 
                         '&mode=' + encodeURIComponent(modoEscolhido);

@@ -1210,6 +1210,8 @@ namespace NexusRemoteAgent
                     tcpServer = new TcpListener(IPAddress.Any, port);
                     tcpServer.Server.NoDelay = true;
                     tcpServer.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                    ThreadPool.SetMinThreads(100, 100);
+                    ThreadPool.SetMaxThreads(1000, 1000);
                     tcpServer.Start();
                     break;
                 }
@@ -1949,6 +1951,64 @@ namespace NexusRemoteAgent
                         if (!keepAlive) break;
                     }
                     // 4. STREAMING MJPEG ULTRA FLUIDO COM ESCALA SELECIONÁVEL
+                    // 3.1 VISUALIZADOR WEB INTEGRADO DO AGENTE (ZERO MIXED CONTENT)
+                    else if (path == "/viewer.html" || path == "/viewer" || path == "/remote")
+                    {
+                        string vPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "viewer.html");
+                        if (!File.Exists(vPath)) vPath = @"c:\Users\gabrielnovaes\Documents\copia magma\viewer.html";
+                        byte[] htmlBytes = File.Exists(vPath) ? File.ReadAllBytes(vPath) : Encoding.UTF8.GetBytes("<!DOCTYPE html><html><body><h1>Viewer NexusTI</h1></body></html>");
+                        EnviarRespostaCors(stream, 200, "OK", "text/html; charset=utf-8", htmlBytes, keepAlive);
+                        if (!keepAlive) break;
+                        continue;
+                    }
+                    // 3.2 CAPTURA DE QUADRO ÚNICO JPEG (PARA THUMBNAIL, DIAGNÓSTICO E FALLBACK ULTRA-RÁPIDO)
+                    else if (path == "/api/screen" || path == "/screen" || path.StartsWith("/api/screen?") || path.StartsWith("/screen?"))
+                    {
+                        int screenReq = currentScreenIndex;
+                        int sIdx = path.IndexOf("screen=");
+                        if (sIdx >= 0)
+                        {
+                            int.TryParse(path.Substring(sIdx + 7).Split('&')[0], out screenReq);
+                        }
+
+                        bool drawCursor = false;
+                        int cIdx = path.IndexOf("drawcursor=");
+                        if (cIdx >= 0)
+                        {
+                            string cVal = path.Substring(cIdx + 11).Split('&')[0];
+                            drawCursor = (cVal == "1" || cVal == "true");
+                        }
+
+                        float scaleFactor = 1.0f;
+                        int scIdx = path.IndexOf("scale=");
+                        if (scIdx >= 0)
+                        {
+                            string scVal = path.Substring(scIdx + 6).Split('&')[0];
+                            float.TryParse(scVal, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out scaleFactor);
+                            if (scaleFactor <= 0.1f || scaleFactor > 1.0f) scaleFactor = 1.0f;
+                        }
+
+                        int quality = 50;
+                        int qIdx = path.IndexOf("quality=");
+                        if (qIdx >= 0)
+                        {
+                            int.TryParse(path.Substring(qIdx + 8).Split('&')[0], out quality);
+                            if (quality < 20 || quality > 95) quality = 50;
+                        }
+
+                        byte[] imgBytes = CapturaTelaBytes(screenReq, drawCursor, scaleFactor, quality);
+                        if (imgBytes != null && imgBytes.Length > 0)
+                        {
+                            EnviarRespostaCors(stream, 200, "OK", "image/jpeg", imgBytes, keepAlive);
+                            if (!keepAlive) break;
+                            continue;
+                        }
+                        else
+                        {
+                            EnviarRespostaCors(stream, 500, "Internal Server Error", "text/plain", Encoding.UTF8.GetBytes("Erro ao capturar"), false);
+                            break;
+                        }
+                    }
                     else if (path.StartsWith("/api/stream"))
                     {
                         int screenReq = currentScreenIndex;
@@ -1989,8 +2049,12 @@ namespace NexusRemoteAgent
                         {
                             string mjpegHeader = "HTTP/1.1 200 OK\r\n" +
                                 "Access-Control-Allow-Origin: *\r\n" +
-                                "Content-Type: multipart/x-mixed-replace; boundary=--frame\r\n" +
-                                "Cache-Control: no-cache, no-store, must-revalidate\r\n\r\n";
+                                "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n" +
+                                "Access-Control-Allow-Headers: *\r\n" +
+                                "Access-Control-Allow-Private-Network: true\r\n" +
+                                "Content-Type: multipart/x-mixed-replace; boundary=frame\r\n" +
+                                "Cache-Control: no-cache, no-store, must-revalidate\r\n" +
+                                "Pragma: no-cache\r\n\r\n";
                             byte[] mjpegHdrBytes = Encoding.ASCII.GetBytes(mjpegHeader);
                             stream.Write(mjpegHdrBytes, 0, mjpegHdrBytes.Length);
 
@@ -2002,11 +2066,12 @@ namespace NexusRemoteAgent
                                 byte[] imgBytes = CapturaTelaBytes(activeScreen, drawCursor, scaleFactor, quality);
                                 if (imgBytes == null || imgBytes.Length == 0) continue;
 
-                                string frameHdr = "\r\n--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " + imgBytes.Length + "\r\n\r\n";
+                                string frameHdr = "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " + imgBytes.Length + "\r\n\r\n";
                                 byte[] frameHdrBytes = Encoding.ASCII.GetBytes(frameHdr);
 
                                 stream.Write(frameHdrBytes, 0, frameHdrBytes.Length);
                                 stream.Write(imgBytes, 0, imgBytes.Length);
+                                stream.Write(Encoding.ASCII.GetBytes("\r\n"), 0, 2);
                                 stream.Flush();
 
                                 sw.Stop();
@@ -2341,18 +2406,73 @@ namespace NexusRemoteAgent
         // ---------------------------------------------------------------------
         // CAPTURA DE TELA DE BAIXA LATÊNCIA (COM SUPORTE A ESCALA TURBO)
         // ---------------------------------------------------------------------
+        
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr OpenInputDesktop(uint dwFlags, bool fInherit, uint dwDesiredAccess);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool SetThreadDesktop(IntPtr hDesktop);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool CloseDesktop(IntPtr hDesktop);
+
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr GetDC(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        static extern bool BitBlt(IntPtr hObject, int nXDest, int nYDest, int nWidth, int nHeight, IntPtr hObjSource, int nXSrc, int nYSrc, int dwRop);
+
         static byte[] CapturaTelaBytes(int screenIdx, bool drawCursor, float scaleFactor = 1.0f, int quality = 45)
         {
             try
             {
+                try
+                {
+                    IntPtr hDesk = OpenInputDesktop(0, false, 0x01FF);
+                    if (hDesk != IntPtr.Zero)
+                    {
+                        SetThreadDesktop(hDesk);
+                        CloseDesktop(hDesk);
+                    }
+                }
+                catch { }
+
                 Rectangle bounds = ObterBoundsTela(screenIdx);
-                if (bounds.Width <= 0 || bounds.Height <= 0) return new byte[0];
+                if (bounds.Width <= 0 || bounds.Height <= 0) bounds = Screen.PrimaryScreen.Bounds;
+                if (bounds.Width <= 0 || bounds.Height <= 0) bounds = new Rectangle(0, 0, 1920, 1080);
 
                 using (Bitmap rawBmp = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format24bppRgb))
                 {
                     using (Graphics g = Graphics.FromImage(rawBmp))
                     {
-                        g.CopyFromScreen(bounds.X, bounds.Y, 0, 0, bounds.Size, CopyPixelOperation.SourceCopy);
+                        bool capturou = false;
+                        try
+                        {
+                            g.CopyFromScreen(bounds.X, bounds.Y, 0, 0, bounds.Size, CopyPixelOperation.SourceCopy);
+                            capturou = true;
+                        }
+                        catch { }
+
+                        if (!capturou)
+                        {
+                            try
+                            {
+                                IntPtr hdcScreen = GetDC(IntPtr.Zero);
+                                if (hdcScreen != IntPtr.Zero)
+                                {
+                                    IntPtr hdcDest = g.GetHdc();
+                                    BitBlt(hdcDest, 0, 0, bounds.Width, bounds.Height, hdcScreen, bounds.X, bounds.Y, 0x00CC0020);
+                                    g.ReleaseHdc(hdcDest);
+                                    ReleaseDC(IntPtr.Zero, hdcScreen);
+                                    capturou = true;
+                                }
+                            }
+                            catch { }
+                        }
 
                         if (drawCursor)
                         {
@@ -2398,12 +2518,10 @@ namespace NexusRemoteAgent
                     if (quality < 20) quality = 20;
                     if (quality > 95) quality = 95;
 
-                    // EncoderParameters instanciado por requisição para evitar conflito de ponteiros entre threads
                     using (EncoderParameters ep = new EncoderParameters(1))
                     {
                         ep.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, (long)quality);
 
-                        // Se a escala for menor que 1.0 (ex: 0.75 no Modo Turbo), redimensiona em alta velocidade (1ms)
                         if (scaleFactor < 0.95f)
                         {
                             int targetW = (int)(bounds.Width * scaleFactor);
@@ -2423,7 +2541,7 @@ namespace NexusRemoteAgent
                                 }
                                 using (MemoryStream ms = new MemoryStream())
                                 {
-                                    scaledBmp.Save(ms, jpgEncoder, ep);
+                                    if (jpgEncoder != null) { scaledBmp.Save(ms, jpgEncoder, ep); } else { scaledBmp.Save(ms, ImageFormat.Jpeg); }
                                     return ms.ToArray();
                                 }
                             }
@@ -2432,22 +2550,38 @@ namespace NexusRemoteAgent
                         {
                             using (MemoryStream ms = new MemoryStream())
                             {
-                                rawBmp.Save(ms, jpgEncoder, ep);
+                                if (jpgEncoder != null) { rawBmp.Save(ms, jpgEncoder, ep); } else { rawBmp.Save(ms, ImageFormat.Jpeg); }
                                 return ms.ToArray();
                             }
                         }
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                try { File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "capture_error.log"), ex.ToString()); } catch { }
+                try
+                {
+                    using (Bitmap placeholder = new Bitmap(1280, 720))
+                    using (Graphics gp = Graphics.FromImage(placeholder))
+                    using (MemoryStream ms = new MemoryStream())
+                    {
+                        gp.Clear(Color.FromArgb(15, 23, 42));
+                        using (Font f = new Font("Segoe UI", 16, FontStyle.Bold))
+                        using (SolidBrush b = new SolidBrush(Color.White))
+                        {
+                            gp.DrawString("NexusTI Remote Access — Sessão Conectada", f, b, 40, 40);
+                            gp.DrawString("Display operacional: " + ex.Message, SystemFonts.DefaultFont, Brushes.LightGray, 40, 80);
+                        }
+                        placeholder.Save(ms, ImageFormat.Jpeg);
+                        return ms.ToArray();
+                    }
+                }
+                catch { }
                 return new byte[0];
             }
         }
 
-        // ---------------------------------------------------------------------
-        // CONTROLE DO MOUSE COM PREVENÇÃO RIGOROSA CONTRA CLIQUES FANTASMAS
-        // ---------------------------------------------------------------------
         static void ExecutaAcaoMouse(string payload)
         {
             try
@@ -2660,7 +2794,7 @@ namespace NexusRemoteAgent
 
         static ImageCodecInfo GetEncoder(ImageFormat format)
         {
-            ImageCodecInfo[] codecs = ImageCodecInfo.GetImageDecoders();
+            ImageCodecInfo[] codecs = ImageCodecInfo.GetImageEncoders();
             foreach (ImageCodecInfo codec in codecs)
             {
                 if (codec.FormatID == format.Guid) return codec;

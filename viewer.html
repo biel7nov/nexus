@@ -326,6 +326,13 @@
     let mouseHttpBusy = false;
     let pendingMouseMove = null;
 
+    // Se o viewer estiver em HTTPS na nuvem e o agente em HTTP na rede, redireciona para o viewer local direto sem Mixed Content
+    if (window.location.protocol === 'https:' && agentUrl && agentUrl.startsWith('http://')) {
+      const targetLocal = agentUrl + '/viewer.html' + window.location.search;
+      console.log('Redirecionando para viewer direto no agente local:', targetLocal);
+      window.location.replace(targetLocal);
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       document.title = `FSC Remote — ${targetName} (${agentUrl.replace(/^https?:\/\//, '')})`;
       document.getElementById('target-name-display').innerText = targetName;
@@ -583,12 +590,67 @@
       recarregarStreamTela(currentScreenIndex);
     }
 
+    let frameLoopTimer = null;
+    let fallbackLoopRodando = false;
+
     function recarregarStreamTela(screenIdx) {
       const streamImg = document.getElementById('remote-stream-img');
+      if (!streamImg) return;
       const drawCursorParam = modoMouseSemLag ? '0' : '1';
       const scaleParam = modoTurbo ? '0.75' : '1.0';
       const qualityParam = modoTurbo ? '40' : '65';
+
+      let frameCarregou = false;
+      streamImg.onload = () => {
+        frameCarregou = true;
+        document.getElementById('loading-overlay')?.classList.add('hidden');
+      };
+
+      // Inicia stream nativo MJPEG na porta 8090
       streamImg.src = `${agentUrl}/api/stream?screen=${screenIdx}&drawcursor=${drawCursorParam}&scale=${scaleParam}&quality=${qualityParam}&t=${Date.now()}`;
+
+      // Watchdog de Imagem: se o stream MJPEG demorar mais de 1000ms para renderizar o primeiro quadro,
+      // ativa automaticamente o loop contínuo de quadros ultra-rápido (/api/screen)
+      clearTimeout(frameLoopTimer);
+      frameLoopTimer = setTimeout(() => {
+        if (!frameCarregou && sessaoAtiva) {
+          console.warn('Stream MJPEG pendente. Ativando loop contínuo de quadros (/api/screen)...');
+          iniciarFrameLoopFallback(screenIdx);
+        }
+      }, 1000);
+    }
+
+    function iniciarFrameLoopFallback(screenIdx) {
+      if (fallbackLoopRodando) return;
+      fallbackLoopRodando = true;
+
+      const streamImg = document.getElementById('remote-stream-img');
+      const fetcher = new Image();
+      let busy = false;
+
+      function proximoQuadro() {
+        if (!sessaoAtiva || !fallbackLoopRodando) return;
+        if (busy) return;
+        busy = true;
+
+        const drawCursorParam = modoMouseSemLag ? '0' : '1';
+        const scaleParam = modoTurbo ? '0.75' : '1.0';
+        const qualityParam = modoTurbo ? '40' : '65';
+
+        fetcher.onload = () => {
+          if (streamImg) streamImg.src = fetcher.src;
+          document.getElementById('loading-overlay')?.classList.add('hidden');
+          busy = false;
+          requestAnimationFrame(proximoQuadro);
+        };
+        fetcher.onerror = () => {
+          busy = false;
+          setTimeout(proximoQuadro, 100);
+        };
+        fetcher.src = `${agentUrl}/api/screen?screen=${screenIdx}&drawcursor=${drawCursorParam}&scale=${scaleParam}&quality=${qualityParam}&t=${Date.now()}`;
+      }
+
+      proximoQuadro();
     }
 
     // =========================================================================
