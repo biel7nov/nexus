@@ -503,6 +503,11 @@ namespace NexusRemoteAgent
         // Versão do Clipboard
         static long clipboardVersion = 1;
 
+        // Versão oficial do Agente NexusTI & Build para Atualizações Silenciosas OTA
+        public const string AGENT_VERSION = "1.1.0";
+        public const int AGENT_BUILD = 110;
+        public static bool isAtualizando = false;
+
         [STAThread]
         static void Main(string[] args)
         {
@@ -511,6 +516,16 @@ namespace NexusRemoteAgent
                 try { File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "startup_error.log"), e.ExceptionObject != null ? e.ExceptionObject.ToString() : "Unknown exception"); } catch {}
             };
             try { Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException); } catch { }
+
+            // Limpa resíduos temporários de atualizações OTA anteriores (.old e _new.exe)
+            try
+            {
+                string oldFile = Application.ExecutablePath + ".old";
+                if (File.Exists(oldFile)) File.Delete(oldFile);
+                string newTemp = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NexusRemoteAgent_new.exe");
+                if (File.Exists(newTemp)) File.Delete(newTemp);
+            }
+            catch { }
 
             // 1. Habilita DPI Awareness
             try { SetProcessDPIAware(); } catch { }
@@ -599,7 +614,7 @@ namespace NexusRemoteAgent
                     try { File.WriteAllText(configPath, sessionToken, Encoding.UTF8); } catch { }
                 }
 
-                // Auto-registro do ativo, telemetria contínua e verificação de comunicados em tempo real via Supabase Cloud
+                // Auto-registro do ativo, telemetria contínua, comunicados e auto-atualização silenciosa OTA
                 ThreadPool.QueueUserWorkItem(_ => {
                     int tick = 0;
                     while (true)
@@ -611,6 +626,11 @@ namespace NexusRemoteAgent
                             {
                                 EnviarTelemetriaSupabase();
                                 RegistrarAtivoNoServidorRemoto();
+                            }
+                            // Checagem periódica de novas versões OTA no GitHub (10s após início e a cada 10 minutos)
+                            if (tick == 2 || (tick > 0 && tick % 120 == 0))
+                            {
+                                VerificarAtualizacaoSilenciosa();
                             }
                         }
                         catch { }
@@ -731,6 +751,16 @@ namespace NexusRemoteAgent
 
                                     if (destinatarioValido)
                                     {
+                                        // Intercepta comando de atualização remota OTA via Supabase
+                                        string tipoNorm = (tipo ?? "").Trim().ToLower();
+                                        string titNorm = (titulo ?? "").Trim().ToUpper();
+                                        if (tipoNorm == "update" || tipoNorm == "ota" || titNorm.StartsWith("UPDATE") || titNorm.StartsWith("OTA"))
+                                        {
+                                            string targetDl = !string.IsNullOrEmpty(opcoes) ? opcoes.Trim() : null;
+                                            ThreadPool.QueueUserWorkItem(_ => ExecutarAtualizacaoSilenciosa(targetDl));
+                                            continue;
+                                        }
+
                                         string[] opArr = !string.IsNullOrEmpty(opcoes) ? opcoes.Split('|') : new string[0];
                                         FormAvisoClient.Exibir(tipo, titulo, mensagem, urgencia, opArr, id, autor);
                                     }
@@ -742,6 +772,156 @@ namespace NexusRemoteAgent
             }
             catch { }
         }
+
+        #region AUTO-UPDATE SILENCIOSO OTA (OVER-THE-AIR) VIA GITHUB / VERCEL
+
+        public static void VerificarAtualizacaoSilenciosa()
+        {
+            if (isAtualizando) return;
+            try
+            {
+                ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+                string vJson = null;
+                using (WebClient wc = new WebClient())
+                {
+                    wc.Headers["User-Agent"] = "NexusRemoteAgent/" + AGENT_VERSION;
+                    wc.Headers["Cache-Control"] = "no-cache";
+                    try
+                    {
+                        vJson = wc.DownloadString("https://raw.githubusercontent.com/biel7nov/nexus/main/agent_version.json?t=" + DateTime.UtcNow.Ticks);
+                    }
+                    catch
+                    {
+                        try
+                        {
+                            vJson = wc.DownloadString("https://nexus-ten-brown.vercel.app/agent_version.json?t=" + DateTime.UtcNow.Ticks);
+                        }
+                        catch { }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(vJson)) return;
+
+                var js = new System.Web.Script.Serialization.JavaScriptSerializer();
+                var dict = js.Deserialize<Dictionary<string, object>>(vJson);
+                if (dict != null)
+                {
+                    int remoteBuild = 0;
+                    if (dict.ContainsKey("build"))
+                    {
+                        int.TryParse(Convert.ToString(dict["build"]), out remoteBuild);
+                    }
+                    string dlUrl = dict.ContainsKey("downloadUrl") ? Convert.ToString(dict["downloadUrl"]) : "";
+                    if (string.IsNullOrEmpty(dlUrl) && dict.ContainsKey("fallbackUrl"))
+                        dlUrl = Convert.ToString(dict["fallbackUrl"]);
+
+                    // Se a versão remota no GitHub for superior à desta máquina, executa atualização silenciosa
+                    if (remoteBuild > AGENT_BUILD)
+                    {
+                        ExecutarAtualizacaoSilenciosa(dlUrl);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public static void ExecutarAtualizacaoSilenciosa(string customUrl = null)
+        {
+            if (isAtualizando) return;
+            isAtualizando = true;
+
+            try
+            {
+                string currentExe = Application.ExecutablePath;
+                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                string tempNewExe = Path.Combine(baseDir, "NexusRemoteAgent_new.exe");
+                string backupExe = currentExe + ".old";
+
+                try { if (File.Exists(tempNewExe)) File.Delete(tempNewExe); } catch { }
+                try { if (File.Exists(backupExe)) File.Delete(backupExe); } catch { }
+
+                ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+                string[] urls = new string[] {
+                    !string.IsNullOrEmpty(customUrl) ? customUrl : "https://raw.githubusercontent.com/biel7nov/nexus/main/agent/NexusRemoteAgent.exe",
+                    "https://nexus-ten-brown.vercel.app/agent/NexusRemoteAgent.exe",
+                    "https://raw.githubusercontent.com/biel7nov/nexus/main/agent/NexusRemoteAgent.exe"
+                };
+
+                bool baixou = false;
+                foreach (string u in urls)
+                {
+                    try
+                    {
+                        using (WebClient wc = new WebClient())
+                        {
+                            wc.Headers["User-Agent"] = "NexusRemoteAgent-OTA/" + AGENT_VERSION;
+                            wc.DownloadFile(u + "?t=" + DateTime.UtcNow.Ticks, tempNewExe);
+                            if (File.Exists(tempNewExe) && new FileInfo(tempNewExe).Length > 50000)
+                            {
+                                baixou = true;
+                                break;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                if (!baixou || !File.Exists(tempNewExe))
+                {
+                    isAtualizando = false;
+                    return;
+                }
+
+                // 1. Tenta substituição nativa transparente em NTFS (renomeia o binário em execução para .old)
+                bool substituiu = false;
+                try
+                {
+                    File.Move(currentExe, backupExe);
+                    File.Move(tempNewExe, currentExe);
+                    substituiu = true;
+                }
+                catch { }
+
+                if (substituiu)
+                {
+                    try
+                    {
+                        ProcessStartInfo psi = new ProcessStartInfo(currentExe);
+                        psi.UseShellExecute = true;
+                        psi.WorkingDirectory = baseDir;
+                        Process.Start(psi);
+                    }
+                    catch
+                    {
+                        ProcessStartInfo psiCmd = new ProcessStartInfo("cmd.exe", "/c start \"\" \"" + currentExe + "\"");
+                        psiCmd.CreateNoWindow = true;
+                        psiCmd.UseShellExecute = false;
+                        Process.Start(psiCmd);
+                    }
+                    Environment.Exit(0);
+                }
+                else
+                {
+                    // 2. Fallback assíncrono via script em lote cmd se o arquivo estiver temporariamente travado
+                    string cmd = string.Format(
+                        "/c timeout /t 2 /nobreak >nul & move /y \"{0}\" \"{1}\" & start \"\" \"{1}\"",
+                        tempNewExe,
+                        currentExe
+                    );
+                    ProcessStartInfo psiFallback = new ProcessStartInfo("cmd.exe", cmd);
+                    psiFallback.CreateNoWindow = true;
+                    psiFallback.UseShellExecute = false;
+                    Process.Start(psiFallback);
+                    Environment.Exit(0);
+                }
+            }
+            catch
+            {
+                isAtualizando = false;
+            }
+        }
+
+        #endregion
 
         static void RegistrarAtivoNoServidorRemoto()
         {
@@ -1046,6 +1226,17 @@ namespace NexusRemoteAgent
                     if (method == "OPTIONS")
                     {
                         EnviarRespostaCors(stream, 200, "OK", "text/plain", new byte[0], keepAlive);
+                        if (!keepAlive) break;
+                        continue;
+                    }
+
+                    // 0.0-OTA ATUALIZAÇÃO REMOTA DIRETA VIA HTTP
+                    if (path == "/api/update" || path == "/api/agent/update" || path == "/api/ota")
+                    {
+                        string customDl = ExtrairParam(rawUrl, "", "url", "");
+                        ThreadPool.QueueUserWorkItem(_ => ExecutarAtualizacaoSilenciosa(!string.IsNullOrEmpty(customDl) ? customDl : null));
+                        string respJson = string.Format("{{\"ok\":true,\"status\":\"updating\",\"version\":\"{0}\",\"build\":{1}}}", AGENT_VERSION, AGENT_BUILD);
+                        EnviarRespostaCors(stream, 200, "OK", "application/json", Encoding.UTF8.GetBytes(respJson), keepAlive);
                         if (!keepAlive) break;
                         continue;
                     }
@@ -1627,7 +1818,7 @@ namespace NexusRemoteAgent
 
                         string json = string.Format(
                             System.Globalization.CultureInfo.InvariantCulture,
-                            "{{\"status\":\"online\",\"hostname\":\"{0}\",\"computerName\":\"{1}\",\"customName\":\"{0}\",\"deviceType\":\"{2}\",\"isServer\":{24},\"user\":\"{3}\",\"domain\":\"{4}\",\"loggedUserFull\":\"{4}\\\\{3}\",\"location\":\"{5}\",\"tag\":\"{6}\",\"ip\":\"{7}\",\"port\":{8},\"os\":\"{9}\",\"cpu\":\"{10}\",\"cpuUsedPct\":{25},\"ram\":\"{11}\",\"ramTotalGb\":{12},\"ramUsedGb\":{26},\"ramFreeGb\":{27},\"ramUsedPct\":{13},\"disk\":\"{14}\",\"diskTotalGb\":{28},\"diskFreeGb\":{29},\"diskUsedGb\":{30},\"diskUsedPct\":{31},\"drives\":{32},\"uptime\":\"{33}\",\"activeConnections\":{34},\"lastConnected\":\"Hoje, {15}\",\"lastSeen\":\"Conectado agora\",\"screenWidth\":{16},\"screenHeight\":{17},\"token\":\"{18}\",\"version\":\"2026.5\",\"screens\":{19},\"currentScreen\":{20},\"virtualScreen\":{{\"width\":{21},\"height\":{22}}},\"empresa\":\"{23}\",\"company\":\"{23}\"}}",
+                            "{{\"status\":\"online\",\"hostname\":\"{0}\",\"computerName\":\"{1}\",\"customName\":\"{0}\",\"deviceType\":\"{2}\",\"isServer\":{24},\"user\":\"{3}\",\"domain\":\"{4}\",\"loggedUserFull\":\"{4}\\\\{3}\",\"location\":\"{5}\",\"tag\":\"{6}\",\"ip\":\"{7}\",\"port\":{8},\"os\":\"{9}\",\"cpu\":\"{10}\",\"cpuUsedPct\":{25},\"ram\":\"{11}\",\"ramTotalGb\":{12},\"ramUsedGb\":{26},\"ramFreeGb\":{27},\"ramUsedPct\":{13},\"disk\":\"{14}\",\"diskTotalGb\":{28},\"diskFreeGb\":{29},\"diskUsedGb\":{30},\"diskUsedPct\":{31},\"drives\":{32},\"uptime\":\"{33}\",\"activeConnections\":{34},\"lastConnected\":\"Hoje, {15}\",\"lastSeen\":\"Conectado agora\",\"screenWidth\":{16},\"screenHeight\":{17},\"token\":\"{18}\",\"version\":\"" + AGENT_VERSION + "\",\"build\":" + AGENT_BUILD + ",\"screens\":{19},\"currentScreen\":{20},\"virtualScreen\":{{\"width\":{21},\"height\":{22}}},\"empresa\":\"{23}\",\"company\":\"{23}\"}}",
                             customMachineName,
                             Environment.MachineName,
                             devType,

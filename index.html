@@ -2027,6 +2027,10 @@
             </div>
 
             <div class="flex items-center gap-2">
+              <button onclick="dispararAtualizacaoAgentesOTA()" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                <span>Atualizar Agentes (OTA GitHub)</span>
+              </button>
               <a href="Instalador-Nexus-Agent.exe" download="Instalador-Nexus-Agent.exe" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition">
                 <i data-lucide="download" class="w-4 h-4"></i>
                 <span>Baixar Instalador (.exe)</span>
@@ -12989,6 +12993,54 @@
       renderizarApuracaoEnquetes();
       renderizarHistoricoAvisos();
       alert('Resultados de enquetes e confirmações atualizados com sucesso!');
+    }
+
+    // DISPARO DE ATUALIZAÇÃO SILENCIOSA OTA VIA SUPABASE & GITHUB
+    async function dispararAtualizacaoAgentesOTA(customUrl) {
+      if (!confirm("Deseja disparar a atualização automática e silenciosa (OTA) em todas as máquinas com o Nexus Agent instalado?\n\nOs computadores clientes baixarão a versão mais recente diretamente do GitHub em segundo plano e atualizarão sem precisar desinstalar.")) {
+        return;
+      }
+
+      const dlUrl = customUrl || "https://raw.githubusercontent.com/biel7nov/nexus/main/agent/NexusRemoteAgent.exe";
+      if (typeof mostrarToast === 'function') {
+        mostrarToast("Disparando comando de atualização OTA para os agentes via Supabase...", "info", "Atualização Remota");
+      }
+
+      try {
+        if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+          const { error } = await supabaseClient.from('comunicados').insert({
+            id: 'OTA-' + Date.now(),
+            tipo: 'update',
+            titulo: 'UPDATE_AGENT',
+            mensagem: 'Comando de auto-atualização silenciosa OTA disparado pelo administrador.',
+            urgencia: 'alta',
+            destinatario: 'broadcast',
+            opcoes: dlUrl,
+            autor: 'Console NexusTI'
+          });
+
+          if (error) {
+            console.warn('Erro ao inserir comunicado no Supabase:', error);
+          }
+        }
+
+        // Notifica também localmente caso o agente esteja rodando no mesmo host
+        try {
+          fetch('http://127.0.0.1:8090/api/update?url=' + encodeURIComponent(dlUrl), { mode: 'no-cors' });
+        } catch (e) {}
+
+        if (typeof mostrarToast === 'function') {
+          mostrarToast("✓ Comando de atualização OTA transmitido com sucesso! As estações clientes atualizarão silenciosamente.", "success", "OTA Disparado");
+        } else {
+          alert("✓ Comando de atualização OTA transmitido com sucesso!");
+        }
+      } catch (e) {
+        if (typeof mostrarToast === 'function') {
+          mostrarToast("Erro ao transmitir comando OTA: " + e.message, "error", "Falha no Disparo");
+        } else {
+          alert("Erro ao transmitir comando OTA: " + e.message);
+        }
+      }
     }
 
     // Inicialização da aba de comunicados

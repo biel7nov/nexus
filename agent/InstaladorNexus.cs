@@ -1209,16 +1209,23 @@ namespace NexusInstaller
                 if (string.IsNullOrEmpty(targetDir)) targetDir = @"C:\Nexus-Agent";
                 if (!Directory.Exists(targetDir)) Directory.CreateDirectory(targetDir);
 
-                // 2. Encerra processos anteriores
-                lblStatus.Text = "Encerrando instâncias anteriores...";
+                // 2. Encerra instâncias e processos anteriores
+                lblStatus.Text = "Encerrando instâncias anteriores do agente...";
                 Application.DoEvents();
-                foreach (var p in Process.GetProcessesByName("FSCRemoteAgent"))
+                foreach (string pName in new string[] { "NexusRemoteAgent", "FSCRemoteAgent" })
                 {
-                    try { p.Kill(); p.WaitForExit(1000); } catch { }
+                    try
+                    {
+                        foreach (var p in Process.GetProcessesByName(pName))
+                        {
+                            try { p.Kill(); p.WaitForExit(1500); } catch { }
+                        }
+                    }
+                    catch { }
                 }
 
-                // 3. Extrai executável do agente (embutido ou local)
-                lblStatus.Text = "Copiando binários do FSC Remote Agent...";
+                // 3. Extrai executável do agente (embutido, local ou download do GitHub)
+                lblStatus.Text = "Copiando binários do Nexus Remote Agent...";
                 Application.DoEvents();
                 string targetExe = Path.Combine(targetDir, "NexusRemoteAgent.exe");
 
@@ -1254,19 +1261,48 @@ namespace NexusInstaller
 
                 if (!extraiu)
                 {
-                    string localExe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NexusRemoteAgent.exe");
-                    if (!File.Exists(localExe)) localExe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "agent", "NexusRemoteAgent.exe");
-                    if (!File.Exists(localExe)) localExe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FSCRemoteAgent.exe");
-                    if (File.Exists(localExe))
+                    string[] candsLocal = new string[] {
+                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NexusRemoteAgent.exe"),
+                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "agent", "NexusRemoteAgent.exe"),
+                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FSCRemoteAgent.exe"),
+                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "agent", "FSCRemoteAgent.exe")
+                    };
+                    foreach (string localExe in candsLocal)
                     {
-                        File.Copy(localExe, targetExe, true);
-                        extraiu = true;
+                        if (File.Exists(localExe))
+                        {
+                            try { File.Copy(localExe, targetExe, true); extraiu = true; break; } catch { }
+                        }
                     }
+                }
+
+                // Fallback automático via GitHub / Vercel caso os binários não estejam presentes
+                if (!File.Exists(targetExe) || new FileInfo(targetExe).Length < 10000)
+                {
+                    try
+                    {
+                        lblStatus.Text = "Baixando versão mais recente do Nexus Agent...";
+                        Application.DoEvents();
+                        ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+                        using (WebClient wc = new WebClient())
+                        {
+                            wc.Headers["User-Agent"] = "NexusInstaller/2.5";
+                            try
+                            {
+                                wc.DownloadFile("https://raw.githubusercontent.com/biel7nov/nexus/main/agent/NexusRemoteAgent.exe", targetExe);
+                            }
+                            catch
+                            {
+                                wc.DownloadFile("https://nexus-ten-brown.vercel.app/agent/NexusRemoteAgent.exe", targetExe);
+                            }
+                        }
+                    }
+                    catch { }
                 }
 
                 if (!File.Exists(targetExe))
                 {
-                    throw new FileNotFoundException("O arquivo do agente '" + targetExe + "' não pôde ser extraído do instalador.");
+                    throw new FileNotFoundException("O arquivo do agente '" + targetExe + "' não pôde ser instalado nem baixado.");
                 }
 
                 try { string fscLegacy = Path.Combine(targetDir, "FSCRemoteAgent.exe"); if (File.Exists(targetExe)) File.Copy(targetExe, fscLegacy, true); } catch { }
@@ -1504,14 +1540,47 @@ namespace NexusInstaller
                 }
                 catch { }
 
-                // 9. Inicia o FSC Remote Agent em segundo plano
+                // 9. Inicia o Nexus Remote Agent em segundo plano
                 lblStatus.Text = "Iniciando o agente em segundo plano...";
                 Application.DoEvents();
 
-                ProcessStartInfo psiAgent = new ProcessStartInfo(targetExe);
-                psiAgent.WorkingDirectory = targetDir;
-                psiAgent.UseShellExecute = true;
-                Process.Start(psiAgent);
+                bool iniciou = false;
+                try
+                {
+                    ProcessStartInfo psiAgent = new ProcessStartInfo(targetExe);
+                    psiAgent.WorkingDirectory = targetDir;
+                    psiAgent.UseShellExecute = true;
+                    Process.Start(psiAgent);
+                    iniciou = true;
+                }
+                catch { }
+
+                if (!iniciou)
+                {
+                    try
+                    {
+                        ProcessStartInfo psiCmd = new ProcessStartInfo("cmd.exe", "/c start \"\" \"" + targetExe + "\"");
+                        psiCmd.CreateNoWindow = true;
+                        psiCmd.UseShellExecute = false;
+                        psiCmd.WorkingDirectory = targetDir;
+                        Process.Start(psiCmd);
+                        iniciou = true;
+                    }
+                    catch { }
+                }
+
+                if (!iniciou)
+                {
+                    try
+                    {
+                        ProcessStartInfo psiPs = new ProcessStartInfo("powershell", "-NoProfile -Command \"Start-Process '" + targetExe + "'\"");
+                        psiPs.CreateNoWindow = true;
+                        psiPs.UseShellExecute = false;
+                        Process.Start(psiPs);
+                        iniciou = true;
+                    }
+                    catch { }
+                }
 
                 // 10. Exibe Tela de Sucesso
                 lblEmpresaResult.Text = "🏢 Empresa: " + empresaAtivo;
