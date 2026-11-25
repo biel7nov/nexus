@@ -699,6 +699,37 @@ namespace NexusRemoteAgent
 
         
         static HashSet<string> avisosExibidosIds = new HashSet<string>();
+        static bool primeiraVerificacaoComunicados = true;
+        static DateTime agentStartTimeUtc = DateTime.UtcNow;
+
+        static void CarregarAvisosVistos()
+        {
+            try
+            {
+                string p = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "avisos_vistos.txt");
+                if (File.Exists(p))
+                {
+                    foreach (string line in File.ReadAllLines(p, Encoding.UTF8))
+                    {
+                        string s = line.Trim();
+                        if (!string.IsNullOrEmpty(s)) avisosExibidosIds.Add(s);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        static void RegistrarAvisoVisto(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return;
+            avisosExibidosIds.Add(id);
+            try
+            {
+                string p = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "avisos_vistos.txt");
+                File.AppendAllText(p, id + Environment.NewLine, Encoding.UTF8);
+            }
+            catch { }
+        }
 
         static void VerificarComunicadosSupabase()
         {
@@ -717,6 +748,28 @@ namespace NexusRemoteAgent
                     string json = sr.ReadToEnd();
                     var js = new System.Web.Script.Serialization.JavaScriptSerializer();
                     object[] lista = js.Deserialize<object[]>(json);
+
+                    // Na primeira inicialização do agente, carrega o histórico persistente de avisos já vistos
+                    if (primeiraVerificacaoComunicados)
+                    {
+                        CarregarAvisosVistos();
+                        // Marca todos os comunicados pré-existentes na nuvem como já vistos para NUNCA
+                        // abrir popups acumulados do passado na tela ao instalar ou iniciar o programa!
+                        if (lista != null)
+                        {
+                            foreach (object item in lista)
+                            {
+                                Dictionary<string, object> dict = item as Dictionary<string, object>;
+                                if (dict != null && dict.ContainsKey("id"))
+                                {
+                                    RegistrarAvisoVisto(Convert.ToString(dict["id"]));
+                                }
+                            }
+                        }
+                        primeiraVerificacaoComunicados = false;
+                        return;
+                    }
+
                     if (lista != null)
                     {
                         foreach (object item in lista)
@@ -732,10 +785,21 @@ namespace NexusRemoteAgent
                                 string destinatario = dict.ContainsKey("destinatario") ? Convert.ToString(dict["destinatario"]) : "broadcast";
                                 string opcoes = dict.ContainsKey("opcoes") ? Convert.ToString(dict["opcoes"]) : "";
                                 string autor = dict.ContainsKey("autor") ? Convert.ToString(dict["autor"]) : "Gestão de TI";
+                                string criadoEmStr = dict.ContainsKey("criado_em") ? Convert.ToString(dict["criado_em"]) : "";
 
                                 if (!string.IsNullOrEmpty(id) && !avisosExibidosIds.Contains(id))
                                 {
-                                    avisosExibidosIds.Add(id);
+                                    RegistrarAvisoVisto(id);
+
+                                    // Descarta avisos emitidos no passado (antes do agente iniciar ou há mais de 10 minutos)
+                                    DateTime criadoEm;
+                                    if (!string.IsNullOrEmpty(criadoEmStr) && DateTime.TryParse(criadoEmStr, out criadoEm))
+                                    {
+                                        if (criadoEm.ToUniversalTime() < agentStartTimeUtc.AddMinutes(-5))
+                                        {
+                                            continue;
+                                        }
+                                    }
 
                                     bool destinatarioValido = (string.IsNullOrEmpty(destinatario) || destinatario == "broadcast" || destinatario.ToLower() == "todas" || destinatario.ToLower().Contains("todas"));
                                     if (!destinatarioValido)
