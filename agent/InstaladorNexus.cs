@@ -1177,7 +1177,7 @@ namespace NexusInstaller
             btnFechar.Size = new Size(522, 48);
             btnFechar.Click += (s, e) => {
                 try {
-                    Process.Start("http://127.0.0.1:8090/chamado");
+                    Process.Start("https://nexus-ten-brown.vercel.app/chamado.html");
                 } catch { }
                 this.Close();
             };
@@ -1521,7 +1521,13 @@ namespace NexusInstaller
                     if (pLnk != null) pLnk.WaitForExit(3000);
 
                     string urlPath = Path.Combine(desktop, "Abrir Chamado T.I (Web).url");
-                    File.WriteAllText(urlPath, "[InternetShortcut]\r\nURL=http://127.0.0.1:8090/chamado\r\nIconIndex=0\r\nIconFile=" + targetExe + "\r\n");
+                    string portalHospedadoUrl = string.Format(
+                        "https://nexus-ten-brown.vercel.app/chamado.html?empresa={0}&setor={1}&ativo={2}",
+                        Uri.EscapeDataString(empresaAtivo ?? "Aço Móveis"),
+                        Uri.EscapeDataString(tagAtivo ?? "TI"),
+                        Uri.EscapeDataString(nomeAtivo ?? Environment.MachineName)
+                    );
+                    File.WriteAllText(urlPath, "[InternetShortcut]\r\nURL=" + portalHospedadoUrl + "\r\nIconIndex=0\r\nIconFile=" + targetExe + "\r\n");
 
                     // Atalho no Menu Iniciar
                     string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Fast Solutions Corporate");
@@ -1617,8 +1623,8 @@ namespace NexusInstaller
                 ukey.SetValue("NoModify", 1, RegistryValueKind.DWord);
                 ukey.SetValue("NoRepair", 1, RegistryValueKind.DWord);
                 ukey.SetValue("InstallDate", DateTime.Now.ToString("yyyyMMdd"));
-                ukey.SetValue("URLInfoAbout", "http://127.0.0.1:8090/chamado");
-                ukey.SetValue("HelpLink", "http://127.0.0.1:8090/chamado");
+                ukey.SetValue("URLInfoAbout", "https://nexus-ten-brown.vercel.app/chamado.html");
+                ukey.SetValue("HelpLink", "https://nexus-ten-brown.vercel.app/chamado.html");
                 ukey.SetValue("Contact", "Equipe de Gestão e Suporte de TI");
                 ukey.SetValue("Comments", "Agente Corporativo de Suporte, Telemetria, Acesso Remoto, Avisos e Enquetes de TI");
             };

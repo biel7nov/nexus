@@ -6040,6 +6040,7 @@
           if (existIdx === -1) {
             listaChamados.unshift(normalizado);
             teveNovo = true;
+            if (typeof sincronizarChamadoNoSupabase === 'function') sincronizarChamadoNoSupabase(normalizado);
             adicionarLog(normalizado.ip, normalizado.ativo, 'Novo Chamado', `${normalizado.id}: ${normalizado.titulo} (${normalizado.solicitante})`, 'text-rose-600 font-bold');
             adicionarNotificacao('chamado', `Novo Chamado #${normalizado.id}`, `${normalizado.solicitante || 'Usuário'} (${normalizado.empresa || 'Empresa'}): ${normalizado.titulo || 'Sem título'}`, { chamadoId: normalizado.id, linkAba: 'view-chamados' });
           } else {
@@ -7672,7 +7673,7 @@
       atualizarIconesLucide();
     }
 
-    function enviarMensagemTecnicoModal() {
+    async function enviarMensagemTecnicoModal() {
       if (!chamadoAbertoNoModalId) return;
       const c = listaChamados.find(item => String(item.id) === String(chamadoAbertoNoModalId));
       if (!c) return;
@@ -7712,16 +7713,47 @@
       }
       c.ultimaAtualizacao = 'Hoje às ' + horaStr + ' por ' + userLogado.nome;
 
-      salvarDadosLocais();
+      if (input1) input1.value = '';
+      if (input2) input2.value = '';
 
-      // Sincroniza mensagem no Supabase Cloud em tempo real
+      salvarDadosLocais();
+      renderizarChatModal(c);
+      renderizarChamados();
+
+      // Sincroniza mensagem no Supabase Cloud em tempo real com merge seguro e upsert
       if (supabaseClient && c && c.id) {
-        supabaseClient.from('chamados').update({
-          historico: c.mensagens,
-          status: c.status === 'Resolvido' ? 'Finalizados' : (c.status === 'Triagem' ? 'Em Triagem' : c.status),
-          tecnico: c.tecnico || c.responsavel || 'Não atribuído',
-          atualizado_em: new Date().toISOString()
-        }).eq('id', String(c.id)).catch(err => console.warn('Supabase chat tec error:', err));
+        try {
+          const { data: rem } = await supabaseClient
+            .from('chamados')
+            .select('id, historico')
+            .eq('id', String(c.id))
+            .maybeSingle();
+
+          if (rem && Array.isArray(rem.historico)) {
+            c.mensagens = deduplicarMensagens([...rem.historico, ...c.mensagens]);
+          }
+
+          await supabaseClient.from('chamados').upsert({
+            id: String(c.id),
+            protocolo: String(c.id),
+            empresa: c.empresa || 'Aço Móveis',
+            solicitante: c.solicitante || 'Colaborador',
+            setor: c.setor || 'TI',
+            categoria: c.categoria || 'Geral',
+            urgencia: c.urgencia || 'Média',
+            descricao: c.descricao || c.desc || c.titulo || '',
+            status: c.status === 'Resolvido' ? 'Finalizados' : (c.status === 'Triagem' ? 'Em Triagem' : (c.status === 'Homologacao' ? 'Em Homologação' : (c.status === 'Active' ? 'Em Aberto' : c.status))),
+            maquina_nome: c.ativo || 'auto',
+            maquina_ip: c.ip || 'auto',
+            tecnico: c.tecnico || c.responsavel || 'Não atribuído',
+            historico: c.mensagens,
+            atualizado_em: new Date().toISOString()
+          });
+          salvarDadosLocais();
+          renderizarChatModal(c);
+        } catch(err) {
+          console.warn('Supabase chat tec error:', err);
+        }
       }
 
       try {
@@ -7751,12 +7783,6 @@
           });
         }
       } catch(e) {}
-
-      if (input1) input1.value = '';
-      if (input2) input2.value = '';
-
-      renderizarChatModal(c);
-      renderizarChamados();
 
       adicionarLog(c.ip || '127.0.0.1', c.ativo, 'Mensagem Enviada', `Técnico ${userLogado.nome} respondeu no chamado #${c.id}`, 'text-blue-600 font-semibold');
     }
@@ -9697,55 +9723,19 @@
         if (setoData && setoData.length > 0) {
           listaDepartamentos = setoData.map(s => s.nome.startsWith('#') ? s.nome : '#' + s.nome);
           try { localStorage.setItem('fsc_kintsugi_deptos', JSON.stringify(listaDepartamentos)); } catch(e){}
-          if (typeof renderizarTagsDeptos === 'function') renderizarTagsDeptos();
+          if (typeof renderizarTagsDepartamentos === 'function') renderizarTagsDepartamentos();
+          if (typeof popularSelectsSetores === 'function') popularSelectsSetores();
         }
       } catch(err) {
         console.warn('Erro ao sincronizar setores Supabase:', err);
       }
 
       // 3. Sincroniza Chamados
-      try {
-        const { data: chamData, error: chamErr } = await supabaseClient.from('chamados').select('*').order('criado_em', { ascending: false });
-        if (chamData && chamData.length > 0) {
-          const listaNuvem = chamData.map(ch => ({
-            id: ch.id,
-            titulo: ch.descricao ? (ch.descricao.length > 40 ? ch.descricao.substring(0, 40) + '...' : ch.descricao) : ('Chamado #' + ch.id),
-            descricao: ch.descricao,
-            desc: ch.descricao,
-            empresa: ch.empresa,
-            solicitante: ch.solicitante,
-            setor: ch.setor,
-            categoria: ch.categoria || 'Geral',
-            urgencia: ch.urgencia || 'Média',
-            status: ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : (ch.status === 'Em Espera' ? 'Em Espera' : (ch.status === 'Em Homologação' ? 'Homologacao' : 'Active')))),
-            data: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
-            horario: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
-            responsavel: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
-            tecnico: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
-            ip: ch.maquina_ip || 'auto',
-            ativo: ch.maquina_nome || 'auto',
-            mensagens: Array.isArray(ch.historico) ? ch.historico : []
-          }));
+      await carregarChamadosDoSupabase();
 
-          // Merge preservando chamados locais e atualizando
-          listaNuvem.forEach(nv => {
-            const idx = listaChamados.findIndex(x => String(x.id) === String(nv.id));
-            if (idx >= 0) {
-              listaChamados[idx] = Object.assign({}, listaChamados[idx], nv);
-            } else {
-              listaChamados.unshift(nv);
-            }
-          });
+      // 3.1. Sincroniza Computadores / Ativos da Nuvem Supabase
+      await sincronizarComputadoresDoSupabase();
 
-          salvarDadosLocais();
-          renderizarChamados();
-          if (typeof renderizarTabelaChamados === 'function') renderizarTabelaChamados();
-        }
-      } catch(err) {
-        console.warn('Erro ao sincronizar chamados Supabase:', err);
-      }
-
-      
       // 5. Sincroniza Usuários / Equipe de TI
       try {
         const { data: usrData, error: usrErr } = await supabaseClient.from('usuarios').select('*');
@@ -9807,9 +9797,17 @@
               const ch = payload.new;
               let idx = listaChamados.findIndex(x => String(x.id) === String(ch.id));
               if (idx >= 0) {
-                if (ch.status) listaChamados[idx].status = ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : ch.status);
-                if (ch.tecnico) listaChamados[idx].tecnico = ch.tecnico;
-                if (ch.historico) listaChamados[idx].mensagens = ch.historico;
+                if (ch.status) listaChamados[idx].status = ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : (ch.status === 'Em Espera' ? 'Em Espera' : (ch.status === 'Em Homologação' ? 'Homologacao' : 'Active'))));
+                if (ch.tecnico && ch.tecnico !== 'Não atribuído') {
+                  listaChamados[idx].tecnico = ch.tecnico;
+                  listaChamados[idx].responsavel = ch.tecnico;
+                }
+                if (Array.isArray(ch.historico)) {
+                  listaChamados[idx].mensagens = deduplicarMensagens([
+                    ...(listaChamados[idx].mensagens || []),
+                    ...ch.historico
+                  ]);
+                }
                 salvarDadosLocais();
                 renderizarChamados();
                 if (typeof renderizarTabelaChamados === 'function') renderizarTabelaChamados();
@@ -9821,6 +9819,9 @@
                 carregarChamadosDoSupabase();
               }
             }
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'computadores' }, () => {
+            sincronizarComputadoresDoSupabase();
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'empresas' }, async () => {
             const { data } = await supabaseClient.from('empresas').select('nome').order('criado_em', { ascending: true });
@@ -9853,13 +9854,111 @@
             if (data && data.length > 0) {
               listaDepartamentos = data.map(d => d.nome.startsWith('#') ? d.nome : '#' + d.nome);
               salvarDadosLocais();
-              if (typeof renderizarTagsDeptos === 'function') renderizarTagsDeptos();
+              if (typeof renderizarTagsDepartamentos === 'function') renderizarTagsDepartamentos();
+              if (typeof popularSelectsSetores === 'function') popularSelectsSetores();
             }
           })
           .subscribe();
       } catch(err) {
         console.warn('Realtime Supabase init:', err);
       }
+
+      // Polling contínuo de segurança para o Chat aberto e Chamados na Nuvem
+      if (!window._supabaseChatPollingStarted) {
+        window._supabaseChatPollingStarted = true;
+        setInterval(sincronizarChatAbertoSupabaseTecnico, 2500);
+        setInterval(() => {
+          carregarChamadosDoSupabase();
+          sincronizarComputadoresDoSupabase();
+        }, 5000);
+      }
+    }
+
+    async function sincronizarChatAbertoSupabaseTecnico() {
+      if (!supabaseClient || !chamadoAbertoNoModalId) return;
+      try {
+        const { data: ch, error } = await supabaseClient
+          .from('chamados')
+          .select('*')
+          .eq('id', String(chamadoAbertoNoModalId))
+          .maybeSingle();
+        if (!ch || error) return;
+
+        const idx = listaChamados.findIndex(x => String(x.id) === String(ch.id));
+        if (idx >= 0) {
+          const oldLen = Array.isArray(listaChamados[idx].mensagens) ? listaChamados[idx].mensagens.length : 0;
+          const remotas = Array.isArray(ch.historico) ? ch.historico : [];
+          const merged = deduplicarMensagens([...(listaChamados[idx].mensagens || []), ...remotas]);
+          if (merged.length !== oldLen) {
+            listaChamados[idx].mensagens = merged;
+            salvarDadosLocais();
+            renderizarChatModal(listaChamados[idx]);
+            renderizarChamados();
+            const ult = merged[merged.length - 1];
+            if (ult && ult.tipo === 'cliente' && typeof tocarAlertaSonoroChamado === 'function') {
+              tocarAlertaSonoroChamado();
+            }
+          }
+        }
+      } catch(e) {}
+    }
+
+    async function sincronizarComputadoresDoSupabase() {
+      if (!supabaseClient) return;
+      try {
+        const { data: comps, error } = await supabaseClient.from('computadores').select('*');
+        if (!comps || error || !Array.isArray(comps)) return;
+        let mudou = false;
+        comps.forEach(comp => {
+          const hostName = comp.nome_computador || comp.id;
+          if (!hostName) return;
+          const hbTime = comp.ultimo_heartbeat ? new Date(comp.ultimo_heartbeat).getTime() : 0;
+          const isOnline = (Date.now() - hbTime) < 120000; // online se enviou heartbeat nos últimos 2 min
+          const cpuPct = typeof comp.cpu_usage === 'number' ? comp.cpu_usage : 10;
+          const ramPct = typeof comp.ram_usage === 'number' ? comp.ram_usage : 35;
+
+          const idx = listaAtivos.findIndex(a => String(a.host || '').toUpperCase() === String(hostName).toUpperCase());
+          const mapped = {
+            id: (idx >= 0 && listaAtivos[idx].id) ? listaAtivos[idx].id : ('FSC-' + hostName),
+            host: hostName,
+            type: comp.is_server ? 'Servidor' : ((idx >= 0 && listaAtivos[idx].type) ? listaAtivos[idx].type : 'Desktop'),
+            isServer: Boolean(comp.is_server),
+            user: (idx >= 0 && listaAtivos[idx].user) ? listaAtivos[idx].user : hostName,
+            domain: 'CORP.LOCAL',
+            loggedUserFull: 'CORP\\' + ((idx >= 0 && listaAtivos[idx].user) ? listaAtivos[idx].user : hostName),
+            location: `${comp.empresa || 'Aço Móveis'} - ${comp.setor || 'TI'}`,
+            empresa: comp.empresa || 'Aço Móveis',
+            company: comp.empresa || 'Aço Móveis',
+            tag: comp.setor || 'TI',
+            os: (idx >= 0 && listaAtivos[idx].os) ? listaAtivos[idx].os : 'Windows 10/11 Pro',
+            cpu: (idx >= 0 && listaAtivos[idx].cpu) ? listaAtivos[idx].cpu : 'Intel Core / AMD',
+            cpuUsedPct: cpuPct,
+            ram: `8.0 GB DDR4 (${ramPct}% em uso)`,
+            ramTotalGb: 8.0,
+            ramUsedGb: +(8.0 * ramPct / 100).toFixed(1),
+            ramFreeGb: +(8.0 * (100 - ramPct) / 100).toFixed(1),
+            ramUsedPct: ramPct,
+            disk: (idx >= 0 && listaAtivos[idx].disk) ? listaAtivos[idx].disk : 'SSD 512 GB',
+            ip: comp.ip || '127.0.0.1',
+            port: 8090,
+            lastConnected: comp.ultimo_heartbeat ? ('Hoje, ' + new Date(comp.ultimo_heartbeat).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
+            lastSeen: isOnline ? 'Conectado agora' : 'Offline',
+            online: isOnline
+          };
+          if (idx >= 0) {
+            listaAtivos[idx] = Object.assign({}, listaAtivos[idx], mapped);
+          } else {
+            listaAtivos.unshift(mapped);
+            mudou = true;
+          }
+        });
+        if (mudou) {
+          const vAtivos = document.getElementById('view-ativos');
+          if (vAtivos && !vAtivos.classList.contains('hidden') && typeof renderizarTabelaInventario === 'function') {
+            renderizarTabelaInventario();
+          }
+        }
+      } catch(e) {}
     }
 
     function sincronizarChamadoNoSupabase(chamado) {
@@ -9911,7 +10010,15 @@
           listaNuvem.forEach(nv => {
             const idx = listaChamados.findIndex(x => String(x.id) === String(nv.id));
             if (idx >= 0) {
-              listaChamados[idx] = Object.assign({}, listaChamados[idx], nv);
+              const mergedMsgs = deduplicarMensagens([
+                ...(listaChamados[idx].mensagens || []),
+                ...(nv.mensagens || [])
+              ]);
+              const oldLen = Array.isArray(listaChamados[idx].mensagens) ? listaChamados[idx].mensagens.length : 0;
+              listaChamados[idx] = Object.assign({}, listaChamados[idx], nv, { mensagens: mergedMsgs });
+              if (typeof chamadoAbertoNoModalId !== 'undefined' && String(chamadoAbertoNoModalId) === String(nv.id) && mergedMsgs.length !== oldLen) {
+                renderizarChatModal(listaChamados[idx]);
+              }
             } else {
               listaChamados.unshift(nv);
             }
@@ -10720,8 +10827,11 @@
         }
       } catch (e) { }
 
-      // Tenta consultar telemetria ao vivo do FSC Agent local
+      // Tenta consultar telemetria ao vivo do FSC Agent local e nuvem Supabase
       await atualizarDadosDoAgenteEmTempoReal();
+      if (typeof sincronizarComputadoresDoSupabase === 'function') {
+        await sincronizarComputadoresDoSupabase();
+      }
 
       const vAtivos = document.getElementById('view-ativos');
       if (forcarSync || (vAtivos && !vAtivos.classList.contains('hidden'))) {
@@ -11338,7 +11448,7 @@
       if (confirm(`Tem certeza que deseja remover o técnico "${u.nome}" da equipe de TI?`)) {
         const uExcluido = listaUsuariosTi.splice(idx, 1)[0];
         if (supabaseClient && uExcluido && uExcluido.email) {
-          supabaseClient.from('usuarios').delete().eq('email', uExcluido.email).catch(console.warn);
+          supabaseClient.from('usuarios').delete().eq('email', uExcluido.email).then(() => {}).catch(console.warn);
         }
         salvarDadosLocais();
         renderizarUsuariosTi();
@@ -11650,6 +11760,11 @@
         });
       }
 
+      if (supabaseClient) {
+        const cleanOld = tagAntiga.replace('#', '').trim();
+        const cleanNew = tagNova.replace('#', '').trim();
+        supabaseClient.from('setores').update({ nome: cleanNew }).in('nome', [tagAntiga, cleanOld]).then(() => {}).catch(console.warn);
+      }
       salvarDadosLocais();
       renderizarTagsEmpresas();
       renderizarTagsDepartamentos();
@@ -11697,9 +11812,12 @@
 
       if (!listaDepartamentos.includes(valor)) {
         listaDepartamentos.push(valor);
+        if (supabaseClient) {
+          supabaseClient.from('setores').insert({ nome: valor.replace('#', '').trim() }).then(() => {}).catch(console.warn);
+        }
         salvarDadosLocais();
         renderizarTagsEmpresas();
-      renderizarTagsDepartamentos();
+        renderizarTagsDepartamentos();
         popularSelectsSetores();
         input.value = '';
       }
@@ -11707,6 +11825,10 @@
 
     function removerSetorTag(tag) {
       listaDepartamentos = listaDepartamentos.filter(t => t !== tag);
+      if (supabaseClient) {
+        const cleanTag = String(tag).replace('#', '').trim();
+        supabaseClient.from('setores').delete().in('nome', [tag, cleanTag]).then(() => {}).catch(console.warn);
+      }
       salvarDadosLocais();
       renderizarTagsEmpresas();
       renderizarTagsDepartamentos();
@@ -11803,7 +11925,7 @@
 
       window.listaEmpresasCadastradas.push(valor);
       if (supabaseClient) {
-        supabaseClient.from('empresas').insert({ nome: valor }).catch(console.warn);
+        supabaseClient.from('empresas').insert({ nome: valor }).then(() => {}).catch(console.warn);
       }
       salvarDadosLocais();
       sincronizarEmpresasNoDisco();
@@ -11829,6 +11951,9 @@
 
       // Remove da lista
       window.listaEmpresasCadastradas.splice(idx, 1);
+      if (supabaseClient && empNome) {
+        supabaseClient.from('empresas').delete().eq('nome', empNome).then(() => {}).catch(console.warn);
+      }
 
       // Se a empresa removida for a que estava configurada como principal no setup
       if (configSistemaTi && configSistemaTi.empresaNome && configSistemaTi.empresaNome.trim().toLowerCase() === empNome.toLowerCase()) {
@@ -11891,6 +12016,9 @@
         window.listaEmpresasCadastradas[idx] = nomeNovo;
       } else {
         window.listaEmpresasCadastradas.push(nomeNovo);
+      }
+      if (supabaseClient && nomeAntigo && nomeNovo) {
+        supabaseClient.from('empresas').update({ nome: nomeNovo }).eq('nome', nomeAntigo).then(() => {}).catch(console.warn);
       }
 
       // Cascading em chamados e ativos

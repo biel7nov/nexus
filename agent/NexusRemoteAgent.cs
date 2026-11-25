@@ -1070,38 +1070,47 @@ namespace NexusRemoteAgent
             }
         }
 
-        public static void AbrirChamadoUI()
+        public static string ObterUrlPortalChamadoHospedado()
         {
             CarregarNomeCustomizado();
-            string[] candidateHtmls = new string[] {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "chamado.html"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\chamado.html"),
-                @"C:\FSC-Agent\chamado.html",
-                @"c:\Users\gabrielnovaes\Documents\copia magma\chamado.html",
-                @"c:\Users\gabrielnovaes\Documents\fsc-console\chamado.html"
-            };
-            string found = null;
-            foreach (var p in candidateHtmls) { if (File.Exists(p)) { found = p; break; } }
+            string emp = !string.IsNullOrEmpty(customEmpresa) ? customEmpresa : "Aço Móveis";
+            string set = !string.IsNullOrEmpty(customMachineTag) ? customMachineTag.Replace("#", "").Trim() : "TI";
+            string hst = !string.IsNullOrEmpty(customMachineName) ? customMachineName : Environment.MachineName;
+            string usr = Environment.UserName ?? "";
+            return string.Format(
+                "https://nexus-ten-brown.vercel.app/chamado.html?empresa={0}&setor={1}&ativo={2}&solicitante={3}&ip={4}",
+                Uri.EscapeDataString(emp),
+                Uri.EscapeDataString(set),
+                Uri.EscapeDataString(hst),
+                Uri.EscapeDataString(usr),
+                Uri.EscapeDataString(localIpAddress ?? "127.0.0.1")
+            );
+        }
 
+        public static void AbrirChamadoUI()
+        {
+            string hostedUrl = ObterUrlPortalChamadoHospedado();
             try
             {
-                if (found != null)
-                {
-                    ProcessStartInfo psi = new ProcessStartInfo("cmd", "/c start \"\" \"" + found + "\"");
-                    psi.CreateNoWindow = true;
-                    psi.UseShellExecute = false;
-                    Process.Start(psi);
-                    return;
-                }
-                else
-                {
-                    Process.Start("http://127.0.0.1:8090/chamado");
-                    return;
-                }
+                ProcessStartInfo psi = new ProcessStartInfo(hostedUrl);
+                psi.UseShellExecute = true;
+                Process.Start(psi);
+                return;
             }
             catch
             {
-                FormChamadoCliente.Exibir(customMachineName, customMachineTag, localIpAddress);
+                try
+                {
+                    ProcessStartInfo psiCmd = new ProcessStartInfo("cmd.exe", "/c start \"\" \"" + hostedUrl + "\"");
+                    psiCmd.CreateNoWindow = true;
+                    psiCmd.UseShellExecute = false;
+                    Process.Start(psiCmd);
+                    return;
+                }
+                catch
+                {
+                    FormChamadoCliente.Exibir(customMachineName, customMachineTag, localIpAddress);
+                }
             }
         }
 
@@ -1153,15 +1162,13 @@ namespace NexusRemoteAgent
             });
 
             menu.MenuItems.Add("Abrir Console Web", (s, e) => {
-                string htmlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\index.html");
-                if (File.Exists(htmlPath))
+                try
                 {
-                    System.Diagnostics.Process.Start(Path.GetFullPath(htmlPath));
+                    ProcessStartInfo psi = new ProcessStartInfo("https://nexus-ten-brown.vercel.app/");
+                    psi.UseShellExecute = true;
+                    System.Diagnostics.Process.Start(psi);
                 }
-                else
-                {
-                    System.Diagnostics.Process.Start("http://" + localIpAddress + ":" + port + "/api/status");
-                }
+                catch { }
             });
 
             menu.MenuItems.Add("-");
@@ -1813,8 +1820,9 @@ namespace NexusRemoteAgent
                     }
                     else if (path.StartsWith("/chamado"))
                     {
-                        string htmlChamado = ObterPaginaHtmlChamado();
-                        byte[] htmlBytes = Encoding.UTF8.GetBytes(htmlChamado);
+                        string redirectUrl = ObterUrlPortalChamadoHospedado();
+                        string htmlRedirect = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta http-equiv='refresh' content='0;url=" + redirectUrl + "'><script>window.location.replace('" + redirectUrl + "');</script></head><body>Redirecionando para o Portal de Chamados...</body></html>";
+                        byte[] htmlBytes = Encoding.UTF8.GetBytes(htmlRedirect);
                         EnviarRespostaCors(stream, 200, "OK", "text/html; charset=utf-8", htmlBytes, keepAlive);
                         if (!keepAlive) break;
                         continue;
