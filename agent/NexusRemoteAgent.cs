@@ -272,7 +272,7 @@ namespace NexusRemoteAgent
                 {
                     try
                     {
-                        if (d.IsReady && (d.DriveType == DriveType.Fixed || d.DriveType == DriveType.Network))
+                        if (d.DriveType == DriveType.Fixed && d.IsReady)
                         {
                             double tot = Math.Round((double)d.TotalSize / (1024.0 * 1024.0 * 1024.0), 1);
                             double fre = Math.Round((double)d.AvailableFreeSpace / (1024.0 * 1024.0 * 1024.0), 1);
@@ -1305,8 +1305,10 @@ namespace NexusRemoteAgent
                             VerificarComunicadosSupabase();
                             if (tick % 6 == 0)
                             {
-                                EnviarTelemetriaSupabase();
-                                RegistrarAtivoNoServidorRemoto();
+                                ThreadPool.QueueUserWorkItem(state => {
+                                    try { EnviarTelemetriaSupabase(); } catch { }
+                                    try { RegistrarAtivoNoServidorRemoto(); } catch { }
+                                });
                             }
                             // A atualização não é automática por timer: ocorre sob demanda ao clicar no botão no software ou no console
                         }

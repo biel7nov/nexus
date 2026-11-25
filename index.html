@@ -5694,14 +5694,25 @@
     }
 
     function verificarStatusRedeAtivos() {
-      const primeiroAtv = (listaAtivos && listaAtivos.length > 0) ? listaAtivos[0] : null;
-      const ip = primeiroAtv ? primeiroAtv.ip : '192.168.18.122';
-      const img = new Image();
-      img.onload = () => {
-        // Estação online confirmada via porta 8090
-      };
-      img.onerror = () => {};
-      img.src = 'http://' + ip + ':8090/screen?thumb=1&t=' + Date.now();
+      if (!Array.isArray(listaAtivos)) return;
+      let alterou = false;
+      listaAtivos.forEach(atv => {
+        if (!atv || !atv.ip || atv.ip === '127.0.0.1') return;
+        const img = new Image();
+        img.onload = () => {
+          if (!atv.online) {
+            atv.online = true;
+            alterou = true;
+            renderizarEstacoesVisaoGeral();
+            const vAtv = document.getElementById('view-ativos');
+            if (vAtv && !vAtv.classList.contains('hidden') && typeof renderizarTabelaInventario === 'function') {
+              renderizarTabelaInventario();
+            }
+          }
+        };
+        img.onerror = () => {};
+        img.src = `http://${atv.ip}:8090/screen?thumb=1&t=${Date.now()}`;
+      });
     }
 
     // =========================================================================
@@ -9707,7 +9718,7 @@
           const hostName = comp.nome_computador || comp.id;
           if (!hostName) return;
           const hbTime = comp.ultimo_heartbeat ? new Date(comp.ultimo_heartbeat).getTime() : 0;
-          const isOnline = (Date.now() - hbTime) < 120000; // online se enviou heartbeat nos últimos 2 min
+          const isOnline = (Date.now() - hbTime) < 300000; // tolerância inteligente de 5 min contra latência de rede
           const cpuPct = typeof comp.cpu_usage === 'number' ? comp.cpu_usage : 10;
           const ramPct = typeof comp.ram_usage === 'number' ? comp.ram_usage : 35;
           const ipAddr = comp.ip || '127.0.0.1';
