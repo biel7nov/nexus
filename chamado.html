@@ -429,9 +429,13 @@
 
   </div>
 
-  <!-- Footer Minimalista -->
-  <footer class="text-center text-[11px] text-slate-400 font-medium py-4 mt-6">
+  <!-- Footer Minimalista com Botão de Atualizar Software do Agente -->
+  <footer class="flex flex-col sm:flex-row items-center justify-between gap-2 max-w-4xl mx-auto px-4 text-[11px] text-slate-400 font-medium py-4 mt-6 border-t border-slate-200/60 dark:border-zinc-800/60">
     <span>NexusTI • Conexão Segura com Console T.I</span>
+    <button type="button" onclick="atualizarSoftwareAgenteLocal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-600 hover:text-indigo-600 dark:text-zinc-300 transition text-[11px] font-semibold cursor-pointer">
+      <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+      <span>Atualizar Software do Agente</span>
+    </button>
   </footer>
 
   <script>
@@ -448,6 +452,16 @@
       }
     } catch(e) {
       console.warn('Supabase init:', e);
+    }
+
+    async function atualizarSoftwareAgenteLocal() {
+      if (!confirm("Deseja atualizar o software Nexus Agent nesta máquina para a versão mais recente do GitHub?")) return;
+      try {
+        await fetch('http://127.0.0.1:8090/api/update', { mode: 'no-cors' });
+        alert("✓ Comando de atualização enviado! O software será atualizado e reiniciado em segundo plano.");
+      } catch(e) {
+        alert("Erro ao disparar atualização: " + e.message);
+      }
     }
 
     let destinoWebAtual = 'mim';

@@ -6,5 +6,5 @@
   "fallbackUrl": "https://nexus-ten-brown.vercel.app/agent/NexusRemoteAgent.exe",
   "installerUrl": "https://raw.githubusercontent.com/biel7nov/nexus/main/Instalador-Nexus-Agent.exe",
   "zipUrl": "https://raw.githubusercontent.com/biel7nov/nexus/main/Nexus-Agent-Instalador.zip",
-  "changelog": "Instalador com extração resiliente, fallback automático via GitHub/Vercel e auto-atualização silenciosa OTA contínua."
+  "changelog": "Instalador resiliente, sem arquivos .old, atualização sob demanda via botão no software e no console."
 }

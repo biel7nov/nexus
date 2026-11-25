@@ -627,11 +627,7 @@ namespace NexusRemoteAgent
                                 EnviarTelemetriaSupabase();
                                 RegistrarAtivoNoServidorRemoto();
                             }
-                            // Checagem periódica de novas versões OTA no GitHub (10s após início e a cada 10 minutos)
-                            if (tick == 2 || (tick > 0 && tick % 120 == 0))
-                            {
-                                VerificarAtualizacaoSilenciosa();
-                            }
+                            // A atualização não é automática por timer: ocorre sob demanda ao clicar no botão no software ou no console
                         }
                         catch { }
                         tick++;
@@ -835,10 +831,10 @@ namespace NexusRemoteAgent
                 string currentExe = Application.ExecutablePath;
                 string baseDir = AppDomain.CurrentDomain.BaseDirectory;
                 string tempNewExe = Path.Combine(baseDir, "NexusRemoteAgent_new.exe");
-                string backupExe = currentExe + ".old";
 
+                // Remove resíduos se houver
                 try { if (File.Exists(tempNewExe)) File.Delete(tempNewExe); } catch { }
-                try { if (File.Exists(backupExe)) File.Delete(backupExe); } catch { }
+                try { string old = currentExe + ".old"; if (File.Exists(old)) File.Delete(old); } catch { }
 
                 ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
                 string[] urls = new string[] {
@@ -872,48 +868,21 @@ namespace NexusRemoteAgent
                     return;
                 }
 
-                // 1. Tenta substituição nativa transparente em NTFS (renomeia o binário em execução para .old)
-                bool substituiu = false;
-                try
-                {
-                    File.Move(currentExe, backupExe);
-                    File.Move(tempNewExe, currentExe);
-                    substituiu = true;
-                }
-                catch { }
+                // Substituição direta sem criar arquivo .old:
+                // O script em lote aguarda 1s para o término do processo atual, move o binário novo por cima do existente e reinicia.
+                string cmd = string.Format(
+                    "/c timeout /t 1 /nobreak >nul & move /y \"{0}\" \"{1}\" & start \"\" \"{1}\"",
+                    tempNewExe,
+                    currentExe
+                );
+                ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", cmd);
+                psi.CreateNoWindow = true;
+                psi.UseShellExecute = false;
+                psi.WorkingDirectory = baseDir;
+                Process.Start(psi);
 
-                if (substituiu)
-                {
-                    try
-                    {
-                        ProcessStartInfo psi = new ProcessStartInfo(currentExe);
-                        psi.UseShellExecute = true;
-                        psi.WorkingDirectory = baseDir;
-                        Process.Start(psi);
-                    }
-                    catch
-                    {
-                        ProcessStartInfo psiCmd = new ProcessStartInfo("cmd.exe", "/c start \"\" \"" + currentExe + "\"");
-                        psiCmd.CreateNoWindow = true;
-                        psiCmd.UseShellExecute = false;
-                        Process.Start(psiCmd);
-                    }
-                    Environment.Exit(0);
-                }
-                else
-                {
-                    // 2. Fallback assíncrono via script em lote cmd se o arquivo estiver temporariamente travado
-                    string cmd = string.Format(
-                        "/c timeout /t 2 /nobreak >nul & move /y \"{0}\" \"{1}\" & start \"\" \"{1}\"",
-                        tempNewExe,
-                        currentExe
-                    );
-                    ProcessStartInfo psiFallback = new ProcessStartInfo("cmd.exe", cmd);
-                    psiFallback.CreateNoWindow = true;
-                    psiFallback.UseShellExecute = false;
-                    Process.Start(psiFallback);
-                    Environment.Exit(0);
-                }
+                // Encerra imediatamente para liberar o arquivo para substituição
+                Environment.Exit(0);
             }
             catch
             {
@@ -1130,6 +1099,22 @@ namespace NexusRemoteAgent
                     System.Diagnostics.Process.Start("http://" + localIpAddress + ":" + port + "/api/status");
                 }
             });
+
+            menu.MenuItems.Add("-");
+
+            // Botão oficial no software para atualizar o agente sob demanda
+            MenuItem mAtualizar = new MenuItem("🔄 Atualizar Software do Agente", (s, e) => {
+                if (MessageBox.Show("Deseja baixar e aplicar a versão mais recente do Nexus Agent do repositório?", "Atualizar Software NexusTI", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                {
+                    try { trayIcon.ShowBalloonTip(4000, "NexusTI Agent", "Baixando versão atualizada do GitHub e reiniciando o serviço...", ToolTipIcon.Info); } catch { }
+                    ThreadPool.QueueUserWorkItem(_ => ExecutarAtualizacaoSilenciosa());
+                }
+            });
+            menu.MenuItems.Add(mAtualizar);
+
+            MenuItem mVersao = new MenuItem("Versão: v" + AGENT_VERSION + " (Build " + AGENT_BUILD + ")");
+            mVersao.Enabled = false;
+            menu.MenuItems.Add(mVersao);
 
             menu.MenuItems.Add("-");
 
