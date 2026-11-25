@@ -1339,23 +1339,23 @@
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             
             <!-- KPI 1: Ativos Conectados -->
-            <div class="p-3.5 rounded-lg bg-white border border-slate-200/80 cursor-pointer transition" onclick="selecionarFiltroAtivo('QUA-01')">
+            <div class="p-3.5 rounded-lg bg-white border border-slate-200/80 cursor-pointer transition" onclick="navegarParaAba('view-ativos')">
               <div class="flex items-center justify-between">
                 <span class="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Ativos Online</span>
-                <span class="flex items-center gap-1 text-[10px] font-mono text-emerald-500"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>100%</span>
+                <span id="kpi-ativos-online-badge" class="flex items-center gap-1 text-[10px] font-mono text-emerald-500"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>100%</span>
               </div>
-              <div class="text-xl font-semibold font-mono text-slate-900 mt-1.5">1</div>
-              <span class="text-[11px] text-slate-500 mt-0.5 block truncate">QUA-01 • Conectado</span>
+              <div id="kpi-ativos-online-count" class="text-xl font-semibold font-mono text-slate-900 mt-1.5">0</div>
+              <span id="kpi-ativos-online-sub" class="text-[11px] text-slate-500 mt-0.5 block truncate">Sincronizando estações...</span>
             </div>
 
             <!-- KPI 2: Ativos Sobrecarregados -->
-            <div class="p-3.5 rounded-lg bg-white border border-slate-200/80 cursor-pointer transition" onclick="navegarParaLogsComFiltro('QUA-01')">
+            <div class="p-3.5 rounded-lg bg-white border border-slate-200/80 cursor-pointer transition" onclick="navegarParaAba('view-logs')">
               <div class="flex items-center justify-between">
                 <span class="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Alertas Hardware</span>
-                <span class="flex items-center gap-1 text-[10px] font-mono text-amber-400"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>RAM 84%</span>
+                <span id="kpi-alertas-hardware-badge" class="flex items-center gap-1 text-[10px] font-mono text-slate-400"><span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>OK</span>
               </div>
-              <div class="text-xl font-semibold font-mono text-slate-900 mt-1.5">1</div>
-              <span class="text-[11px] text-slate-500 mt-0.5 block truncate">QUA-01 (Memória Alta)</span>
+              <div id="kpi-alertas-hardware-count" class="text-xl font-semibold font-mono text-slate-900 mt-1.5">0</div>
+              <span id="kpi-alertas-hardware-sub" class="text-[11px] text-slate-500 mt-0.5 block truncate">Telemetria nominal</span>
             </div>
 
             <!-- KPI 3: Chamados Abertos -->
@@ -1387,9 +1387,9 @@
             <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
               <div class="flex items-center gap-2">
                 <span class="text-xs font-semibold text-slate-900">Estações Conectadas</span>
-                <span class="text-[11px] text-slate-500 hidden sm:inline">• Telemetria e acesso remoto direto</span>
+                <span class="text-[11px] text-slate-500 hidden sm:inline">• Telemetria e acesso remoto direto das máquinas com Nexus Remote Agent</span>
               </div>
-              <span class="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">1 ativo</span>
+              <span id="contador-estacoes-visao-geral" class="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">0 ativos</span>
             </div>
 
             <!-- Tabela Minimalista dos Ativos Instalados -->
@@ -1405,70 +1405,9 @@
                     <th class="px-4 py-2.5 text-right whitespace-nowrap">Ações</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
-                  <tr class="hover:bg-slate-50/80 transition cursor-pointer" onclick="selecionarAtivoNaLista('QUA-01')">
-                    <td class="px-4 py-3">
-                      <div class="flex items-center gap-2.5">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
-                        <div>
-                          <div class="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
-                            <span>QUA-01</span>
-                            <span class="text-[10px] font-normal text-slate-400 bg-slate-50 px-1.5 py-0.2 rounded border border-slate-200">Qualidade</span>
-                          </div>
-                          <div class="text-[10px] text-slate-500 font-mono">FSC-910 248</div>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td class="px-4 py-3">
-                      <div class="font-mono text-xs text-slate-800">192.168.13.199:8090</div>
-                      <div class="text-[10px] text-slate-500">ReviOS-10-23.08</div>
-                    </td>
-
-                    <td class="px-4 py-3">
-                      <div class="text-xs text-slate-700">Windows 10 Pro</div>
-                      <div class="text-[10px] text-slate-500">Core i5 • 8GB RAM</div>
-                    </td>
-
-                    <td class="px-4 py-3">
-                      <div class="text-xs text-emerald-500 font-medium">Online</div>
-                      <div class="text-[10px] text-slate-500 font-mono">4ms • 99.8%</div>
-                    </td>
-
-                    <td class="px-4 py-3">
-                      <div class="space-y-1.5 w-36">
-                        <div class="flex items-center justify-between text-[10px] font-mono">
-                          <span class="text-slate-500">CPU</span>
-                          <span class="text-slate-700">38%</span>
-                        </div>
-                        <div class="w-full bg-slate-200 h-[3px] rounded-full overflow-hidden">
-                          <div class="bg-indigo-400 h-full rounded-full" style="width: 38%;"></div>
-                        </div>
-
-                        <div class="flex items-center justify-between text-[10px] font-mono">
-                          <span class="text-amber-500">RAM</span>
-                          <span class="text-amber-500">84%</span>
-                        </div>
-                        <div class="w-full bg-slate-200 h-[3px] rounded-full overflow-hidden">
-                          <div class="bg-amber-400 h-full rounded-full" style="width: 84%;"></div>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td class="px-4 py-3 text-right">
-                      <div class="flex items-center justify-end gap-1">
-                        <button onclick="event.stopPropagation(); iniciarAcessoRemoto('192.168.13.199', 'QUA-01')" class="flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-600 text-white font-medium text-[11px] transition" title="Iniciar acesso remoto">
-                          <i data-lucide="monitor" class="w-3 h-3"></i>
-                          <span>Acessar</span>
-                        </button>
-                        <button onclick="event.stopPropagation(); navegarParaLogsComFiltro('QUA-01')" class="p-1 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-slate-200 transition" title="Logs">
-                          <i data-lucide="activity" class="w-3.5 h-3.5"></i>
-                        </button>
-                        <button onclick="event.stopPropagation(); abrirEmissaoParaHost('QUA-01', '192.168.13.199')" class="p-1 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-slate-200 transition" title="Comunicado">
-                          <i data-lucide="megaphone" class="w-3.5 h-3.5"></i>
-                        </button>
-                      </div>
-                    </td>
+                <tbody id="tbody-estacoes-conectadas-visao-geral" class="divide-y divide-slate-100">
+                  <tr>
+                    <td colspan="6" class="px-4 py-8 text-center text-slate-400 font-sans">Carregando estações conectadas...</td>
                   </tr>
                 </tbody>
               </table>
@@ -1479,38 +1418,8 @@
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
             <!-- ALERTA 1: ATIVOS SOBRECARREGADOS -->
-            <div class="bg-white rounded-xl border border-slate-200/80 p-4 flex flex-col justify-between space-y-3">
-              <div class="space-y-2.5">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                    <h3 class="text-xs font-medium text-slate-900">Sobrecarga de Memória</h3>
-                  </div>
-                  <span class="text-[10px] font-mono text-amber-400">RAM 84%</span>
-                </div>
-
-                <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 space-y-1.5">
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="font-medium text-slate-800">QUA-01</span>
-                    <span class="font-mono text-[11px] text-slate-500">192.168.13.199</span>
-                  </div>
-                  <p class="text-[11px] text-slate-500 leading-relaxed">
-                    Consumo de 6.7 GB / 8 GB. Processo <span class="font-mono text-slate-700">chrome.exe</span> ativo há 3h20m.
-                  </p>
-                  <div class="w-full bg-slate-200 h-[2px] rounded-full overflow-hidden pt-0.5">
-                    <div class="bg-amber-400 h-full rounded-full" style="width: 84%;"></div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="flex items-center justify-between gap-2 pt-1">
-                <button onclick="navegarParaLogsComFiltro('QUA-01')" class="flex-1 py-1.5 px-2.5 rounded-md bg-white border border-slate-200 text-slate-700 text-[11px] font-medium transition text-center">
-                  Inspecionar Logs
-                </button>
-                <button onclick="iniciarAcessoRemoto('192.168.13.199', 'QUA-01')" class="py-1.5 px-2.5 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-slate-200 text-[11px] font-medium transition" title="Conectar">
-                  Remoto
-                </button>
-              </div>
+            <div id="container-alerta-hardware-dashboard" class="bg-white rounded-xl border border-slate-200/80 p-4 flex flex-col justify-between space-y-3">
+              <!-- Atualizado dinamicamente via JS com base nas estações reais -->
             </div>
 
             <!-- ALERTA 2: CHAMADO EM ABERTO -->
@@ -1535,7 +1444,7 @@
                     <span class="font-mono text-[10px] text-slate-500">5/5</span>
                   </div>
                   <p class="text-[11px] text-slate-500 leading-relaxed">
-                    Alocação 100% em uso (QUA-01). Vencimento em 02/12/2026.
+                    Alocação 100% em uso (TI-0001). Vencimento em 02/12/2026.
                   </p>
                   <div class="w-full bg-slate-200 h-[2px] rounded-full overflow-hidden pt-0.5">
                     <div class="bg-indigo-400 h-full rounded-full" style="width: 100%;"></div>
@@ -2464,15 +2373,6 @@
                     <label class="block text-xs font-bold text-slate-700 mb-1.5">2. Destinatário(s)</label>
                     <select id="campo-destinatario-aviso" onchange="atualizarLivePreviewAviso()" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold bg-white text-slate-700 focus:outline-none focus:border-indigo-500 shadow-sm">
                       <option value="broadcast">Todas as Estações Online (Broadcast)</option>
-                      <option value="QUA-01">QUA-01 (192.168.13.199)</option>
-                      <option value="DIR-NOTE01">DIR-NOTE01 (192.168.13.105)</option>
-                      <option value="FIN-NOTE02">FIN-NOTE02 (192.168.13.112)</option>
-                      <option value="FAB-TABLET01">FAB-TABLET01 (192.168.13.210)</option>
-                      <option value="SRV-DATABASE">SRV-DATABASE (192.168.13.10)</option>
-                      <option value="#Qualidade">Setor #Qualidade</option>
-                      <option value="#Financeiro">Setor #Financeiro</option>
-                      <option value="#TI">Setor #TI</option>
-                      <option value="#Producao">Setor #Produção</option>
                     </select>
                   </div>
 
@@ -2654,12 +2554,6 @@
                     <label class="block text-xs font-bold text-slate-700 mb-1.5">Público-Alvo / Destinatários</label>
                     <select id="campo-destinatario-enquete" onchange="sincronizarEnqueteForm()" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold bg-white text-slate-700 focus:outline-none focus:border-purple-500 shadow-sm">
                       <option value="broadcast">Todas as Estações Online (Broadcast)</option>
-                      <option value="QUA-01">QUA-01 (192.168.13.199)</option>
-                      <option value="DIR-NOTE01">DIR-NOTE01 (192.168.13.105)</option>
-                      <option value="FIN-NOTE02">FIN-NOTE02 (192.168.13.112)</option>
-                      <option value="#Qualidade">Setor #Qualidade</option>
-                      <option value="#TI">Setor #TI</option>
-                      <option value="#Financeiro">Setor #Financeiro</option>
                     </select>
                   </div>
 
@@ -2941,7 +2835,7 @@
         </section>
 
         <!-- =================================================================== -->
-        <!-- VIEW: DETALHES DO ATIVO QUA-01 (FICHA COMPLETA COM TELEMETRIA) -->
+        <!-- VIEW: DETALHES DO ATIVO (FICHA COMPLETA COM TELEMETRIA) -->
         <!-- =================================================================== -->
         <section id="view-ativo-detalhe" class="view-panel hidden space-y-6">
           
@@ -2949,30 +2843,30 @@
           <div class="p-6 rounded-xl bg-white border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div class="flex items-center gap-4">
               <div id="detalhe-avatar" class="w-14 h-14 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-black text-xl shadow-inner shrink-0">
-                QUA
+                TI
               </div>
               <div>
                 <div class="flex items-center gap-2.5">
-                  <h1 id="detalhe-title" class="text-xl font-bold text-slate-900 tracking-tight">Estação QUA-01</h1>
-                  <span id="detalhe-tag" class="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">#Qualidade</span>
+                  <h1 id="detalhe-title" class="text-xl font-bold text-slate-900 tracking-tight">Estação TI-0001</h1>
+                  <span id="detalhe-tag" class="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">#TI</span>
                   <span id="detalhe-status" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     <span>Online na Porta 8090</span>
                   </span>
                 </div>
-                <p id="detalhe-subtitle" class="text-xs text-slate-400 mt-1 font-mono">ID: FSC-910 248 • IP: 192.168.13.199:8090 • Usuário: ReviOS-10-23.08</p>
+                <p id="detalhe-subtitle" class="text-xs text-slate-400 mt-1 font-mono">ID: FSC-TI-0001 • IP: 192.168.18.122:8090 • Usuário: gabrielnovaes</p>
               </div>
             </div>
 
             <div class="flex items-center gap-2.5 shrink-0">
-              <button id="detalhe-btn-remoto" onclick="iniciarAcessoRemoto('192.168.13.199', 'QUA-01')" class="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition">
+              <button id="detalhe-btn-remoto" onclick="iniciarAcessoRemoto('192.168.18.122', 'TI-0001')" class="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                 <span>Iniciar Acesso Remoto</span>
               </button>
-              <button id="detalhe-btn-ping" onclick="pingAtivoEspecifico('192.168.13.199', 'QUA-01')" class="px-4 py-2.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition">
+              <button id="detalhe-btn-ping" onclick="pingAtivoEspecifico('192.168.18.122', 'TI-0001')" class="px-4 py-2.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition">
                 <span class="flex items-center gap-1.5"><i data-lucide="activity" class="w-3.5 h-3.5"></i> Testar Ping</span>
               </button>
-              <button id="detalhe-btn-logs" onclick="navegarParaLogsComFiltro('QUA-01')" class="px-4 py-2.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition">
+              <button id="detalhe-btn-logs" onclick="navegarParaLogsComFiltro('TI-0001')" class="px-4 py-2.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition">
                 <span class="flex items-center gap-1.5"><i data-lucide="file-text" class="w-3.5 h-3.5"></i> Logs</span>
               </button>
             </div>
@@ -3045,11 +2939,11 @@
                 </div>
                 <div class="flex items-center justify-between py-1 border-b border-slate-50">
                   <span class="text-slate-400">Usuário do Windows</span>
-                  <span class="font-semibold text-slate-800 font-mono">ReviOS-10-23.08</span>
+                  <span class="font-semibold text-slate-800 font-mono">gabrielnovaes</span>
                 </div>
                 <div class="flex items-center justify-between py-1 border-b border-slate-50">
                   <span class="text-slate-400">Endereço IP Local</span>
-                  <span class="font-semibold text-slate-800 font-mono">192.168.13.199:8090</span>
+                  <span class="font-semibold text-slate-800 font-mono">192.168.18.122:8090</span>
                 </div>
                 <div class="flex items-center justify-between py-1 border-b border-slate-50">
                   <span class="text-slate-400">Caminho de Instalação</span>
@@ -3915,11 +3809,11 @@
       <div class="bg-slate-50 rounded-xl p-4 border border-slate-200/70 space-y-2.5 text-xs">
         <div class="flex items-center justify-between">
           <span class="text-slate-500 font-medium">Equipamento Alvo:</span>
-          <span id="diag-host-nome" class="font-bold text-slate-900">QUA-01</span>
+          <span id="diag-host-nome" class="font-bold text-slate-900">TI-0001</span>
         </div>
         <div class="flex items-center justify-between">
           <span class="text-slate-500 font-medium">Endereço IP & Porta:</span>
-          <span id="diag-host-ip" class="font-mono font-bold text-slate-800">192.168.13.199:8090</span>
+          <span id="diag-host-ip" class="font-mono font-bold text-slate-800">192.168.18.122:8090</span>
         </div>
         <div class="flex items-center justify-between pt-1 border-t border-slate-200/60">
           <span class="text-slate-500 font-medium">Porta 8090 Direta (LAN):</span>
@@ -4065,10 +3959,7 @@
               <span>IP da Máquina (Acesso Remoto) *</span>
             </label>
             <select id="campo-chamado-ativo" class="input-spotlight w-full p-2.5 rounded-xl text-xs font-mono font-semibold cursor-pointer">
-              <option value="192.168.13.199" selected>192.168.13.199 (QUA-01 - Qualidade)</option>
-              <option value="192.168.13.112">192.168.13.112 (FIN-NOTE02 - Financeiro)</option>
-              <option value="192.168.18.25">192.168.18.25 (ALMOX-01 - Logística)</option>
-              <option value="192.168.13.105">192.168.13.105 (DIR-NOTE01 - Diretoria)</option>
+              <option value="192.168.18.122" selected>192.168.18.122 (TI-0001 - TI)</option>
               <option value="127.0.0.1">127.0.0.1 (Localhost / Gateway)</option>
             </select>
           </div>
@@ -4214,7 +4105,7 @@
           </div>
           <div>
             <label class="block font-semibold text-slate-700 mb-1">Ativo Principal</label>
-            <input type="text" id="campo-lic-ativo" value="QUA-01" class="w-full p-2.5 rounded-xl border border-slate-200 text-slate-800 focus:outline-none focus:border-blue-500">
+            <input type="text" id="campo-lic-ativo" value="TI-0001" class="w-full p-2.5 rounded-xl border border-slate-200 text-slate-800 focus:outline-none focus:border-blue-500">
           </div>
         </div>
 
@@ -4300,11 +4191,11 @@
       <div class="space-y-3 text-xs">
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Endereço IP ou Host</label>
-          <input type="text" id="campo-acesso-ip" value="192.168.13.199" class="w-full p-2.5 rounded-xl border border-slate-200 font-mono text-sm">
+          <input type="text" id="campo-acesso-ip" value="192.168.18.122" class="w-full p-2.5 rounded-xl border border-slate-200 font-mono text-sm">
         </div>
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Nome do Ativo (Identificação)</label>
-          <input type="text" id="campo-acesso-nome" value="QUA-01" class="w-full p-2.5 rounded-xl border border-slate-200">
+          <input type="text" id="campo-acesso-nome" value="TI-0001" class="w-full p-2.5 rounded-xl border border-slate-200">
         </div>
       </div>
 
@@ -4537,10 +4428,10 @@
               <span>Estação & Telemetria</span>
             </div>
             <div class="space-y-1">
-              <div class="flex justify-between"><span class="text-slate-400">Hostname:</span> <span id="detalhe-chamado-ativo" class="font-mono font-bold text-slate-800">QUA-01</span></div>
-              <div class="flex justify-between"><span class="text-slate-400">IP / Conexão:</span> <span id="detalhe-chamado-ip" class="font-mono text-slate-700">192.168.13.199:8090</span></div>
+              <div class="flex justify-between"><span class="text-slate-400">Hostname:</span> <span id="detalhe-chamado-ativo" class="font-mono font-bold text-slate-800">TI-0001</span></div>
+              <div class="flex justify-between"><span class="text-slate-400">IP / Conexão:</span> <span id="detalhe-chamado-ip" class="font-mono text-slate-700">192.168.18.122:8090</span></div>
               <div class="flex justify-between"><span class="text-slate-400">Status:</span> <span class="text-emerald-600 font-semibold flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Online</span></div>
-              <div class="flex justify-between"><span class="text-slate-400">Agente:</span> <span class="text-emerald-700 font-semibold">NexusTI Remote Agent v2.4</span></div>
+              <div class="flex justify-between"><span class="text-slate-400">Agente:</span> <span class="text-emerald-700 font-semibold">NexusTI Remote Agent v2.5</span></div>
             </div>
           </div>
         </div>
@@ -4592,7 +4483,7 @@
                 <div class="text-[11px] text-slate-500 flex items-center gap-2">
                   <span id="drawer-chat-full-empresa">Aço Móveis</span>
                   <span>•</span>
-                  <span id="drawer-chat-full-ativo" class="font-mono">192.168.13.199</span>
+                  <span id="drawer-chat-full-ativo" class="font-mono">192.168.18.122</span>
                 </div>
               </div>
             </div>
@@ -4864,113 +4755,7 @@
   <!-- ========================================================================= -->
   <script>
     // ESTADO GLOBAL DO SISTEMA
-    let listaAtivos = [
-      {
-        id: "FSC-910 248",
-        host: "QUA-01",
-        type: "Desktop",
-        user: "ReviOS-10-23.08",
-        domain: "CORP.LOCAL",
-        loggedUserFull: "CORP\\ReviOS-10-23.08",
-        location: "Matriz - Sala Qualidade",
-        tag: "#Qualidade",
-        os: "Microsoft Windows 10 Pro (64-bit 22H2)",
-        hw: "Intel Core i5-10400 @ 2.90GHz • 8GB RAM • SSD 512GB",
-        cpu: "Intel Core i5-10400 @ 2.90GHz (4c/8t)",
-        ram: "8.0 GB DDR4 (84% em uso)",
-        disk: "SSD 512 GB (215 GB livres)",
-        resolution: "1920x1080 Full HD",
-        ip: "192.168.13.199",
-        port: 8090,
-        lastConnected: "Agora mesmo (Online)",
-        lastSeen: "Conectado agora",
-        online: true
-      },
-      {
-        id: "FSC-452 119",
-        host: "DIR-NOTE01",
-        type: "Notebook",
-        user: "carlos.mendonca",
-        domain: "CORP.LOCAL",
-        loggedUserFull: "CORP\\carlos.mendonca",
-        location: "Matriz - Diretoria Executiva",
-        tag: "#Diretoria",
-        os: "Microsoft Windows 11 Pro (64-bit 23H2)",
-        hw: "Intel Core i7-1270P • 16GB RAM • SSD 1TB",
-        cpu: "Intel Core i7-1270P @ 2.20GHz (12c/16t)",
-        ram: "16.0 GB LPDDR5 (42% em uso)",
-        disk: "NVMe SSD 1 TB (620 GB livres)",
-        resolution: "2560x1440 QHD",
-        ip: "192.168.13.105",
-        port: 8090,
-        lastConnected: "Hoje, 14:42",
-        lastSeen: "Há 5 min",
-        online: true
-      },
-      {
-        id: "FSC-781 902",
-        host: "FIN-NOTE02",
-        type: "Notebook",
-        user: "marina.costa",
-        domain: "CORP.LOCAL",
-        loggedUserFull: "CORP\\marina.costa",
-        location: "Filial SP - Financeiro",
-        tag: "#Financeiro",
-        os: "Microsoft Windows 11 Pro (64-bit 23H2)",
-        hw: "AMD Ryzen 5 5600U • 16GB RAM • SSD 512GB",
-        cpu: "AMD Ryzen 5 5600U @ 2.30GHz (6c/12t)",
-        ram: "16.0 GB DDR4 (58% em uso)",
-        disk: "SSD 512 GB (180 GB livres)",
-        resolution: "1920x1080 Full HD",
-        ip: "192.168.13.112",
-        port: 8090,
-        lastConnected: "Hoje, 14:30",
-        lastSeen: "Há 17 min",
-        online: true
-      },
-      {
-        id: "FSC-334 671",
-        host: "FAB-TABLET01",
-        type: "Celular",
-        user: "operador.fabrica",
-        domain: "MDM-CORP",
-        loggedUserFull: "MDM-CORP\\operador.fabrica",
-        location: "Chão de Fábrica - Linha 2",
-        tag: "#Producao",
-        os: "Android 14 Enterprise (MDM)",
-        hw: "Snapdragon 778G • 6GB RAM • UFS 128GB",
-        cpu: "Qualcomm Snapdragon 778G (8-core)",
-        ram: "6.0 GB RAM (45% em uso)",
-        disk: "UFS 128 GB (85 GB livres)",
-        resolution: "2000x1200",
-        ip: "192.168.13.210",
-        port: 8090,
-        lastConnected: "Hoje, 14:45",
-        lastSeen: "Conectado agora",
-        online: true
-      },
-      {
-        id: "FSC-102 338",
-        host: "SRV-DATABASE",
-        type: "Desktop",
-        user: "SYSTEM (Serviço)",
-        domain: "CORP.LOCAL",
-        loggedUserFull: "CORP\\Administrator",
-        location: "Data Center - Rack A1",
-        tag: "#Infra",
-        os: "Windows Server 2022 Datacenter",
-        hw: "Intel Xeon Silver 4314 • 64GB ECC • RAID 4TB",
-        cpu: "Intel Xeon Silver 4314 @ 2.40GHz (16c/32t)",
-        ram: "64.0 GB ECC DDR4 (39% em uso)",
-        disk: "RAID 10 SSD 4 TB (2.8 TB livres)",
-        resolution: "1280x1024 Headless",
-        ip: "192.168.13.10",
-        port: 8090,
-        lastConnected: "Hoje, 14:47 (Uptime 45d)",
-        lastSeen: "Conectado agora",
-        online: true
-      }
-    ];
+    let listaAtivos = [];
 
     // Pastas da Visão Central em Português
     let pastasDashboard = [
@@ -4987,15 +4772,15 @@
       },
       {
         id: "folder-raw-data",
-        title: "Estação QUA-01",
-        subtitle: "39 registros",
-        meta: "180.2 MB",
+        title: "Estação TI-0001",
+        subtitle: "Ativo Conectado",
+        meta: "Telemetria Ativa",
         preview: "Computador online na porta 8090. Atalho 'Abrir Chamado T.I' ativo no Desktop.",
         type: "ativo",
-        targetHost: "QUA-01",
-        targetIp: "192.168.13.199",
-        active: true, // DESTAQUE AZUL IGUAL AO PRINT
-        tags: ["Qualidade", "Windows 10", "Prioritário"]
+        targetHost: "TI-0001",
+        targetIp: "192.168.18.122",
+        active: true,
+        tags: ["TI", "Windows 10/11", "Prioritário"]
       },
       {
         id: "folder-processed-data",
@@ -5043,7 +4828,7 @@
       }
     ];
 
-    let itemSelecionado = pastasDashboard[1]; // Raw data (QUA-01)
+    let itemSelecionado = pastasDashboard[1]; // Raw data (TI-0001)
     let listaChamados = [];
     let listaLicencas = [];
     let listaLogs = [];
@@ -5435,7 +5220,7 @@
           if (viewAlvo === 'todos' || viewAlvo === 'view-ativos') {
             selecionarFiltroAtivo('todos');
           } else if (viewAlvo === 'qua01' || viewAlvo === 'QUA-01' || viewAlvo === 'view-ativo-detalhe') {
-            selecionarFiltroAtivo('QUA-01');
+            selecionarFiltroAtivo(listaAtivos && listaAtivos.length > 0 ? listaAtivos[0].host : 'TI-0001');
           } else if (viewAlvo === 'servidores' || viewAlvo === 'view-servidores') {
             selecionarFiltroAtivo('servidores');
           } else if (document.getElementById(viewAlvo)) {
@@ -5613,7 +5398,7 @@
         renderizarTabelaInventario();
       } else if (viewId === 'view-ativo-detalhe') {
         if (pText) pText.textContent = 'Ativos';
-        if (cText) cText.textContent = 'Estação QUA-01';
+        if (cText) cText.textContent = itemSelecionado ? (itemSelecionado.name || itemSelecionado.host || itemSelecionado.title || 'Estação') : 'Estação Conectada';
       } else if (viewId === 'view-servidores') {
         if (pText) pText.textContent = 'Visão Geral';
         if (cText) cText.textContent = 'Servidores & Rede';
@@ -5717,7 +5502,7 @@
         if (btnServ) btnServ.className = activeClass;
         navegarParaAba('view-servidores');
       } else {
-        if (btnQua && (alvo === 'QUA-01' || alvo.includes('QUA'))) btnQua.className = activeClass + ' flex items-center justify-between';
+        // Seleção dinâmica do ativo
         navegarParaAba('view-ativo-detalhe');
         selecionarAtivoNaLista(alvo);
       }
@@ -5727,8 +5512,9 @@
     // ACESSO REMOTO (VIEWER INTEGRATION)
     // =========================================================================
     function iniciarAcessoRemoto(ip, host, modo) {
-      const targetIp = ip || '192.168.13.199';
-      const targetName = host || 'QUA-01';
+      const primeiroAtv = (listaAtivos && listaAtivos.length > 0) ? listaAtivos[0] : null;
+      const targetIp = ip || (primeiroAtv ? primeiroAtv.ip : '192.168.18.122');
+      const targetName = host || (primeiroAtv ? primeiroAtv.host : 'TI-0001');
       const elModo = document.getElementById('seletor-modo-remoto-topo');
       const modoEscolhido = modo || (elModo ? elModo.value : 'auto');
       const centralSrv = (configSistemaTi && configSistemaTi.servidorIp) ? configSistemaTi.servidorIp : '192.168.18.122:8090';
@@ -5742,8 +5528,9 @@
 
     // Diagnóstico de Portas & Firewall para Máquinas com Portas Fechadas
     function diagnosticarPortasAtivo(ip, host) {
-      const targetHost = host || 'QUA-01';
-      const targetIp = ip || '192.168.13.199';
+      const primeiroAtv = (listaAtivos && listaAtivos.length > 0) ? listaAtivos[0] : null;
+      const targetHost = host || (primeiroAtv ? primeiroAtv.host : 'TI-0001');
+      const targetIp = ip || (primeiroAtv ? primeiroAtv.ip : '192.168.18.122');
       mostrarToast(`Testando conectividade de portas em ${targetHost} (${targetIp})...`, 'info', 'Diagnóstico');
 
       const modal = document.getElementById('modal-diagnostico-portas');
@@ -5804,7 +5591,8 @@
       if (itemSelecionado && itemSelecionado.targetIp) {
         iniciarAcessoRemoto(itemSelecionado.targetIp, itemSelecionado.targetHost);
       } else {
-        iniciarAcessoRemoto('192.168.13.199', 'QUA-01');
+        const primeiroAtv = (listaAtivos && listaAtivos.length > 0) ? listaAtivos[0] : null;
+        iniciarAcessoRemoto(primeiroAtv ? primeiroAtv.ip : '192.168.18.122', primeiroAtv ? primeiroAtv.host : 'TI-0001');
       }
     }
 
@@ -5837,8 +5625,10 @@
 
     function pingAtivoSelecionado() {
       alternarMenuMais();
-      const ip = (itemSelecionado && itemSelecionado.targetIp) ? itemSelecionado.targetIp : '192.168.13.199';
-      adicionarLog('127.0.0.1', itemSelecionado ? itemSelecionado.targetHost : 'QUA-01', 'Ping Rede', 'Checagem de conectividade com ' + ip + ':8090', 'text-slate-500');
+      const primeiroAtv = (listaAtivos && listaAtivos.length > 0) ? listaAtivos[0] : null;
+      const ip = (itemSelecionado && itemSelecionado.targetIp) ? itemSelecionado.targetIp : (primeiroAtv ? primeiroAtv.ip : '192.168.18.122');
+      const host = itemSelecionado ? itemSelecionado.targetHost : (primeiroAtv ? primeiroAtv.host : 'TI-0001');
+      adicionarLog('127.0.0.1', host, 'Ping Rede', 'Checagem de conectividade com ' + ip + ':8090', 'text-slate-500');
       
       const img = new Image();
       const t0 = Date.now();
@@ -5853,7 +5643,8 @@
     }
 
     function verificarStatusRedeAtivos() {
-      const ip = '192.168.13.199';
+      const primeiroAtv = (listaAtivos && listaAtivos.length > 0) ? listaAtivos[0] : null;
+      const ip = primeiroAtv ? primeiroAtv.ip : '192.168.18.122';
       const img = new Image();
       img.onload = () => {
         // Estação online confirmada via porta 8090
@@ -6659,7 +6450,7 @@
           </div>
 
           <div class="flex items-center justify-between text-[10px] text-slate-400">
-            <span class="font-mono flex items-center gap-1 truncate text-slate-600 font-bold" title="IP de Acesso Remoto"><i data-lucide="laptop" class="w-3 h-3 text-slate-400 shrink-0"></i> <span class="truncate">IP: ${c.ip || c.ativo || "192.168.13.199"}</span></span>
+            <span class="font-mono flex items-center gap-1 truncate text-slate-600 font-bold" title="IP de Acesso Remoto"><i data-lucide="laptop" class="w-3 h-3 text-slate-400 shrink-0"></i> <span class="truncate">IP: ${c.ip || c.ativo || "192.168.18.122"}</span></span>
             ${c.paraOutro ? `<span class="text-[9px] text-slate-400 truncate">Por: ${c.abertoPor || 'Você'}</span>` : ''}
           </div>
 
@@ -7460,7 +7251,7 @@
       if (elNomeSol) elNomeSol.textContent = c.solicitante || 'o solicitante';
       if (elFullSol) elFullSol.textContent = c.solicitante || 'Solicitante';
       if (elFullEmp) elFullEmp.textContent = c.empresa || 'Empresa';
-      if (elFullAtv) elFullAtv.textContent = c.ip || c.ativo || '192.168.13.199';
+      if (elFullAtv) elFullAtv.textContent = c.ip || c.ativo || '192.168.18.122';
       if (elFullStatus) {
         elFullStatus.textContent = c.status || 'Active';
         if (c.status === 'Resolvido') {
@@ -8250,7 +8041,7 @@
         if (campoChave) campoChave.value = lic.chave || '';
         if (campoTot) campoTot.value = lic.total || 1;
         if (campoUso) campoUso.value = lic.emUso || 1;
-        if (campoAtivo) campoAtivo.value = lic.ativo || 'QUA-01';
+        if (campoAtivo) campoAtivo.value = lic.ativo || (listaAtivos[0] ? listaAtivos[0].host : 'TI-0001');
         if (campoVal) campoVal.value = lic.valorTotal || 0;
         if (campoParc) campoParc.value = lic.numParcelas || 12;
         selecionarFormaPagamentoModal(lic.formaPagamento || 'parcelado');
@@ -8262,7 +8053,7 @@
         if (campoChave) campoChave.value = '';
         if (campoTot) campoTot.value = 5;
         if (campoUso) campoUso.value = 1;
-        if (campoAtivo) campoAtivo.value = 'QUA-01';
+        if (campoAtivo) campoAtivo.value = (listaAtivos[0] ? listaAtivos[0].host : 'TI-0001');
         if (campoVal) campoVal.value = '3850.00';
         if (campoParc) campoParc.value = '12';
         selecionarFormaPagamentoModal('parcelado');
@@ -8323,7 +8114,7 @@
           chave: document.getElementById('campo-lic-chave').value.trim() || 'OEM-INSTALLED-KEY',
           total: parseInt(document.getElementById('campo-lic-total').value) || 1,
           emUso: parseInt(document.getElementById('campo-lic-uso').value) || 1,
-          ativo: document.getElementById('campo-lic-ativo').value.trim() || 'QUA-01',
+          ativo: document.getElementById('campo-lic-ativo').value.trim() || (listaAtivos[0] ? listaAtivos[0].host : 'TI-0001'),
           validade: 'Perpétua',
           status: 'Ativa',
           valorTotal: valTot,
@@ -8669,7 +8460,7 @@
       const novo = {
         data: horaFormatada,
         ip: ip || '127.0.0.1',
-        host: host || 'QUA-01',
+        host: host || ((listaAtivos && listaAtivos.length > 0) ? listaAtivos[0].host : 'TI-0001'),
         empresa: emp,
         evento: evento,
         ciclo: ciclo,
@@ -8680,6 +8471,7 @@
       };
       listaLogs.unshift(novo);
       if (listaLogs.length > 500) listaLogs.pop();
+      try { localStorage.setItem('fsc_kintsugi_logs', JSON.stringify(listaLogs.slice(0, 200))); } catch(e){}
       renderizarLogs();
       atualizarCardsPoliticaLogs();
     }
@@ -8704,22 +8496,25 @@
     }
 
     function limparLogsComConfirmacao() {
-      if (confirm(`Deseja realmente limpar os logs operacionais da tela?\n(O registro de Marco Zero será mantido para conformidade legal)`)) {
-        const baseline = listaLogs.filter(l => l.evento && l.evento.includes('Marco Zero'));
-        listaLogs = baseline.length > 0 ? baseline : [{
-          data: '15/01/2026 08:00',
-          host: 'QUA-01',
-          ip: '192.168.13.199:8090',
+      if (confirm(`Deseja realmente limpar os registros de logs operacionais da tela?`)) {
+        const primeiroAtivo = (listaAtivos && listaAtivos.length > 0) ? listaAtivos[0] : null;
+        const baseline = listaLogs.filter(l => l.evento && l.evento.includes('Marco Zero') && !['QUA-01', 'DIR-NOTE01', 'FIN-NOTE02', 'FAB-TABLET01', 'SRV-DATABASE'].includes(l.host));
+        listaLogs = baseline.length > 0 ? baseline : (primeiroAtivo ? [{
+          data: 'Hoje, ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          host: primeiroAtivo.host,
+          empresa: primeiroAtivo.empresa || 'Aço Móveis',
+          ip: (primeiroAtivo.ip || '127.0.0.1') + ':8090',
           evento: 'Marco Zero (Enrollment)',
           ciclo: 'Baseline Zero',
-          detalhes: 'Agente FSC registrado. Baseline de hardware, SO e softwares ativo.',
+          detalhes: `Agente Nexus Remote Agent registrado na estação ${primeiroAtivo.host}. Baseline ativo.`,
           color: 'text-blue-700 font-bold',
-          origem: 'Agente Local',
-          diasAtras: 308
-        }];
-        adicionarLog('127.0.0.1', 'Console Central', 'Logs Limpos pelo Operador', 'Trilha operacional reiniciada. Baseline legal preservado.', 'text-rose-600 font-bold', 'Manual', 'Admin');
+          origem: 'Nexus Agent',
+          diasAtras: 0
+        }] : []);
+        adicionarLog('127.0.0.1', 'Console Central', 'Logs Limpos pelo Operador', 'Trilha operacional reiniciada pelo técnico.', 'text-rose-600 font-bold', 'Manual', 'Admin');
+        try { localStorage.setItem('fsc_kintsugi_logs', JSON.stringify(listaLogs)); } catch(e){}
         renderizarLogs();
-        mostrarToast('Logs operacionais limpos. Marco Zero preservado.', 'warning', 'Logs Limpos');
+        mostrarToast('Logs operacionais limpos.', 'warning', 'Logs Limpos');
       }
     }
 
@@ -8771,7 +8566,7 @@
     }
 
     function abrirModalGerenciar() {
-      alert('Gerenciando ativo: ' + (itemSelecionado ? itemSelecionado.title : 'QUA-01') + '\nStatus: Operacional na rede interna.');
+      alert('Gerenciando ativo: ' + (itemSelecionado ? (itemSelecionado.title || itemSelecionado.host) : 'TI-0001') + '\nStatus: Operacional na rede interna.');
     }
 
     function abrirModalConfiguracoes() {
@@ -8849,42 +8644,10 @@
             listaNotificacoes = parsed;
           }
         } else {
-          // Estado inicial apenas se o usuário ainda não tiver limpado
-          listaNotificacoes = [
-            {
-              id: 'notif-ini-1',
-              tipo: 'alerta',
-              titulo: 'Sobrecarga de RAM',
-              descricao: 'Estação QUA-01 atingiu 84% de memória.',
-              horario: 'Hoje, 09:15',
-              lida: false,
-              corPonto: 'bg-amber-400',
-              linkAba: 'view-logs',
-              filtroHost: 'QUA-01'
-            },
-            {
-              id: 'notif-ini-2',
-              tipo: 'chamado',
-              titulo: 'Fila de Suporte',
-              descricao: 'Chamados aguardando atendimento técnico.',
-              horario: 'Hoje, 08:30',
-              lida: false,
-              corPonto: 'bg-rose-500',
-              linkAba: 'view-chamados'
-            },
-            {
-              id: 'notif-ini-3',
-              tipo: 'licenca',
-              titulo: 'Licença a Expirar',
-              descricao: 'Microsoft 365 Business Standard requer renovação.',
-              horario: 'Hoje, 08:00',
-              lida: false,
-              corPonto: 'bg-indigo-400',
-              linkAba: 'view-licencas'
-            }
-          ];
+          listaNotificacoes = [];
           salvarNotificacoes();
         }
+        listaNotificacoes = (listaNotificacoes || []).filter(n => !n.descricao?.includes('QUA-01') && n.filtroHost !== 'QUA-01');
       } catch (e) {
         listaNotificacoes = [];
       }
@@ -9866,6 +9629,19 @@
         const { data: comps, error } = await supabaseClient.from('computadores').select('*');
         if (!comps || error || !Array.isArray(comps)) return;
         let mudou = false;
+
+        // Purga qualquer ativo fictício / de exemplo e mantém exclusivamente máquinas reais
+        const MOCK_ASSETS = new Set(['QUA-01', 'DIR-NOTE01', 'FIN-NOTE02', 'FAB-TABLET01', 'SRV-DATABASE']);
+        const validHostNames = new Set(comps.map(c => String(c.nome_computador || c.id || '').toUpperCase()));
+        listaAtivos = (listaAtivos || []).filter(a => {
+          const h = String(a.host || '').toUpperCase();
+          if (MOCK_ASSETS.has(h)) return false;
+          return validHostNames.has(h) || (a.online && a.ip === '127.0.0.1');
+        });
+
+        if (!window._telemetryHeartbeatsLogged) window._telemetryHeartbeatsLogged = new Set();
+        let novosLogs = false;
+
         comps.forEach(comp => {
           const hostName = comp.nome_computador || comp.id;
           if (!hostName) return;
@@ -9873,6 +9649,8 @@
           const isOnline = (Date.now() - hbTime) < 120000; // online se enviou heartbeat nos últimos 2 min
           const cpuPct = typeof comp.cpu_usage === 'number' ? comp.cpu_usage : 10;
           const ramPct = typeof comp.ram_usage === 'number' ? comp.ram_usage : 35;
+          const ipAddr = comp.ip || '127.0.0.1';
+          const emp = comp.empresa || 'Aço Móveis';
 
           const idx = listaAtivos.findIndex(a => String(a.host || '').toUpperCase() === String(hostName).toUpperCase());
           const mapped = {
@@ -9884,8 +9662,8 @@
             domain: 'CORP.LOCAL',
             loggedUserFull: 'CORP\\' + ((idx >= 0 && listaAtivos[idx].user) ? listaAtivos[idx].user : hostName),
             location: `${comp.empresa || 'Aço Móveis'} - ${comp.setor || 'TI'}`,
-            empresa: comp.empresa || 'Aço Móveis',
-            company: comp.empresa || 'Aço Móveis',
+            empresa: emp,
+            company: emp,
             tag: comp.setor || 'TI',
             os: (idx >= 0 && listaAtivos[idx].os) ? listaAtivos[idx].os : 'Windows 10/11 Pro',
             cpu: (idx >= 0 && listaAtivos[idx].cpu) ? listaAtivos[idx].cpu : 'Intel Core / AMD',
@@ -9896,24 +9674,94 @@
             ramFreeGb: +(8.0 * (100 - ramPct) / 100).toFixed(1),
             ramUsedPct: ramPct,
             disk: (idx >= 0 && listaAtivos[idx].disk) ? listaAtivos[idx].disk : 'SSD 512 GB',
-            ip: comp.ip || '127.0.0.1',
+            ip: ipAddr,
             port: 8090,
             lastConnected: comp.ultimo_heartbeat ? ('Hoje, ' + new Date(comp.ultimo_heartbeat).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
             lastSeen: isOnline ? 'Conectado agora' : 'Offline',
             online: isOnline
           };
+
           if (idx >= 0) {
             listaAtivos[idx] = Object.assign({}, listaAtivos[idx], mapped);
           } else {
             listaAtivos.unshift(mapped);
             mudou = true;
           }
-        });
-        if (mudou) {
-          const vAtivos = document.getElementById('view-ativos');
-          if (vAtivos && !vAtivos.classList.contains('hidden') && typeof renderizarTabelaInventario === 'function') {
-            renderizarTabelaInventario();
+
+          // Geração de Logs de Telemetria Reais da Máquina que possui o agente instalado
+          if (hbTime > 0) {
+            const sigHb = `hb_${hostName}_${hbTime}`;
+            if (!window._telemetryHeartbeatsLogged.has(sigHb)) {
+              window._telemetryHeartbeatsLogged.add(sigHb);
+              const horaFormatada = 'Hoje, ' + new Date(hbTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+              const temBaseline = listaLogs.some(l => l.host === hostName && l.evento && l.evento.includes('Marco Zero'));
+              if (!temBaseline) {
+                listaLogs.push({
+                  data: horaFormatada,
+                  host: hostName,
+                  empresa: emp,
+                  ip: `${ipAddr}:8090`,
+                  evento: 'Marco Zero (Enrollment)',
+                  ciclo: 'Baseline Zero',
+                  detalhes: `Ativação e registro inicial do Nexus Remote Agent na estação ${hostName}. Telemetria e suporte habilitados.`,
+                  color: 'text-blue-700 font-bold',
+                  origem: 'Nexus Agent',
+                  diasAtras: 0,
+                  timestamp: hbTime - 1000
+                });
+              }
+
+              listaLogs.unshift({
+                data: horaFormatada,
+                host: hostName,
+                empresa: emp,
+                ip: `${ipAddr}:8090`,
+                evento: 'Heartbeat Telemetria',
+                ciclo: 'Ciclo 60s',
+                detalhes: `Telemetria periódica recebida: CPU ${cpuPct}%, RAM ${ramPct}%, Status: ${isOnline ? 'Online' : 'Offline'}. Agente NexusTI ativo.`,
+                color: isOnline ? 'text-slate-600' : 'text-rose-600',
+                origem: 'Nexus Agent',
+                diasAtras: 0,
+                timestamp: hbTime
+              });
+
+              if (cpuPct >= 80 || ramPct >= 80) {
+                listaLogs.unshift({
+                  data: horaFormatada,
+                  host: hostName,
+                  empresa: emp,
+                  ip: `${ipAddr}:8090`,
+                  evento: cpuPct >= 80 ? 'Alerta de Sobrecarga CPU' : 'Alerta de Sobrecarga RAM',
+                  ciclo: 'Push 0s',
+                  detalhes: `Consumo elevado detectado no agente: CPU ${cpuPct}%, RAM ${ramPct}%.`,
+                  color: 'text-amber-600 font-bold',
+                  origem: 'Nexus Agent',
+                  diasAtras: 0,
+                  timestamp: hbTime + 1
+                });
+              }
+              novosLogs = true;
+            }
           }
+        });
+
+        if (novosLogs) {
+          if (listaLogs.length > 500) listaLogs = listaLogs.slice(0, 500);
+          try { localStorage.setItem('fsc_kintsugi_logs', JSON.stringify(listaLogs.slice(0, 200))); } catch(e){}
+          renderizarLogs();
+          atualizarCardsPoliticaLogs();
+        }
+
+        renderizarEstacoesVisaoGeral();
+
+        const vAtivos = document.getElementById('view-ativos');
+        if (vAtivos && !vAtivos.classList.contains('hidden') && typeof renderizarTabelaInventario === 'function') {
+          renderizarTabelaInventario();
+        }
+        const vRemoto = document.getElementById('view-remote');
+        if (vRemoto && !vRemoto.classList.contains('hidden') && typeof renderizarListaAcessoRemoto === 'function') {
+          renderizarListaAcessoRemoto();
         }
       } catch(e) {}
     }
@@ -10264,136 +10112,8 @@
         listaDepartamentos = ["#Financeiro", "#Produção", "#TI", "#Diretoria", "#DP", "#Logística", "#Comercial", "#QUALIDADE", "#PROJETO", "#COMPRAS", "#RECEPÇÃO", "#ALMOXARIFADO"];
       }
 
-      // Pre-seed Chamados reais se vazio (Garante exibição até 6 cards distribuídos pelas abas)
-      if (!listaChamados || listaChamados.length === 0) {
-        listaChamados = [
-          {
-            id: "TICK-101",
-            titulo: "Solicitação de Acesso VPN Remota",
-            categoria: "Rede & Internet",
-            solicitante: "Gabriel Novaes",
-            email: "gabriel@empresa.com",
-            avatar: "GN",
-            ativo: "QUA-01",
-            ip: "192.168.13.199",
-            urgencia: "Média",
-            status: "Active",
-            horario: "Hoje, 14:10",
-            data: "Hoje, 14:10",
-            responsavel: "",
-            tecnico: "",
-            tecnicosAtribuidos: [],
-            paraOutro: false,
-            abertoPor: "Gabriel Novaes",
-            descricao: "Configuração de rota VPN para teletrabalho na filial.",
-            desc: "Configuração de rota VPN para teletrabalho na filial."
-          },
-          {
-            id: "TICK-102",
-            titulo: "Substituição de Teclado e Mouse",
-            categoria: "Hardware / Manutenção",
-            solicitante: "Mariana Costa",
-            setor: "Qualidade",
-            email: "mariana.costa@empresa.com",
-            avatar: "MC",
-            ativo: "QUA-01",
-            ip: "192.168.13.199",
-            urgencia: "Baixa",
-            status: "Triagem",
-            horario: "Hoje, 13:45",
-            data: "Hoje, 13:45",
-            responsavel: "Lucas Silva",
-            tecnico: "Lucas Silva",
-            tecnicosAtribuidos: ["Mariana Souza"],
-            paraOutro: true,
-            abertoPor: "Gabriel Novaes",
-            descricao: "Teclado do setor de Qualidade apresentando falha nas teclas de atalho.",
-            desc: "Teclado do setor de Qualidade apresentando falha nas teclas de atalho."
-          },
-          {
-            id: "TICK-103",
-            titulo: "Lentidão ao Gerar Relatórios no ERP",
-            categoria: "Software / Sistema Operacional",
-            solicitante: "Carlos Souza",
-            setor: "Financeiro",
-            avatar: "CS",
-            ativo: "FIN-NOTE02",
-            ip: "192.168.13.112",
-            urgencia: "Alta",
-            status: "Em Andamento",
-            horario: "Hoje, 11:20",
-            data: "Hoje, 11:20",
-            responsavel: "Gabriel Novaes",
-            tecnico: "Gabriel Novaes",
-            tecnicosAtribuidos: [],
-            paraOutro: true,
-            abertoPor: "Gabriel Novaes",
-            descricao: "Processo de fechamento contábil travando na emissão de DRE.",
-            desc: "Processo de fechamento contábil travando na emissão de DRE."
-          },
-          {
-            id: "TICK-104",
-            titulo: "Aguardando Peça do Switch Central",
-            categoria: "Rede & Internet",
-            solicitante: "Infraestrutura TI",
-            avatar: "TI",
-            ativo: "SRV-DATABASE",
-            ip: "192.168.13.10",
-            urgencia: "Crítica",
-            status: "Em Espera",
-            horario: "Hoje, 10:05",
-            data: "Hoje, 10:05",
-            responsavel: "Mariana Souza",
-            tecnico: "Mariana Souza",
-            tecnicosAtribuidos: ["Lucas Silva"],
-            paraOutro: false,
-            abertoPor: "Gabriel Novaes",
-            descricao: "Aguardando entrega do módulo SFP 10Gbps do fornecedor.",
-            desc: "Aguardando entrega do módulo SFP 10Gbps do fornecedor."
-          },
-          {
-            id: "TICK-105",
-            titulo: "Validação da Nova Imagem Windows 11",
-            categoria: "Software / Sistema Operacional",
-            solicitante: "Lucas Silva",
-            setor: "TI_Infra",
-            avatar: "LS",
-            ativo: "DIR-NOTE01",
-            ip: "192.168.13.105",
-            urgencia: "Média",
-            status: "Homologacao",
-            horario: "Hoje, 09:30",
-            data: "Hoje, 09:30",
-            responsavel: "Lucas Silva",
-            tecnico: "Lucas Silva",
-            tecnicosAtribuidos: [],
-            paraOutro: false,
-            abertoPor: "Gabriel Novaes",
-            descricao: "Homologação do pacote Office e antivírus corporativo.",
-            desc: "Homologação do pacote Office e antivírus corporativo."
-          },
-          {
-            id: "TICK-106",
-            titulo: "Instalação da Impressora Térmica Zebra",
-            categoria: "Hardware / Manutenção",
-            solicitante: "Marcos Almoxarifado",
-            setor: "Logística",
-            avatar: "MA",
-            ativo: "ALMOX-01",
-            ip: "192.168.18.25",
-            urgencia: "Média",
-            status: "Resolvido",
-            horario: "Hoje, 08:15",
-            data: "Hoje, 08:15",
-            responsavel: "Gabriel Novaes",
-            tecnico: "Gabriel Novaes",
-            tecnicosAtribuidos: [],
-            paraOutro: true,
-            abertoPor: "Gabriel Novaes",
-            descricao: "Driver instalado e etiquetas de código de barras testadas com sucesso.",
-            desc: "Driver instalado e etiquetas de código de barras testadas com sucesso."
-          }
-        ];
+      if (!Array.isArray(listaChamados)) {
+        listaChamados = [];
       }
 
       // Pre-seed Licenças se vazio (Alinhado com alerta da Tela Início: Microsoft 365 a 14 dias de expirar)
@@ -10406,7 +10126,7 @@
             tipo: 'Assinatura Anual',
             emUso: 25,
             total: 30,
-            ativo: 'Corporativo (QUA-01, ALMOX-01...)',
+            ativo: 'Corporativo (TI-0001, Estações Ativas)',
             validade: '14 dias (02/12/2026)',
             status: 'Expirando',
             valorTotal: 3850.00,
@@ -10451,7 +10171,7 @@
             tipo: 'Licença de Rede (Floating)',
             emUso: 3,
             total: 5,
-            ativo: 'QUA-01 (Engenharia & Projetos)',
+            ativo: 'TI-0001 (Projetos TI)',
             validade: '180 dias',
             status: 'Ativa',
             valorTotal: 18900.00,
@@ -10477,142 +10197,19 @@
         };
       }
 
-      // Pre-seed Logs com Histórico SIEM / Telemetria / Marco Civil (sem registros fictícios de produção)
-      if (!listaLogs || listaLogs.length === 0 || listaLogs.length <= 4) {
-        listaLogs = [
-          {
-            data: 'Hoje, 09:41',
-            host: 'QUA-01',
-            empresa: 'Aço Móveis',
-            ip: '192.168.13.199:8090',
-            evento: 'Heartbeat Telemetria',
-            ciclo: 'Ciclo 60s',
-            detalhes: 'Telemetria periódica: CPU 18%, RAM 4.7 GB (57%), Latência 1.8ms (Zero I/O)',
-            color: 'text-slate-600',
-            origem: 'FSC Agent',
-            diasAtras: 0
-          },
-          {
-            data: 'Hoje, 09:40',
-            host: 'QUA-01',
-            empresa: 'Aço Móveis',
-            ip: '192.168.13.199:8090',
-            evento: 'Heartbeat Telemetria',
-            ciclo: 'Ciclo 60s',
-            detalhes: 'Telemetria periódica: CPU 21%, RAM 4.8 GB (58%), Latência 2.2ms',
-            color: 'text-slate-600',
-            origem: 'FSC Agent',
-            diasAtras: 0
-          },
-          {
-            data: 'Hoje, 09:15',
-            host: 'QUA-01',
-            empresa: 'Aço Móveis',
-            ip: '192.168.13.199:8090',
-            evento: 'Sobrecarga de RAM',
-            ciclo: 'Push 0s',
-            detalhes: 'Consumo de memória RAM em 84% (Processo ERP e chrome.exe 4.2 GB)',
-            color: 'text-amber-600 font-bold',
-            origem: 'Agente Local',
-            diasAtras: 0
-          },
-          {
-            data: 'Hoje, 08:30',
-            host: 'QUA-01',
-            empresa: 'Aço Móveis',
-            ip: '192.168.13.199:8090',
-            evento: 'Conexão Agente Online',
-            ciclo: 'Push 0s',
-            detalhes: 'NexusTI Remote Agent online na porta 8090 (Uptime 99.8%). Handshake OK.',
-            color: 'text-emerald-600 font-semibold',
-            origem: 'Agente Local',
-            diasAtras: 0
-          },
-          {
-            data: 'Hoje, 08:00',
-            host: 'Servidor Central',
-            empresa: 'Aço Móveis',
-            ip: '192.168.18.122',
-            evento: 'Auditoria Licenças SAM',
-            ciclo: 'Push 0s',
-            detalhes: 'Alerta FinOps: Licença Microsoft 365 Business Standard expira em 14 dias (02/12/2026)',
-            color: 'text-purple-600 font-semibold',
-            origem: 'Console TI',
-            diasAtras: 0
-          },
-          {
-            data: 'Hoje, 07:45',
-            host: 'ALMOX-01',
-            empresa: 'Aço Móveis',
-            ip: '192.168.18.25:8090',
-            evento: 'Heartbeat Telemetria',
-            ciclo: 'Ciclo 60s',
-            detalhes: 'Heartbeat recebido com sucesso (CPU 12%, RAM 3.4 GB, Latência 1.9ms)',
-            color: 'text-slate-600',
-            origem: 'FSC Agent',
-            diasAtras: 0
-          },
-          {
-            data: 'Hoje, 06:00',
-            host: 'Servidor Central',
-            empresa: 'Aço Móveis',
-            ip: '192.168.18.122:8090',
-            evento: 'Varredura Inventário SAM',
-            ciclo: 'Ciclo 6h',
-            detalhes: 'Varredura periódica de executáveis: 42 softwares ativos conferidos no catálogo SAM.',
-            color: 'text-blue-600 font-semibold',
-            origem: 'Auditoria TI',
-            diasAtras: 0
-          },
-          {
-            data: 'Hoje, 00:00',
-            host: 'Console SIEM',
-            empresa: 'Aço Móveis',
-            ip: '127.0.0.1',
-            evento: 'Rotação Automática de Logs',
-            ciclo: 'Ciclo Diário',
-            detalhes: 'Rotina automática executada: 0 registros excederam a janela de 365 dias (Marco Civil Art. 13/15).',
-            color: 'text-purple-700 font-semibold',
-            origem: 'Sistema',
-            diasAtras: 0
-          },
-          {
-            data: '01/11/2026 10:00',
-            host: 'QUA-01',
-            empresa: 'Aço Móveis',
-            ip: '192.168.13.199:8090',
-            evento: 'Varredura Inventário SAM',
-            ciclo: 'Ciclo 6h',
-            detalhes: 'Auditoria mensal de softwares corporativos concluída sem discrepâncias.',
-            color: 'text-blue-600 font-semibold',
-            origem: 'Auditoria TI',
-            diasAtras: 18
-          },
-          {
-            data: '05/10/2026 14:20',
-            host: 'QUA-01',
-            empresa: 'Aço Móveis',
-            ip: '192.168.13.199:8090',
-            evento: 'Acesso Remoto Seguro',
-            ciclo: 'Push 0s',
-            detalhes: 'Sessão remota assistida finalizada pelo técnico Gabriel Novaes (Duração: 14 min).',
-            color: 'text-indigo-600 font-semibold',
-            origem: 'Console TI',
-            diasAtras: 45
-          },
-          {
-            data: '15/01/2026 08:00',
-            host: 'QUA-01',
-            empresa: 'Aço Móveis',
-            ip: '192.168.13.199:8090',
-            evento: 'Marco Zero (Enrollment)',
-            ciclo: 'Baseline Zero',
-            detalhes: 'Ativação e registro inicial do agente QUA-01. Snapshot baseline de hardware (Intel Core i5, 8GB RAM, SSD 512GB), SO Windows 10 e 42 softwares gerado.',
-            color: 'text-blue-700 font-bold',
-            origem: 'Agente Local',
-            diasAtras: 308
+      // Carrega logs persistidos locais (apenas eventos legítimos)
+      const logsSalvos = localStorage.getItem('fsc_kintsugi_logs');
+      if (logsSalvos) {
+        try {
+          const parsedLogs = JSON.parse(logsSalvos);
+          if (Array.isArray(parsedLogs)) {
+            listaLogs = parsedLogs.filter(l => l && l.host && !l.host.includes('QUA-01') && !String(l.ip).includes('192.168.13.199'));
           }
-        ];
+        } catch (e) {
+          listaLogs = [];
+        }
+      } else {
+        listaLogs = [];
       }
     }
 
@@ -10621,23 +10218,27 @@
     // =========================================================================
     function navegarParaLogsComFiltro(hostname) {
       navegarParaAba('view-logs');
-      // Adiciona um evento de log recente de sobrecarga se ainda não existir
-      adicionarLog('192.168.13.199', hostname || 'QUA-01', 'Sobrecarga de RAM', 'Consumo em 84% (Processo chrome.exe 4.2 GB)', 'text-amber-600 font-bold');
+      const inputFiltro = document.getElementById('input-busca-logs');
+      if (inputFiltro && hostname) {
+        inputFiltro.value = hostname;
+        renderizarLogs(hostname);
+      }
     }
 
     function selecionarAtivoNaLista(hostname) {
-      const atv = listaAtivos.find(a => a.host === hostname) || listaAtivos[0] || {
-        host: hostname || 'QUA-01',
-        tag: 'Qualidade',
-        ip: '192.168.13.199',
+      const atv = (listaAtivos || []).find(a => a.host === hostname) || (listaAtivos && listaAtivos[0]) || {
+        host: hostname || 'TI-0001',
+        tag: 'TI',
+        empresa: 'Aço Móveis',
+        ip: '192.168.18.122',
         online: true,
-        cpu: '38%',
-        ram: '84%',
-        disco: '42%',
-        uptime: '99.8%',
-        user: 'ReviOS-10-23.08',
-        os: 'Windows 10 Pro',
-        id: 'FSC-910 248'
+        cpu: '15%',
+        ram: '45%',
+        disco: '28%',
+        uptime: '99.9%',
+        user: 'gabrielnovaes',
+        os: 'Windows 10/11 Pro',
+        id: 'FSC-TI-0001'
       };
 
       const elAvatar = document.getElementById('detalhe-avatar');
@@ -10669,9 +10270,178 @@
     function abrirChamadoParaAtivo(hostname) {
       abrirModalNovoChamado();
       const el = document.getElementById('campo-chamado-ativo');
-      if (el) el.value = hostname || 'QUA-01';
+      if (el) el.value = hostname || (listaAtivos[0] ? listaAtivos[0].host : 'TI-0001');
     }
 
+
+    // =========================================================================
+    // RENDERIZAÇÃO DAS ESTAÇÕES NA VISÃO GERAL (DASHBOARD)
+    // =========================================================================
+    function renderizarEstacoesVisaoGeral() {
+      const tbody = document.getElementById('tbody-estacoes-conectadas-visao-geral');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      const restricaoTec = obterEmpresaPermitidaUsuarioAtual();
+      const filtroAtivo = restricaoTec !== 'todas' ? restricaoTec : (window.filtroEmpresaGlobal || 'todas');
+      const ativos = (listaAtivos || []).filter(a => registroCorrespondeFiltroEmpresa(a, filtroAtivo));
+
+      const elContador = document.getElementById('contador-estacoes-visao-geral');
+      if (elContador) elContador.textContent = `${ativos.length} ${ativos.length === 1 ? 'ativo' : 'ativos'}`;
+
+      // KPIs do Topo da Visão Geral
+      const elOnlineKpi = document.getElementById('kpi-ativos-online-count');
+      const elOnlineSub = document.getElementById('kpi-ativos-online-sub');
+      const elAlertaKpi = document.getElementById('kpi-alertas-hardware-count');
+      const elAlertaSub = document.getElementById('kpi-alertas-hardware-sub');
+
+      const onlineCount = ativos.filter(a => a.online).length;
+      const sobrecarregados = ativos.filter(a => (typeof a.cpuUsedPct === 'number' && a.cpuUsedPct >= 80) || (typeof a.ramUsedPct === 'number' && a.ramUsedPct >= 80));
+      const alertaCount = sobrecarregados.length;
+
+      if (elOnlineKpi) elOnlineKpi.textContent = onlineCount;
+      if (elOnlineSub) elOnlineSub.textContent = ativos.length > 0 ? `${ativos[0].host} • ${ativos[0].online ? 'Conectado' : 'Offline'}` : 'Nenhuma máquina conectada';
+      if (elAlertaKpi) elAlertaKpi.textContent = alertaCount;
+      if (elAlertaSub) elAlertaSub.textContent = alertaCount > 0 ? `${alertaCount} com consumo elevado` : 'Telemetria nominal';
+
+      // Alerta 1 de Hardware na Visão Geral
+      const elAlertaCard = document.getElementById('container-alerta-hardware-dashboard');
+      if (elAlertaCard) {
+        if (sobrecarregados.length > 0) {
+          const sAtv = sobrecarregados[0];
+          const isCpu = sAtv.cpuUsedPct >= 80;
+          elAlertaCard.innerHTML = `
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                  <h3 class="text-xs font-medium text-slate-900">${isCpu ? 'Sobrecarga de CPU' : 'Sobrecarga de Memória'}</h3>
+                </div>
+                <span class="text-[10px] font-mono text-amber-500 font-bold">${isCpu ? 'CPU ' + sAtv.cpuUsedPct + '%' : 'RAM ' + sAtv.ramUsedPct + '%'}</span>
+              </div>
+              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 space-y-1.5">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-medium text-slate-800">${sAtv.host}</span>
+                  <span class="font-mono text-[11px] text-slate-500">${sAtv.ip || 'DHCP'}</span>
+                </div>
+                <p class="text-[11px] text-slate-500 leading-relaxed">
+                  Consumo elevado detectado no agente: ${sAtv.ram || (sAtv.ramUsedPct + '%')} • CPU ${sAtv.cpuUsedPct || 0}%.
+                </p>
+                <div class="w-full bg-slate-200 h-[2px] rounded-full overflow-hidden pt-0.5">
+                  <div class="bg-amber-400 h-full rounded-full" style="width: ${isCpu ? sAtv.cpuUsedPct : sAtv.ramUsedPct}%;"></div>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between gap-2 pt-1">
+              <button onclick="navegarParaLogsComFiltro('${sAtv.host}')" class="flex-1 py-1.5 px-2.5 rounded-md bg-white border border-slate-200 text-slate-700 text-[11px] font-medium transition text-center hover:bg-slate-50">
+                Inspecionar Logs
+              </button>
+              <button onclick="iniciarAcessoRemoto('${sAtv.ip}', '${sAtv.host}')" class="py-1.5 px-2.5 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-slate-700 text-[11px] font-medium transition" title="Conectar">
+                Remoto
+              </button>
+            </div>
+          `;
+        } else {
+          elAlertaCard.innerHTML = `
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <h3 class="text-xs font-medium text-slate-900">Telemetria de Hardware</h3>
+                </div>
+                <span class="text-[10px] font-mono text-emerald-500 font-bold">Nominal</span>
+              </div>
+              <div class="p-3 rounded-lg bg-emerald-50/50 border border-emerald-100/60 space-y-1.5">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-medium text-emerald-900">Operação Segura</span>
+                  <span class="font-mono text-[11px] text-emerald-700">${ativos.length} estações</span>
+                </div>
+                <p class="text-[11px] text-slate-600 leading-relaxed">
+                  Todas as máquinas com Nexus Remote Agent estão operando dentro dos limites seguros de CPU e Memória RAM.
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center justify-between gap-2 pt-1">
+              <button onclick="navegarParaAba('view-logs')" class="flex-1 py-1.5 px-2.5 rounded-md bg-white border border-slate-200 text-slate-700 text-[11px] font-medium transition text-center hover:bg-slate-50">
+                Consultar Logs SIEM
+              </button>
+            </div>
+          `;
+        }
+      }
+
+      if (ativos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-slate-400 font-sans">Nenhum computador conectado com o Nexus Remote Agent no momento. Baixe o instalador no topo para conectar as estações.</td></tr>';
+        return;
+      }
+
+      ativos.forEach(atv => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50/80 transition cursor-pointer';
+        tr.onclick = () => selecionarAtivoNaLista(atv.host);
+        const cpu = typeof atv.cpuUsedPct === 'number' ? atv.cpuUsedPct : 15;
+        const ram = typeof atv.ramUsedPct === 'number' ? atv.ramUsedPct : 40;
+        tr.innerHTML = `
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-2.5">
+              <span class="w-2 h-2 rounded-full ${atv.online ? 'bg-emerald-400' : 'bg-slate-300'} shrink-0"></span>
+              <div>
+                <div class="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
+                  <span>${atv.host}</span>
+                  <span class="text-[10px] font-normal text-slate-400 bg-slate-50 px-1.5 py-0.2 rounded border border-slate-200">${atv.tag || atv.empresa || 'TI'}</span>
+                </div>
+                <div class="text-[10px] text-slate-500 font-mono">${atv.id || ('FSC-' + atv.host)}</div>
+              </div>
+            </div>
+          </td>
+          <td class="px-4 py-3">
+            <div class="font-mono text-xs text-slate-800">${atv.ip || 'DHCP'}:8090</div>
+            <div class="text-[10px] text-slate-500">${atv.user || atv.host}</div>
+          </td>
+          <td class="px-4 py-3">
+            <div class="text-xs text-slate-700">${atv.os || 'Windows 10/11 Pro'}</div>
+            <div class="text-[10px] text-slate-500">${atv.cpu || 'Intel Core / AMD'}</div>
+          </td>
+          <td class="px-4 py-3">
+            <div class="text-xs ${atv.online ? 'text-emerald-500 font-medium' : 'text-slate-400 font-medium'}">${atv.online ? 'Online' : 'Offline'}</div>
+            <div class="text-[10px] text-slate-500 font-mono">${atv.lastConnected || 'Recente'}</div>
+          </td>
+          <td class="px-4 py-3">
+            <div class="space-y-1.5 w-36">
+              <div class="flex items-center justify-between text-[10px] font-mono">
+                <span class="text-slate-500">CPU</span>
+                <span class="text-slate-700">${cpu}%</span>
+              </div>
+              <div class="w-full bg-slate-200 h-[3px] rounded-full overflow-hidden">
+                <div class="bg-indigo-400 h-full rounded-full" style="width: ${cpu}%;"></div>
+              </div>
+              <div class="flex items-center justify-between text-[10px] font-mono">
+                <span class="${ram >= 80 ? 'text-amber-500 font-bold' : 'text-slate-500'}">RAM</span>
+                <span class="${ram >= 80 ? 'text-amber-500 font-bold' : 'text-slate-700'}">${ram}%</span>
+              </div>
+              <div class="w-full bg-slate-200 h-[3px] rounded-full overflow-hidden">
+                <div class="${ram >= 80 ? 'bg-amber-400' : 'bg-emerald-400'} h-full rounded-full" style="width: ${ram}%;"></div>
+              </div>
+            </div>
+          </td>
+          <td class="px-4 py-3 text-right">
+            <div class="flex items-center justify-end gap-1">
+              <button onclick="event.stopPropagation(); iniciarAcessoRemoto('${atv.ip}', '${atv.host}')" class="flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-[11px] transition" title="Iniciar acesso remoto">
+                <i data-lucide="monitor" class="w-3 h-3"></i>
+                <span>Acessar</span>
+              </button>
+              <button onclick="event.stopPropagation(); navegarParaLogsComFiltro('${atv.host}')" class="p-1 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-slate-700 transition" title="Logs">
+                <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="event.stopPropagation(); abrirEmissaoParaHost('${atv.host}', '${atv.ip}')" class="p-1 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-slate-700 transition" title="Comunicado">
+                <i data-lucide="megaphone" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      setTimeout(atualizarIconesLucide, 50);
+    }
 
     // =========================================================================
     // RENDERIZAÇÃO DA ABA ACESSO REMOTO COM EQUIPAMENTOS INSTALADOS
@@ -10846,7 +10616,7 @@
 
         if (resp.ok) {
           const data = await resp.json();
-          const targetHost = data.customName || data.hostname || 'QUA-01';
+          const targetHost = data.customName || data.hostname || 'TI-0001';
           const idx = listaAtivos.findIndex(a => a.host === targetHost || a.ip === data.ip);
 
           const empAgente = data.empresa || data.company || 'Aço Móveis';
@@ -10860,17 +10630,17 @@
           } catch (e) {}
 
           const ativoAtualizado = {
-            id: (idx >= 0 && listaAtivos[idx].id) ? listaAtivos[idx].id : 'FSC-910 248',
+            id: (idx >= 0 && listaAtivos[idx].id) ? listaAtivos[idx].id : ('FSC-' + targetHost),
             host: targetHost,
             type: flagServidor ? 'Servidor' : ((data.deviceType && data.deviceType.toLowerCase() !== 'servidor') ? data.deviceType : 'Desktop'),
             isServer: flagServidor,
-            user: data.user || 'ReviOS-10-23.08',
+            user: data.user || 'gabrielnovaes',
             domain: data.domain || 'CORP.LOCAL',
-            loggedUserFull: data.loggedUserFull || (data.domain + '\\' + data.user),
-            location: data.location || (empAgente + ' - Qualidade'),
+            loggedUserFull: data.loggedUserFull || (data.domain + '\\' + (data.user || 'gabrielnovaes')),
+            location: data.location || (empAgente + ' - TI'),
             empresa: empAgente,
             company: empAgente,
-            tag: data.tag || 'Qualidade',
+            tag: data.tag || 'TI',
             os: data.os || 'Microsoft Windows 10 Pro (64-bit)',
             cpu: data.cpu || 'Intel Core i5-10400 @ 2.90GHz (4c/8t)',
             cpuUsedPct: typeof data.cpuUsedPct === 'number' ? data.cpuUsedPct : 18,
@@ -10888,7 +10658,7 @@
             uptime: data.uptime || '14h 20m',
             activeConnections: typeof data.activeConnections === 'number' ? data.activeConnections : 28,
             resolution: (data.screenWidth && data.screenHeight) ? `${data.screenWidth}x${data.screenHeight} Full HD` : '1920x1080 Full HD',
-            ip: data.ip || '192.168.13.199',
+            ip: data.ip || (itemSelecionado && itemSelecionado.ip) || '192.168.18.122',
             port: data.port || 8090,
             lastConnected: 'Agora mesmo (' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ')',
             lastSeen: 'Conectado agora',
@@ -11563,7 +11333,7 @@
         .then(d => {
           if (statusEl) {
             statusEl.className = 'text-xs font-bold text-emerald-600';
-            statusEl.innerHTML = `<span class="flex items-center gap-1.5"><i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i><span>Agente local online respondendo! Host: ${d.hostname || 'QUA-01'}, Usuário: ${d.user || 'Corporativo'}.</span></span>`; atualizarIconesLucide();
+            statusEl.innerHTML = `<span class="flex items-center gap-1.5"><i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i><span>Agente local online respondendo! Host: ${d.hostname || 'TI-0001'}, Usuário: ${d.user || 'Corporativo'}.</span></span>`; atualizarIconesLucide();
           }
         })
         .catch(() => {
@@ -12171,14 +11941,6 @@
       reader.readAsText(file);
     }
 
-    function limparLogsComConfirmacao() {
-      if (confirm('Deseja realmente limpar todos os registros de telemetria e auditoria da tela?')) {
-        listaLogs = [];
-        renderizarLogs();
-        alert('Histórico de logs limpo com sucesso.');
-      }
-    }
-
 
     function atualizarIconesLucide() {
       if (typeof lucide !== 'undefined' && lucide.createIcons) {
@@ -12279,60 +12041,8 @@
       'Muito Lenta / Quedas constantes'
     ];
 
-    let historicoAvisos = [
-      {
-        id: 'AVS-9102',
-        tipo: 'aviso',
-        urgencia: 'importante',
-        titulo: 'Manutenção Preventiva no Servidor de Arquivos',
-        mensagem: 'O servidor de rede passará por manutenção programada hoje às 18:00.',
-        destinatario: 'Todas as Estações (Broadcast)',
-        horario: 'Hoje, 14:30',
-        autor: 'Gabriel Novaes (Gestão TI)',
-        confirmacoes: '5 de 5 confirmaram (100%)'
-      },
-      {
-        id: 'AVS-8911',
-        tipo: 'enquete',
-        urgencia: 'informativo',
-        titulo: 'Avaliação da Conexão de Internet & Rede Wi-Fi',
-        mensagem: 'Como você avalia a estabilidade da rede corporativa hoje?',
-        destinatario: 'Todas as Estações (Broadcast)',
-        horario: 'Hoje, 11:15',
-        autor: 'Gabriel Novaes (Gestão TI)',
-        confirmacoes: '5 votos recebidos'
-      },
-      {
-        id: 'AVS-7814',
-        tipo: 'nota',
-        urgencia: 'urgente',
-        titulo: 'Alerta de Segurança: Tentativa de Phishing por E-mail',
-        mensagem: 'Não abram anexos de remetentes desconhecidos fingindo ser bancos.',
-        destinatario: 'QUA-01 (192.168.13.199)',
-        horario: 'Hoje, 09:20',
-        autor: 'Gabriel Novaes (Gestão TI)',
-        confirmacoes: 'Leitura confirmada'
-      }
-    ];
-
-    let dadosEnqueteAtiva = {
-      id: 'ENQ-2026-01',
-      pergunta: 'Como você avalia o desempenho e velocidade da conexão de rede hoje?',
-      totalVotos: 5,
-      opcoes: [
-        { texto: 'Muito Rápida / Estável (Sem problemas)', votos: 2, pct: 40, cor: 'bg-emerald-500' },
-        { texto: 'Normal (Atende bem as atividades)', votos: 2, pct: 40, cor: 'bg-blue-500' },
-        { texto: 'Lenta em alguns momentos do dia', votos: 1, pct: 20, cor: 'bg-amber-500' },
-        { texto: 'Muito Lenta / Quedas constantes', votos: 0, pct: 0, cor: 'bg-rose-500' }
-      ],
-      votantes: [
-        { host: 'QUA-01', voto: 'Normal', hora: '11:18' },
-        { host: 'DIR-NOTE01', voto: 'Muito Rápida', hora: '11:21' },
-        { host: 'FIN-NOTE02', voto: 'Normal', hora: '11:25' },
-        { host: 'FAB-TABLET01', voto: 'Lenta em alguns momentos', hora: '11:32' },
-        { host: 'SRV-DATABASE', voto: 'Muito Rápida', hora: '11:40' }
-      ]
-    };
+    let historicoAvisos = [];
+    let dadosEnqueteAtiva = null;
 
         // =========================================================================
     // NAVEGAÇÃO MODULAR EM MENUS: CENTRAL DE COMUNICADOS & ENQUETES
@@ -12490,7 +12200,7 @@
       // Tenta enviar via HTTP para cada máquina online
       let alvos = [];
       if (dest === 'broadcast') {
-        alvos = listaAtivos ? listaAtivos.map(a => a.ip) : ['192.168.13.199', '127.0.0.1'];
+        alvos = (listaAtivos && listaAtivos.length > 0) ? listaAtivos.map(a => a.ip).filter(Boolean) : ['192.168.18.122'];
       } else if (dest.startsWith('#')) {
         const tagLimpa = dest.toLowerCase();
         const nomeLimpo = dest.replace('#', '').toLowerCase();
@@ -12499,7 +12209,7 @@
           const l = (a.location || '').toLowerCase();
           return t === tagLimpa || t.includes(nomeLimpo) || l.includes(nomeLimpo);
         }).map(a => a.ip) : [];
-        if (alvos.length === 0) alvos = ['192.168.13.199'];
+        if (alvos.length === 0) alvos = (listaAtivos && listaAtivos[0]?.ip) ? [listaAtivos[0].ip] : ['192.168.18.122'];
       } else {
         const atv = listaAtivos ? listaAtivos.find(a => a.host === dest) : null;
         if (atv) alvos = [atv.ip];
@@ -12678,7 +12388,7 @@
       atualizarLivePreviewAviso();
     }
 
-    function computarVotoNaEnquete(opcaoIndex, hostName = 'QUA-01') {
+    function computarVotoNaEnquete(opcaoIndex, hostName = 'TI-0001') {
       if (!dadosEnqueteAtiva || !dadosEnqueteAtiva.opcoes[opcaoIndex]) return;
       const jaVotou = dadosEnqueteAtiva.votantes.find(v => v.host === hostName);
       if (jaVotou) {
@@ -12847,7 +12557,7 @@
       // Tenta enviar via HTTP para cada máquina online
       let alvos = [];
       if (dest === 'broadcast') {
-        alvos = listaAtivos ? listaAtivos.map(a => a.ip) : ['192.168.13.199', '127.0.0.1'];
+        alvos = (listaAtivos && listaAtivos.length > 0) ? listaAtivos.map(a => a.ip).filter(Boolean) : ['192.168.18.122'];
       } else if (dest.startsWith('#')) {
         const tagLimpa = dest.toLowerCase();
         const nomeLimpo = dest.replace('#', '').toLowerCase();
@@ -12856,7 +12566,7 @@
           const l = (a.location || '').toLowerCase();
           return t === tagLimpa || t.includes(nomeLimpo) || l.includes(nomeLimpo);
         }).map(a => a.ip) : [];
-        if (alvos.length === 0) alvos = ['192.168.13.199'];
+        if (alvos.length === 0) alvos = (listaAtivos && listaAtivos[0]?.ip) ? [listaAtivos[0].ip] : ['192.168.18.122'];
       } else {
         const atv = listaAtivos ? listaAtivos.find(a => a.host === dest) : null;
         if (atv) alvos = [atv.ip];
@@ -13093,9 +12803,9 @@
     }
 
     async function atualizarRespostasEnquetes() {
-      // Tenta buscar /api/enquete/resultados de QUA-01 ou local
+      // Tenta buscar /api/enquete/resultados da estação conectada ou local
       try {
-        const resp = await fetch('http://192.168.13.199:8090/api/enquete/resultados', { mode: 'cors' });
+        const targetHostIp = (listaAtivos && listaAtivos.length > 0 && listaAtivos[0].ip) ? listaAtivos[0].ip : '192.168.18.122'; const resp = await fetch(`http://${targetHostIp}:8090/api/enquete/resultados`, { mode: 'cors' });
         if (resp.ok) {
           const votos = await resp.json();
           if (Array.isArray(votos) && votos.length > 0) {
