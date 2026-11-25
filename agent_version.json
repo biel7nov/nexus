@@ -1,10 +1,10 @@
 {
-  "version": "1.1.0",
-  "build": 110,
+  "version": "1.2.0",
+  "build": 120,
   "releaseDate": "2026-11-25",
-  "downloadUrl": "https://raw.githubusercontent.com/biel7nov/nexus/main/agent/NexusRemoteAgent.exe",
-  "fallbackUrl": "https://nexus-ten-brown.vercel.app/agent/NexusRemoteAgent.exe",
-  "installerUrl": "https://raw.githubusercontent.com/biel7nov/nexus/main/Instalador-Nexus-Agent.exe",
-  "zipUrl": "https://raw.githubusercontent.com/biel7nov/nexus/main/Nexus-Agent-Instalador.zip",
-  "changelog": "Instalador resiliente, sem arquivos .old, atualização sob demanda via botão no software e no console."
+  "downloadUrl": "https://nexus-ten-brown.vercel.app/agent/NexusRemoteAgent.exe",
+  "fallbackUrl": "https://raw.githubusercontent.com/biel7nov/nexus/main/agent/NexusRemoteAgent.exe",
+  "installerUrl": "https://nexus-ten-brown.vercel.app/Instalador-Nexus-Agent.exe",
+  "zipUrl": "https://nexus-ten-brown.vercel.app/Nexus-Agent-Instalador.zip",
+  "changelog": "Viewer de acesso remoto embutido, limpeza automática de arquivos soltos e criação garantida de atalho na Área de Trabalho Pública."
 }

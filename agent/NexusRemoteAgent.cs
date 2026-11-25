@@ -12,6 +12,7 @@ using System.Windows.Forms;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace NexusRemoteAgent
 {
@@ -389,11 +390,351 @@ namespace NexusRemoteAgent
         {
             try
             {
-                string locFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "machine_location.txt");
+                string locFile = Path.Combine(ObterDiretorioDadosAgente(), "machine_location.txt");
                 if (File.Exists(locFile)) return File.ReadAllText(locFile).Trim();
             }
             catch { }
             return customEmpresa + " - " + customMachineTag.Replace("#", "").Trim();
+        }
+
+        public static string ObterDiretorioDadosAgente()
+        {
+            try
+            {
+                string baseDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
+                if (baseDir.Equals(@"C:\FSC-Agent", StringComparison.OrdinalIgnoreCase) ||
+                    baseDir.Equals(@"C:\Nexus-Agent", StringComparison.OrdinalIgnoreCase))
+                {
+                    return baseDir;
+                }
+                if (Directory.Exists(@"C:\FSC-Agent") && File.Exists(@"C:\FSC-Agent\machine_name.txt"))
+                    return @"C:\FSC-Agent";
+                if (Directory.Exists(@"C:\Nexus-Agent") && File.Exists(@"C:\Nexus-Agent\machine_name.txt"))
+                    return @"C:\Nexus-Agent";
+                if (Directory.Exists(@"C:\FSC-Agent"))
+                    return @"C:\FSC-Agent";
+                string defDir = @"C:\Nexus-Agent";
+                if (!Directory.Exists(defDir)) Directory.CreateDirectory(defDir);
+                return defDir;
+            }
+            catch
+            {
+                return @"C:\Nexus-Agent";
+            }
+        }
+
+        public static void ExtrairRecursosHtmlPadrao()
+        {
+            try
+            {
+                string dataDir = ObterDiretorioDadosAgente();
+                string[] htmlFiles = new string[] { "viewer.html", "chamado.html" };
+                string[] resNames = Assembly.GetExecutingAssembly().GetManifestResourceNames();
+                foreach (string hf in htmlFiles)
+                {
+                    try
+                    {
+                        Stream rs = null;
+                        foreach (string rn in resNames)
+                        {
+                            if (rn.EndsWith(hf, StringComparison.OrdinalIgnoreCase))
+                            {
+                                rs = Assembly.GetExecutingAssembly().GetManifestResourceStream(rn);
+                                if (rs != null) break;
+                            }
+                        }
+                        if (rs == null) rs = Assembly.GetExecutingAssembly().GetManifestResourceStream(hf);
+                        if (rs != null)
+                        {
+                            string outPath = Path.Combine(dataDir, hf);
+                            using (rs)
+                            using (FileStream fs = new FileStream(outPath, FileMode.Create, FileAccess.Write))
+                            {
+                                rs.CopyTo(fs);
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+        }
+
+        public static byte[] ObterBytesViewerHtml()
+        {
+            try
+            {
+                string[] cands = new string[] {
+                    Path.Combine(ObterDiretorioDadosAgente(), "viewer.html"),
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "viewer.html"),
+                    @"C:\FSC-Agent\viewer.html",
+                    @"C:\Nexus-Agent\viewer.html",
+                    @"c:\Users\gabrielnovaes\Documents\copia magma\viewer.html",
+                    @"c:\Users\gabrielnovaes\Documents\fsc-console\viewer.html"
+                };
+                foreach (string c in cands)
+                {
+                    if (File.Exists(c) && new FileInfo(c).Length > 1000)
+                    {
+                        return File.ReadAllBytes(c);
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                string[] resNames = Assembly.GetExecutingAssembly().GetManifestResourceNames();
+                Stream rs = null;
+                foreach (string rn in resNames)
+                {
+                    if (rn.EndsWith("viewer.html", StringComparison.OrdinalIgnoreCase))
+                    {
+                        rs = Assembly.GetExecutingAssembly().GetManifestResourceStream(rn);
+                        if (rs != null) break;
+                    }
+                }
+                if (rs == null) rs = Assembly.GetExecutingAssembly().GetManifestResourceStream("viewer.html");
+                if (rs != null)
+                {
+                    using (rs)
+                    using (MemoryStream ms = new MemoryStream())
+                    {
+                        rs.CopyTo(ms);
+                        byte[] b = ms.ToArray();
+                        try { File.WriteAllBytes(Path.Combine(ObterDiretorioDadosAgente(), "viewer.html"), b); } catch { }
+                        return b;
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+                using (WebClient wc = new WebClient())
+                {
+                    wc.Headers["User-Agent"] = "NexusRemoteAgent/" + AGENT_VERSION;
+                    byte[] b = wc.DownloadData("https://nexus-ten-brown.vercel.app/viewer.html");
+                    if (b != null && b.Length > 1000)
+                    {
+                        try { File.WriteAllBytes(Path.Combine(ObterDiretorioDadosAgente(), "viewer.html"), b); } catch { }
+                        return b;
+                    }
+                }
+            }
+            catch { }
+
+            return Encoding.UTF8.GetBytes("<!DOCTYPE html><html><head><meta charset='UTF-8'><script>window.location.replace('https://nexus-ten-brown.vercel.app/viewer.html' + window.location.search);</script></head><body>Carregando Viewer NexusTI...</body></html>");
+        }
+
+        public static void LimparArquivosSoltosIndesejados()
+        {
+            try
+            {
+                string[] strayNames = new string[] {
+                    "empresa.txt", "machine_name.txt", "machine_tag.txt", "machine_empresa.txt",
+                    "is_server.txt", "agent_token.txt", "server_ip.txt", "machine_location.txt",
+                    "avisos_vistos.txt", "empresas.json", "setores.json", "chamados.json",
+                    "assets_registry.json", "avisos_historico.json", "avisos_confirmados.json",
+                    "enquetes_respostas.json", "startup_error.log", "port_error.log",
+                    "capture_error.log", "aviso_err.log", "aviso_error.log"
+                };
+
+                List<string> dirsToCheck = new List<string>();
+                try { dirsToCheck.Add(AppDomain.CurrentDomain.BaseDirectory); } catch { }
+                try { dirsToCheck.Add(Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".."))); } catch { }
+                dirsToCheck.Add(@"C:\");
+                try { dirsToCheck.Add(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)); } catch { }
+                try { dirsToCheck.Add(Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory)); } catch { }
+
+                if (Directory.Exists(@"C:\Users"))
+                {
+                    foreach (string uDir in Directory.GetDirectories(@"C:\Users"))
+                    {
+                        dirsToCheck.Add(uDir);
+                        foreach (string sub in new string[] { "Desktop", "Área de Trabalho", "Downloads" })
+                        {
+                            string p = Path.Combine(uDir, sub);
+                            if (Directory.Exists(p))
+                            {
+                                dirsToCheck.Add(p);
+                                try { foreach (string child in Directory.GetDirectories(p)) dirsToCheck.Add(child); } catch { }
+                            }
+                        }
+                        try
+                        {
+                            foreach (string od in Directory.GetDirectories(uDir, "OneDrive*"))
+                            {
+                                foreach (string sub in new string[] { "Desktop", "Área de Trabalho", "Downloads" })
+                                {
+                                    string p = Path.Combine(od, sub);
+                                    if (Directory.Exists(p))
+                                    {
+                                        dirsToCheck.Add(p);
+                                        try { foreach (string child in Directory.GetDirectories(p)) dirsToCheck.Add(child); } catch { }
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                foreach (string d in dirsToCheck)
+                {
+                    if (string.IsNullOrEmpty(d) || !Directory.Exists(d)) continue;
+                    string normD = d.TrimEnd('\\', '/').ToLower();
+                    if (normD == @"c:\fsc-agent" || normD == @"c:\nexus-agent") continue;
+                    if (normD.Contains("copia magma") || normD.Contains("fsc-console") || normD.Contains("gestão de ti") || normD.Contains("gestao de ti")) continue;
+
+                    foreach (string fName in strayNames)
+                    {
+                        try
+                        {
+                            string fp = Path.Combine(d, fName);
+                            if (File.Exists(fp)) File.Delete(fp);
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public static void GarantirAtalhosAreaDeTrabalho()
+        {
+            try
+            {
+                string targetExe = Application.ExecutablePath;
+                if (File.Exists(@"C:\FSC-Agent\FSCRemoteAgent.exe")) targetExe = @"C:\FSC-Agent\FSCRemoteAgent.exe";
+                else if (File.Exists(@"C:\Nexus-Agent\NexusRemoteAgent.exe")) targetExe = @"C:\Nexus-Agent\NexusRemoteAgent.exe";
+
+                string portalUrl = ObterUrlPortalChamadoHospedado();
+                List<string> desktops = new List<string>();
+                try
+                {
+                    string pubDesk = Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory);
+                    if (!string.IsNullOrEmpty(pubDesk) && Directory.Exists(pubDesk)) desktops.Add(pubDesk);
+                }
+                catch { }
+                try
+                {
+                    string curDesk = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                    if (!string.IsNullOrEmpty(curDesk) && Directory.Exists(curDesk) && !desktops.Contains(curDesk)) desktops.Add(curDesk);
+                }
+                catch { }
+                try
+                {
+                    if (Directory.Exists(@"C:\Users"))
+                    {
+                        foreach (string uDir in Directory.GetDirectories(@"C:\Users"))
+                        {
+                            string uName = Path.GetFileName(uDir).ToLower();
+                            if (uName == "default" || uName == "default user" || uName == "all users") continue;
+                            foreach (string sub in new string[] { "Desktop", "Área de Trabalho" })
+                            {
+                                string p = Path.Combine(uDir, sub);
+                                if (Directory.Exists(p) && !desktops.Contains(p)) desktops.Add(p);
+                            }
+                            try
+                            {
+                                foreach (string od in Directory.GetDirectories(uDir, "OneDrive*"))
+                                {
+                                    foreach (string sub in new string[] { "Desktop", "Área de Trabalho" })
+                                    {
+                                        string p = Path.Combine(od, sub);
+                                        if (Directory.Exists(p) && !desktops.Contains(p)) desktops.Add(p);
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                }
+                catch { }
+
+                foreach (string d in desktops)
+                {
+                    try
+                    {
+                        string oldUrl = Path.Combine(d, "Abrir Chamado T.I (Web).url");
+                        if (File.Exists(oldUrl)) File.Delete(oldUrl);
+                    }
+                    catch { }
+                }
+
+                bool criadoPublico = false;
+                try
+                {
+                    string pubDesk = Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory);
+                    if (!string.IsNullOrEmpty(pubDesk) && Directory.Exists(pubDesk))
+                    {
+                        string pubLnk = Path.Combine(pubDesk, "Abrir Chamado T.I.lnk");
+                        CriarAtalhoWScript(pubLnk, targetExe, "-chamado", targetExe + ",0", "Abrir Chamado com Suporte de T.I");
+                        if (File.Exists(pubLnk))
+                        {
+                            criadoPublico = true;
+                            foreach (string d in desktops)
+                            {
+                                if (d.Equals(pubDesk, StringComparison.OrdinalIgnoreCase)) continue;
+                                try
+                                {
+                                    string dupLnk = Path.Combine(d, "Abrir Chamado T.I.lnk");
+                                    if (File.Exists(dupLnk)) File.Delete(dupLnk);
+                                }
+                                catch { }
+                            }
+                        }
+                    }
+                }
+                catch { }
+
+                if (!criadoPublico)
+                {
+                    foreach (string d in desktops)
+                    {
+                        try
+                        {
+                            string lnk = Path.Combine(d, "Abrir Chamado T.I.lnk");
+                            CriarAtalhoWScript(lnk, targetExe, "-chamado", targetExe + ",0", "Abrir Chamado com Suporte de T.I");
+                            if (!File.Exists(lnk) && !string.IsNullOrEmpty(portalUrl))
+                            {
+                                string urlFallback = Path.Combine(d, "Abrir Chamado T.I.url");
+                                File.WriteAllText(urlFallback, "[InternetShortcut]\r\nURL=" + portalUrl + "\r\nIconIndex=0\r\nIconFile=" + targetExe + "\r\n");
+                            }
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private static void CriarAtalhoWScript(string shortcutPath, string targetPath, string arguments, string iconLocation, string description)
+        {
+            try
+            {
+                Type shellType = Type.GetTypeFromProgID("WScript.Shell");
+                if (shellType != null)
+                {
+                    object shell = Activator.CreateInstance(shellType);
+                    object shortcut = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { shortcutPath });
+                    if (shortcut != null)
+                    {
+                        Type st = shortcut.GetType();
+                        st.InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { targetPath });
+                        if (!string.IsNullOrEmpty(arguments))
+                            st.InvokeMember("Arguments", BindingFlags.SetProperty, null, shortcut, new object[] { arguments });
+                        if (!string.IsNullOrEmpty(iconLocation))
+                            st.InvokeMember("IconLocation", BindingFlags.SetProperty, null, shortcut, new object[] { iconLocation });
+                        if (!string.IsNullOrEmpty(description))
+                            st.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] { description });
+                        st.InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
+                    }
+                }
+            }
+            catch { }
         }
 
         // ---------------------------------------------------------------------
@@ -504,8 +845,8 @@ namespace NexusRemoteAgent
         static long clipboardVersion = 1;
 
         // Versão oficial do Agente NexusTI & Build para Atualizações Silenciosas OTA
-        public const string AGENT_VERSION = "1.1.0";
-        public const int AGENT_BUILD = 110;
+        public const string AGENT_VERSION = "1.2.0";
+        public const int AGENT_BUILD = 120;
         public static bool isAtualizando = false;
 
         [STAThread]
@@ -513,7 +854,7 @@ namespace NexusRemoteAgent
         {
             // Proteção contra encerramento inesperado com log de diagnóstico
             AppDomain.CurrentDomain.UnhandledException += (s, e) => {
-                try { File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "startup_error.log"), e.ExceptionObject != null ? e.ExceptionObject.ToString() : "Unknown exception"); } catch {}
+                try { File.WriteAllText(Path.Combine(ObterDiretorioDadosAgente(), "startup_error.log"), e.ExceptionObject != null ? e.ExceptionObject.ToString() : "Unknown exception"); } catch {}
             };
             try { Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException); } catch { }
 
@@ -556,9 +897,13 @@ namespace NexusRemoteAgent
 
             try
             {
+                // Extrai viewer.html e chamado.html embutidos, limpa arquivos soltos e garante atalho na Área de Trabalho
+                ExtrairRecursosHtmlPadrao();
+                LimparArquivosSoltosIndesejados();
 
                 // Carrega Nome Customizado da Máquina (definido na instalação)
                 CarregarNomeCustomizado();
+                GarantirAtalhosAreaDeTrabalho();
 
                 // Detecta IP de rede real
                 try
@@ -603,7 +948,7 @@ namespace NexusRemoteAgent
                 catch { }
 
                 // Token persistente único por máquina
-                string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "agent_token.txt");
+                string configPath = Path.Combine(ObterDiretorioDadosAgente(), "agent_token.txt");
                 if (File.Exists(configPath))
                 {
                     sessionToken = File.ReadAllText(configPath, Encoding.UTF8).Trim();
@@ -706,7 +1051,7 @@ namespace NexusRemoteAgent
         {
             try
             {
-                string p = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "avisos_vistos.txt");
+                string p = Path.Combine(ObterDiretorioDadosAgente(), "avisos_vistos.txt");
                 if (File.Exists(p))
                 {
                     foreach (string line in File.ReadAllLines(p, Encoding.UTF8))
@@ -725,7 +1070,7 @@ namespace NexusRemoteAgent
             avisosExibidosIds.Add(id);
             try
             {
-                string p = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "avisos_vistos.txt");
+                string p = Path.Combine(ObterDiretorioDadosAgente(), "avisos_vistos.txt");
                 File.AppendAllText(p, id + Environment.NewLine, Encoding.UTF8);
             }
             catch { }
@@ -965,7 +1310,7 @@ namespace NexusRemoteAgent
                 CadastrarAtivoCentral(customMachineName, customMachineTag, localIpAddress, Environment.UserName, osName, devType, customEmpresa, isServerMachine);
 
                 string srvIp = "192.168.18.122:8090";
-                string srvFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "server_ip.txt");
+                string srvFile = Path.Combine(ObterDiretorioDadosAgente(), "server_ip.txt");
                 if (File.Exists(srvFile))
                 {
                     string s = File.ReadAllText(srvFile, Encoding.UTF8).Trim();
@@ -1000,7 +1345,7 @@ namespace NexusRemoteAgent
         {
             try
             {
-                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                string baseDir = ObterDiretorioDadosAgente();
                 string localAppDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"FastSolutions\FSC-Agent");
 
                 string nameFile = Path.Combine(baseDir, "machine_name.txt");
@@ -1221,7 +1566,7 @@ namespace NexusRemoteAgent
                     Thread.Sleep(1000);
                     if (tentativas >= 10)
                     {
-                        try { File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "port_error.log"), ex.ToString()); } catch { }
+                        try { File.WriteAllText(Path.Combine(ObterDiretorioDadosAgente(), "port_error.log"), ex.ToString()); } catch { }
                         return;
                     }
                 }
@@ -1761,8 +2106,7 @@ namespace NexusRemoteAgent
                         if (string.IsNullOrEmpty(sHost) || String.Equals(sHost, customMachineName, StringComparison.OrdinalIgnoreCase) || sIp == localIpAddress || sIp == "127.0.0.1")
                         {
                             isServerMachine = sIsServer;
-                            try { File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "is_server.txt"), sIsServer ? "true" : "false", Encoding.UTF8); } catch { }
-                            try { File.WriteAllText(Path.Combine(@"C:\FSC-Agent", "is_server.txt"), sIsServer ? "true" : "false", Encoding.UTF8); } catch { }
+                            try { File.WriteAllText(Path.Combine(ObterDiretorioDadosAgente(), "is_server.txt"), sIsServer ? "true" : "false", Encoding.UTF8); } catch { }
                             if (string.IsNullOrEmpty(sHost)) sHost = customMachineName;
                             if (string.IsNullOrEmpty(sIp)) sIp = localIpAddress;
                         }
@@ -1776,8 +2120,7 @@ namespace NexusRemoteAgent
                     else if (path.StartsWith("/res/spotlight.jpg") || path.StartsWith("/spotlight.jpg"))
                     {
                         string[] spotPaths = new string[] {
-                            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"res\spotlight.jpg"),
-                            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\res\spotlight.jpg"),
+                            Path.Combine(ObterDiretorioDadosAgente(), @"res\spotlight.jpg"),
                             @"c:\Users\gabrielnovaes\Documents\copia magma\res\spotlight.jpg",
                             @"c:\Users\gabrielnovaes\Documents\fsc-console\res\spotlight.jpg"
                         };
@@ -1791,12 +2134,38 @@ namespace NexusRemoteAgent
                             continue;
                         }
                     }
+                    else if (path == "/agent/nexusremoteagent.exe" || path == "/nexusremoteagent.exe" || path == "/fscremoteagent.exe")
+                    {
+                        string[] exePaths = new string[] {
+                            @"c:\Users\gabrielnovaes\Documents\copia magma\agent\NexusRemoteAgent.exe",
+                            @"c:\Users\gabrielnovaes\Documents\copia magma\NexusRemoteAgent.exe",
+                            Application.ExecutablePath
+                        };
+                        string foundExe = null;
+                        foreach (var p in exePaths) { if (File.Exists(p)) { foundExe = p; break; } }
+                        if (foundExe != null)
+                        {
+                            byte[] fileBytes = File.ReadAllBytes(foundExe);
+                            StringBuilder sbDl = new StringBuilder();
+                            sbDl.AppendFormat("HTTP/1.1 200 OK\r\n");
+                            sbDl.Append("Access-Control-Allow-Origin: *\r\n");
+                            sbDl.Append("Content-Type: application/octet-stream\r\n");
+                            sbDl.Append("Content-Disposition: attachment; filename=\"NexusRemoteAgent.exe\"\r\n");
+                            sbDl.AppendFormat("Content-Length: {0}\r\n", fileBytes.Length);
+                            sbDl.Append("Connection: close\r\n\r\n");
+                            byte[] hBytes = Encoding.UTF8.GetBytes(sbDl.ToString());
+                            stream.Write(hBytes, 0, hBytes.Length);
+                            stream.Write(fileBytes, 0, fileBytes.Length);
+                            stream.Flush();
+                            if (!keepAlive) break;
+                            continue;
+                        }
+                    }
                     else if (path.StartsWith("/download") || path.StartsWith("/instalador-nexus-agent.exe") || path.StartsWith("/instalador") || path.StartsWith("/nexus-agent-instalador.zip"))
                     {
                         string targetName = path.Contains("zip") ? "FSC-Agent-Instalador.zip" : "Instalador-FSC-Agent.exe";
                         string[] dlPaths = new string[] {
-                            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, targetName),
-                            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\" + targetName),
+                            Path.Combine(ObterDiretorioDadosAgente(), targetName),
                             @"c:\Users\gabrielnovaes\Documents\copia magma\" + targetName,
                             @"c:\Users\gabrielnovaes\Documents\fsc-console\" + targetName
                         };
@@ -1930,7 +2299,7 @@ namespace NexusRemoteAgent
                         if (!string.IsNullOrEmpty(novoNome))
                         {
                             customMachineName = novoNome;
-                            try { File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "machine_name.txt"), customMachineName, Encoding.UTF8); } catch { }
+                            try { File.WriteAllText(Path.Combine(ObterDiretorioDadosAgente(), "machine_name.txt"), customMachineName, Encoding.UTF8); } catch { }
                             if (trayIcon != null) trayIcon.Text = "NexusTI Agent — " + customMachineName + " (" + localIpAddress + ":" + port + ")";
                         }
                         EnviarRespostaCors(stream, 200, "OK", "application/json", Encoding.UTF8.GetBytes("{\"ok\":true,\"name\":\"" + customMachineName + "\"}"), keepAlive);
@@ -1954,9 +2323,7 @@ namespace NexusRemoteAgent
                     // 3.1 VISUALIZADOR WEB INTEGRADO DO AGENTE (ZERO MIXED CONTENT)
                     else if (path == "/viewer.html" || path == "/viewer" || path == "/remote")
                     {
-                        string vPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "viewer.html");
-                        if (!File.Exists(vPath)) vPath = @"c:\Users\gabrielnovaes\Documents\copia magma\viewer.html";
-                        byte[] htmlBytes = File.Exists(vPath) ? File.ReadAllBytes(vPath) : Encoding.UTF8.GetBytes("<!DOCTYPE html><html><body><h1>Viewer NexusTI</h1></body></html>");
+                        byte[] htmlBytes = ObterBytesViewerHtml();
                         EnviarRespostaCors(stream, 200, "OK", "text/html; charset=utf-8", htmlBytes, keepAlive);
                         if (!keepAlive) break;
                         continue;
@@ -2559,7 +2926,7 @@ namespace NexusRemoteAgent
             }
             catch (Exception ex)
             {
-                try { File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "capture_error.log"), ex.ToString()); } catch { }
+                try { File.WriteAllText(Path.Combine(ObterDiretorioDadosAgente(), "capture_error.log"), ex.ToString()); } catch { }
                 try
                 {
                     using (Bitmap placeholder = new Bitmap(1280, 720))
@@ -2848,10 +3215,8 @@ namespace NexusRemoteAgent
                 var js = new System.Web.Script.Serialization.JavaScriptSerializer();
 
                 string[] dirs = new string[] {
-                    AppDomain.CurrentDomain.BaseDirectory,
-                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".."),
+                    ObterDiretorioDadosAgente(),
                     Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"FastSolutions\FSC-Agent"),
-                    @"C:\FSC-Agent",
                     @"c:\Users\gabrielnovaes\Documents\copia magma",
                     @"c:\Users\gabrielnovaes\Documents\fsc-console"
                 };
@@ -2904,7 +3269,7 @@ namespace NexusRemoteAgent
                     try
                     {
                         string srvIp = "192.168.18.122";
-                        string srvFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "server_ip.txt");
+                        string srvFile = Path.Combine(ObterDiretorioDadosAgente(), "server_ip.txt");
                         if (File.Exists(srvFile))
                         {
                             try { srvIp = File.ReadAllText(srvFile, Encoding.UTF8).Trim(); } catch { }
@@ -2942,10 +3307,8 @@ namespace NexusRemoteAgent
             {
                 var js = new System.Web.Script.Serialization.JavaScriptSerializer();
                 string[] dirs = new string[] {
-                    AppDomain.CurrentDomain.BaseDirectory,
-                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".."),
+                    ObterDiretorioDadosAgente(),
                     Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"FastSolutions\FSC-Agent"),
-                    @"C:\FSC-Agent",
                     @"c:\Users\gabrielnovaes\Documents\copia magma",
                     @"c:\Users\gabrielnovaes\Documents\fsc-console"
                 };
@@ -3033,9 +3396,7 @@ namespace NexusRemoteAgent
         {
             if (string.IsNullOrEmpty(id)) return;
             string[] paths = new string[] {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "chamados.json"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\chamados.json"),
-                @"C:\FSC-Agent\chamados.json",
+                Path.Combine(ObterDiretorioDadosAgente(), "chamados.json"),
                 @"c:\Users\gabrielnovaes\Documents\copia magma\chamados.json",
                 @"c:\Users\gabrielnovaes\Documents\fsc-console\chamados.json"
             };
@@ -3106,9 +3467,7 @@ namespace NexusRemoteAgent
             }
 
             string[] paths = new string[] {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "chamados.json"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\chamados.json"),
-                @"C:\FSC-Agent\chamados.json",
+                Path.Combine(ObterDiretorioDadosAgente(), "chamados.json"),
                 @"c:\Users\gabrielnovaes\Documents\copia magma\chamados.json",
                 @"c:\Users\gabrielnovaes\Documents\fsc-console\chamados.json"
             };
@@ -3181,9 +3540,7 @@ namespace NexusRemoteAgent
         {
             if (string.IsNullOrEmpty(id)) return;
             string[] paths = new string[] {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "chamados.json"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\chamados.json"),
-                @"C:\FSC-Agent\chamados.json",
+                Path.Combine(ObterDiretorioDadosAgente(), "chamados.json"),
                 @"c:\Users\gabrielnovaes\Documents\copia magma\chamados.json",
                 @"c:\Users\gabrielnovaes\Documents\fsc-console\chamados.json"
             };
@@ -3228,9 +3585,7 @@ namespace NexusRemoteAgent
         public static void DefinirStatusServidorAtivoCentral(string host, string ip, bool isSrv, string empresa = "")
         {
             string[] paths = new string[] {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets_registry.json"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\assets_registry.json"),
-                @"C:\FSC-Agent\assets_registry.json",
+                Path.Combine(ObterDiretorioDadosAgente(), "assets_registry.json"),
                 @"c:\Users\gabrielnovaes\Documents\copia magma\assets_registry.json",
                 @"c:\Users\gabrielnovaes\Documents\fsc-console\assets_registry.json"
             };
@@ -3296,9 +3651,7 @@ namespace NexusRemoteAgent
                 string tipoFinal = flagSrv ? "Servidor" : (string.IsNullOrEmpty(devType) ? "Desktop" : devType);
 
                 string[] paths = new string[] {
-                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets_registry.json"),
-                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\assets_registry.json"),
-                    @"C:\FSC-Agent\assets_registry.json",
+                    Path.Combine(ObterDiretorioDadosAgente(), "assets_registry.json"),
                     @"c:\Users\gabrielnovaes\Documents\copia magma\assets_registry.json",
                     @"c:\Users\gabrielnovaes\Documents\fsc-console\assets_registry.json"
                 };
@@ -3393,9 +3746,7 @@ namespace NexusRemoteAgent
                 try
                 {
                     string[] paths = new string[] {
-                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets_registry.json"),
-                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\assets_registry.json"),
-                        @"C:\FSC-Agent\assets_registry.json",
+                        Path.Combine(ObterDiretorioDadosAgente(), "assets_registry.json"),
                         @"c:\Users\gabrielnovaes\Documents\copia magma\assets_registry.json",
                         @"c:\Users\gabrielnovaes\Documents\fsc-console\assets_registry.json"
                     };
@@ -3416,10 +3767,7 @@ namespace NexusRemoteAgent
         public static string ObterEmpresasJson()
         {
             string[] paths = new string[] {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "empresas.json"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\empresas.json"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "res\\empresas.json"),
-                @"C:\Nexus-Agent\empresas.json",
+                Path.Combine(ObterDiretorioDadosAgente(), "empresas.json"),
                 @"c:\Users\gabrielnovaes\Documents\copia magma\empresas.json",
                 @"c:\Users\gabrielnovaes\Documents\gestão de TI\empresas.json",
                 @"c:\Users\gabrielnovaes\Documents\fsc-console\empresas.json"
@@ -3439,9 +3787,7 @@ namespace NexusRemoteAgent
         {
             if (string.IsNullOrEmpty(json)) return;
             string[] targets = new string[] {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "empresas.json"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\empresas.json"),
-                @"C:\Nexus-Agent\empresas.json",
+                Path.Combine(ObterDiretorioDadosAgente(), "empresas.json"),
                 @"c:\Users\gabrielnovaes\Documents\copia magma\empresas.json",
                 @"c:\Users\gabrielnovaes\Documents\copia magma\agent\empresas.json",
                 @"c:\Users\gabrielnovaes\Documents\gestão de TI\empresas.json",
@@ -3471,9 +3817,7 @@ namespace NexusRemoteAgent
                     if (!string.IsNullOrEmpty(empPrincipal) && empPrincipal.ToLower() != "empresas" && empPrincipal.ToLower() != "empresaprincipal")
                     {
                         string[] txtTargets = new string[] {
-                            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "empresa.txt"),
-                            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\empresa.txt"),
-                            @"C:\Nexus-Agent\empresa.txt",
+                            Path.Combine(ObterDiretorioDadosAgente(), "empresa.txt"),
                             @"c:\Users\gabrielnovaes\Documents\copia magma\agent\empresa.txt",
                             @"c:\Users\gabrielnovaes\Documents\copia magma\empresa.txt",
                             @"c:\Users\gabrielnovaes\Documents\gestão de TI\agent\empresa.txt",
@@ -3497,10 +3841,7 @@ namespace NexusRemoteAgent
         static string ObterSetoresJson()
         {
             string[] paths = new string[] {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "setores.json"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\setores.json"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "res\\setores.json"),
-                @"C:\Nexus-Agent\setores.json",
+                Path.Combine(ObterDiretorioDadosAgente(), "setores.json"),
                 @"c:\Users\gabrielnovaes\Documents\copia magma\setores.json",
                 @"c:\Users\gabrielnovaes\Documents\gestão de TI\setores.json",
                 @"c:\Users\gabrielnovaes\Documents\fsc-console\setores.json"
@@ -3520,9 +3861,7 @@ namespace NexusRemoteAgent
         {
             if (string.IsNullOrEmpty(json)) return;
             string[] targets = new string[] {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "setores.json"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\setores.json"),
-                @"C:\Nexus-Agent\setores.json",
+                Path.Combine(ObterDiretorioDadosAgente(), "setores.json"),
                 @"c:\Users\gabrielnovaes\Documents\copia magma\setores.json",
                 @"c:\Users\gabrielnovaes\Documents\copia magma\agent\setores.json",
                 @"c:\Users\gabrielnovaes\Documents\gestão de TI\setores.json",
@@ -3551,9 +3890,7 @@ namespace NexusRemoteAgent
                 try
                 {
                     string[] paths = new string[] {
-                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "chamados.json"),
-                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\chamados.json"),
-                        @"C:\FSC-Agent\chamados.json",
+                        Path.Combine(ObterDiretorioDadosAgente(), "chamados.json"),
                         @"c:\Users\gabrielnovaes\Documents\copia magma\chamados.json",
                         @"c:\Users\gabrielnovaes\Documents\fsc-console\chamados.json",
                         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"FastSolutions\FSC-Agent\chamados.json")
@@ -3704,9 +4041,8 @@ namespace NexusRemoteAgent
         {
             string[] dirs = new string[] {
                 @"c:\Users\gabrielnovaes\Documents\fsc-console",
-                AppDomain.CurrentDomain.BaseDirectory,
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"FastSolutions\FSC-Agent"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..")
+                ObterDiretorioDadosAgente(),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"FastSolutions\FSC-Agent")
             };
 
             foreach (string d in dirs)
@@ -3744,7 +4080,7 @@ namespace NexusRemoteAgent
         {
             string[] dirs = new string[] {
                 @"c:\Users\gabrielnovaes\Documents\fsc-console",
-                AppDomain.CurrentDomain.BaseDirectory,
+                ObterDiretorioDadosAgente(),
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"FastSolutions\FSC-Agent")
             };
             foreach (string d in dirs)
@@ -3767,7 +4103,7 @@ namespace NexusRemoteAgent
         {
             string[] dirs = new string[] {
                 @"c:\Users\gabrielnovaes\Documents\fsc-console",
-                AppDomain.CurrentDomain.BaseDirectory,
+                ObterDiretorioDadosAgente(),
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"FastSolutions\FSC-Agent")
             };
             foreach (string d in dirs)
@@ -4133,7 +4469,7 @@ namespace NexusRemoteAgent
                 }
                 catch (Exception ex)
                 {
-                    try { File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "aviso_err.log"), ex.ToString()); } catch { }
+                    try { File.WriteAllText(Path.Combine(Program.ObterDiretorioDadosAgente(), "aviso_err.log"), ex.ToString()); } catch { }
                 }
             });
             t.SetApartmentState(ApartmentState.STA);

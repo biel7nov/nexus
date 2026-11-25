@@ -66,24 +66,18 @@ copy /y "%~dp0NexusRemoteAgent.exe" "%TARGET_DIR%\NexusRemoteAgent.exe" >nul 2>&
 copy /y "%~dp0NexusRemoteAgent.exe" "%TARGET_DIR%\FSCRemoteAgent.exe" >nul 2>&1
 if exist "%~dp0Instalador-Nexus-Agent.exe" copy /y "%~dp0Instalador-Nexus-Agent.exe" "%TARGET_DIR%\Desinstalador-Nexus-Agent.exe" >nul 2>&1
 if exist "%~dp0chamado.html" copy /y "%~dp0chamado.html" "%TARGET_DIR%\chamado.html" >nul 2>&1
+if exist "%~dp0viewer.html" copy /y "%~dp0viewer.html" "%TARGET_DIR%\viewer.html" >nul 2>&1
 if exist "%~dp0res\logo_nexus.ico" copy /y "%~dp0res\logo_nexus.ico" "%TARGET_DIR%\res\logo_nexus.ico" >nul 2>&1
 if exist "%~dp0logo_nexus.ico" copy /y "%~dp0logo_nexus.ico" "%TARGET_DIR%\res\logo_nexus.ico" >nul 2>&1
 if exist "%~dp0res\spotlight.jpg" copy /y "%~dp0res\spotlight.jpg" "%TARGET_DIR%\res\spotlight.jpg" >nul 2>&1
 if exist "%~dp0agent_token.txt" copy /y "%~dp0agent_token.txt" "%TARGET_DIR%\agent_token.txt" >nul 2>&1
 
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "NexusRemoteAgent" /t REG_SZ /d "\"%TARGET_DIR%\NexusRemoteAgent.exe\"" /f >nul 2>&1
+reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Run" /v "NexusRemoteAgent" /t REG_SZ /d "\"%TARGET_DIR%\NexusRemoteAgent.exe\"" /f >nul 2>&1
 
 netsh advfirewall firewall delete rule name="NexusTI Remote Agent" >nul 2>&1
 netsh advfirewall firewall delete rule name="FSC Remote Agent" >nul 2>&1
 netsh advfirewall firewall add rule name="NexusTI Remote Agent" dir=in action=allow protocol=TCP localport=8090 profile=any >nul 2>&1
-
-set "DESKTOP_DIR=%USERPROFILE%\Desktop"
-if exist "%PUBLIC%\Desktop" (
-    echo [InternetShortcut]> "%DESKTOP_DIR%\Abrir Chamado T.I (Web).url"
-    echo URL=https://nexus-ten-brown.vercel.app/chamado.html>> "%DESKTOP_DIR%\Abrir Chamado T.I (Web).url"
-    echo IconFile=%TARGET_DIR%\NexusRemoteAgent.exe>> "%DESKTOP_DIR%\Abrir Chamado T.I (Web).url"
-    echo IconIndex=0>> "%DESKTOP_DIR%\Abrir Chamado T.I (Web).url"
-)
 
 start "" "%TARGET_DIR%\NexusRemoteAgent.exe"
 
