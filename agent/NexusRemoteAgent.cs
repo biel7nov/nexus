@@ -845,8 +845,8 @@ namespace NexusRemoteAgent
         static long clipboardVersion = 1;
 
         // Versão oficial do Agente NexusTI & Build para Atualizações Silenciosas OTA
-        public const string AGENT_VERSION = "1.2.0";
-        public const int AGENT_BUILD = 120;
+        public const string AGENT_VERSION = "1.2.5";
+        public const int AGENT_BUILD = 125;
         public static bool isAtualizando = false;
 
         [STAThread]
@@ -883,17 +883,52 @@ namespace NexusRemoteAgent
             {
                 Process currentProc = Process.GetCurrentProcess();
                 List<Process> existingProcs = new List<Process>();
-            existingProcs.AddRange(Process.GetProcessesByName("NexusRemoteAgent"));
-            existingProcs.AddRange(Process.GetProcessesByName("FSCRemoteAgent"));
+                existingProcs.AddRange(Process.GetProcessesByName("NexusRemoteAgent"));
+                existingProcs.AddRange(Process.GetProcessesByName("FSCRemoteAgent"));
                 foreach (var p in existingProcs)
                 {
                     if (p.Id != currentProc.Id)
                     {
-                        try { p.Kill(); } catch { }
+                        try { p.Kill(); p.WaitForExit(1500); } catch { }
                     }
                 }
             }
             catch { }
+
+            // Executa extração de HTML, limpeza de arquivos soltos e criação do atalho na Área de Trabalho Pública imediatamente (aproveitando token elevado se houver)
+            try
+            {
+                ExtrairRecursosHtmlPadrao();
+                LimparArquivosSoltosIndesejados();
+                CarregarNomeCustomizado();
+                GarantirAtalhosAreaDeTrabalho();
+            }
+            catch { }
+
+            // Se iniciado sem --daemon (ex: via cmd.exe de OTA), relança via ShellExecute (bInheritHandles=false)
+            // para liberar 100% quaisquer handles de socket herdados na porta 8090
+            bool isDaemon = false;
+            if (args != null)
+            {
+                foreach (string a in args)
+                {
+                    if (a != null && a.ToLower() == "--daemon") isDaemon = true;
+                }
+            }
+            if (!isDaemon)
+            {
+                try
+                {
+                    Thread.Sleep(500);
+                    ProcessStartInfo psiClean = new ProcessStartInfo(Application.ExecutablePath, "--daemon");
+                    psiClean.UseShellExecute = true;
+                    psiClean.WorkingDirectory = Path.GetDirectoryName(Application.ExecutablePath);
+                    Process.Start(psiClean);
+                    Environment.Exit(0);
+                    return;
+                }
+                catch { }
+            }
 
             try
             {
@@ -1277,16 +1312,19 @@ namespace NexusRemoteAgent
                     return;
                 }
 
+                // Fecha o socket TCP atual antes de disparar o processo de atualização para nunca herdar o handle da porta 8090
+                try { if (tcpServer != null) tcpServer.Stop(); } catch { }
+
                 // Substituição direta sem criar arquivo .old:
                 // O script em lote aguarda 1s para o término do processo atual, move o binário novo por cima do existente e reinicia.
                 string cmd = string.Format(
-                    "/c timeout /t 1 /nobreak >nul & move /y \"{0}\" \"{1}\" & start \"\" \"{1}\"",
+                    "/c timeout /t 1 /nobreak >nul & move /y \"{0}\" \"{1}\" & start \"\" \"{1}\" --daemon",
                     tempNewExe,
                     currentExe
                 );
                 ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", cmd);
-                psi.CreateNoWindow = true;
-                psi.UseShellExecute = false;
+                psi.WindowStyle = ProcessWindowStyle.Hidden;
+                psi.UseShellExecute = true;
                 psi.WorkingDirectory = baseDir;
                 Process.Start(psi);
 
@@ -1548,13 +1586,12 @@ namespace NexusRemoteAgent
         static void IniciaServidorTcp()
         {
             int tentativas = 0;
-            while (tentativas < 10)
+            while (tentativas < 15)
             {
                 try
                 {
                     tcpServer = new TcpListener(IPAddress.Any, port);
                     tcpServer.Server.NoDelay = true;
-                    tcpServer.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                     ThreadPool.SetMinThreads(100, 100);
                     ThreadPool.SetMaxThreads(1000, 1000);
                     tcpServer.Start();
@@ -1564,7 +1601,7 @@ namespace NexusRemoteAgent
                 {
                     tentativas++;
                     Thread.Sleep(1000);
-                    if (tentativas >= 10)
+                    if (tentativas >= 15)
                     {
                         try { File.WriteAllText(Path.Combine(ObterDiretorioDadosAgente(), "port_error.log"), ex.ToString()); } catch { }
                         return;
