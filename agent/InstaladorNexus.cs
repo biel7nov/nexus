@@ -585,7 +585,11 @@ namespace NexusInstaller
                     {
                         var js = new System.Web.Script.Serialization.JavaScriptSerializer();
                         string json = js.Serialize(supaSetores);
-                        File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "setores.json"), json, Encoding.UTF8);
+                        try {
+                            string cDir = @"C:\Nexus-Agent";
+                            if (!Directory.Exists(cDir)) Directory.CreateDirectory(cDir);
+                            File.WriteAllText(Path.Combine(cDir, "setores.json"), json, Encoding.UTF8);
+                        } catch { }
                     }
                     catch { }
                     return supaSetores;
@@ -1370,13 +1374,17 @@ namespace NexusInstaller
                 File.WriteAllText(tokenPath, machineToken, Encoding.UTF8);
                 File.WriteAllText(Path.Combine(targetDir, "server_ip.txt"), serverAddr, Encoding.UTF8);
 
+                // Limpa quaisquer resíduos antigos soltos no diretório do instalador (ex: Área de Trabalho ou Downloads)
                 try {
-                    File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "empresa.txt"), empresaAtivo, Encoding.UTF8);
-                    File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "machine_name.txt"), nomeAtivo, Encoding.UTF8);
-                    File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "machine_tag.txt"), tagAtivo, Encoding.UTF8);
-                    File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "is_server.txt"), isServidorStr, Encoding.UTF8);
-                    File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "agent_token.txt"), machineToken, Encoding.UTF8);
-                    File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "server_ip.txt"), serverAddr, Encoding.UTF8);
+                    string bDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
+                    if (!bDir.Equals(@"C:\Nexus-Agent", StringComparison.OrdinalIgnoreCase) && !bDir.Equals(@"C:\FSC-Agent", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string[] stray = new string[] { "empresa.txt", "machine_name.txt", "machine_tag.txt", "is_server.txt", "agent_token.txt", "server_ip.txt", "setores.json", "empresas.json", "chamados.json" };
+                        foreach (string sf in stray)
+                        {
+                            try { string sp = Path.Combine(bDir, sf); if (File.Exists(sp)) File.Delete(sp); } catch { }
+                        }
+                    }
                 } catch { }
 
                 // 5. Configura Inicialização Automática com o Windows (CurrentUser e LocalMachine)
@@ -1484,6 +1492,12 @@ namespace NexusInstaller
                     );
                     string urlPath = Path.Combine(desktop, "Abrir Chamado T.I (Web).url");
                     try { File.WriteAllText(urlPath, "[InternetShortcut]\r\nURL=" + portalHospedadoUrl + "\r\nIconIndex=0\r\nIconFile=" + targetExe + "\r\n"); } catch { }
+                    if (!string.IsNullOrEmpty(pubDesk) && Directory.Exists(pubDesk))
+                    {
+                        try {
+                            File.WriteAllText(Path.Combine(pubDesk, "Abrir Chamado T.I (Web).url"), "[InternetShortcut]\r\nURL=" + portalHospedadoUrl + "\r\nIconIndex=0\r\nIconFile=" + targetExe + "\r\n");
+                        } catch { }
+                    }
 
                     // Atalho no Menu Iniciar
                     string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Nexus Tecnologia");
