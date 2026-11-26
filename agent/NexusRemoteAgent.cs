@@ -3439,33 +3439,37 @@ namespace NexusRemoteAgent
             {
                 try
                 {
-                    try
+                    Rectangle bounds = ObterBoundsTela(screenIdx);
+                    if (bounds.Width <= 0 || bounds.Height <= 0) bounds = Screen.PrimaryScreen.Bounds;
+                    if (bounds.Width <= 0 || bounds.Height <= 0) bounds = new Rectangle(0, 0, 1920, 1080);
+
+                    using (Bitmap rawBmp = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format24bppRgb))
                     {
-                        IntPtr hDesk = OpenInputDesktop(0, false, 0x01FF);
-                        if (hDesk != IntPtr.Zero)
+                        using (Graphics g = Graphics.FromImage(rawBmp))
                         {
-                            SetThreadDesktop(hDesk);
-                        }
-                    }
-                    catch { }
+                            bool capturou = false;
 
-                Rectangle bounds = ObterBoundsTela(screenIdx);
-                if (bounds.Width <= 0 || bounds.Height <= 0) bounds = Screen.PrimaryScreen.Bounds;
-                if (bounds.Width <= 0 || bounds.Height <= 0) bounds = new Rectangle(0, 0, 1920, 1080);
-
-                using (Bitmap rawBmp = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format24bppRgb))
-                {
-                    using (Graphics g = Graphics.FromImage(rawBmp))
-                    {
-                        bool capturou = false;
-
-                        // Camada 1: CopyFromScreen padrão
-                        try
-                        {
-                            g.CopyFromScreen(bounds.X, bounds.Y, 0, 0, bounds.Size, CopyPixelOperation.SourceCopy);
-                            capturou = true;
-                        }
-                        catch { }
+                            // Camada 1: CopyFromScreen padrão (não mexe em handles de desktop - 100% seguro com RDP nativo)
+                            try
+                            {
+                                g.CopyFromScreen(bounds.X, bounds.Y, 0, 0, bounds.Size, CopyPixelOperation.SourceCopy);
+                                capturou = true;
+                            }
+                            catch
+                            {
+                                // Apenas tenta acoplar o desktop de entrada se CopyFromScreen falhou (ex: transição de lock screen)
+                                try
+                                {
+                                    IntPtr hDesk = OpenInputDesktop(0, false, 0x01FF);
+                                    if (hDesk != IntPtr.Zero)
+                                    {
+                                        SetThreadDesktop(hDesk);
+                                        g.CopyFromScreen(bounds.X, bounds.Y, 0, 0, bounds.Size, CopyPixelOperation.SourceCopy);
+                                        capturou = true;
+                                    }
+                                }
+                                catch { }
+                            }
 
                         // Camada 2: CreateDC("DISPLAY") se CopyFromScreen falhou
                         if (!capturou)
@@ -3771,21 +3775,23 @@ namespace NexusRemoteAgent
 
                 if (!string.IsNullOrEmpty(shortcut))
                 {
-                    if (shortcut == "CTRL_ALT_DEL" || shortcut == "DESBLOQUEAR" || shortcut == "UNLOCK" || shortcut == "TSCON")
+                    if (shortcut == "TSCON")
                     {
                         try
                         {
-                            // Tenta reconectar sessao desconectada de volta ao console grafico do servidor
+                            // Apenas reconecta console se requisitado explicitamente e sem interferir em sessões RDP
                             ProcessStartInfo psiTscon = new ProcessStartInfo("cmd.exe", "/c for /f \"tokens=3\" %i in ('qwinsta ^| findstr /i \"administrador\"') do tscon %i /dest:console");
                             psiTscon.CreateNoWindow = true;
                             psiTscon.UseShellExecute = false;
                             Process.Start(psiTscon);
                         }
                         catch { }
-
+                    }
+                    else if (shortcut == "CTRL_ALT_DEL" || shortcut == "DESBLOQUEAR" || shortcut == "UNLOCK")
+                    {
                         try
                         {
-                            // Pressiona espaco e enter para dispensar a tela de protecao/bloqueio do Windows
+                            // Pressiona espaco e enter para dispensar a tela de protecao/bloqueio do Windows de forma segura
                             keybd_event(0x20, 0, 0, 0); // VK_SPACE
                             Thread.Sleep(30);
                             keybd_event(0x20, 0, KEYEVENTF_KEYUP, 0);
@@ -3793,12 +3799,6 @@ namespace NexusRemoteAgent
                             keybd_event(0x0D, 0, 0, 0); // VK_RETURN
                             Thread.Sleep(30);
                             keybd_event(0x0D, 0, KEYEVENTF_KEYUP, 0);
-                        }
-                        catch { }
-
-                        try
-                        {
-                            System.Diagnostics.Process.Start("taskmgr.exe");
                         }
                         catch { }
                     }
