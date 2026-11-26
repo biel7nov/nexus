@@ -1045,7 +1045,7 @@ namespace NexusRemoteAgent
         static extern bool SetCursorPos(int X, int Y);
 
         [DllImport("user32.dll")]
-        static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, int dwExtraInfo);
+        static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, int dwExtraInfo);
 
         [DllImport("user32.dll")]
         static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
@@ -1071,6 +1071,42 @@ namespace NexusRemoteAgent
         const uint MOUSEEVENTF_MIDDLEDOWN = 0x0020;
         const uint MOUSEEVENTF_MIDDLEUP = 0x0040;
         const uint MOUSEEVENTF_WHEEL = 0x0800;
+        const uint MOUSEEVENTF_ABSOLUTE = 0x8000;
+
+        // Controle de Estado de Energia e Ativação de Display
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        static extern uint SetThreadExecutionState(uint esFlags);
+
+        const uint ES_SYSTEM_REQUIRED = 0x00000001;
+        const uint ES_DISPLAY_REQUIRED = 0x00000002;
+        const uint ES_CONTINUOUS = 0x80000000;
+        const uint ES_AWAYMODE_REQUIRED = 0x00000040;
+
+        [DllImport("user32.dll")]
+        static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        const uint WM_SYSCOMMAND = 0x0112;
+        const int SC_MONITORPOWER = 0xF170;
+        static readonly IntPtr HWND_BROADCAST = new IntPtr(0xffff);
+
+        private static DateTime _ultimoAcordoDisplay = DateTime.MinValue;
+
+        public static void AcordarMonitorEDisplay()
+        {
+            try
+            {
+                SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED);
+
+                if ((DateTime.Now - _ultimoAcordoDisplay).TotalSeconds > 8)
+                {
+                    _ultimoAcordoDisplay = DateTime.Now;
+                    SendMessage(HWND_BROADCAST, WM_SYSCOMMAND, (IntPtr)SC_MONITORPOWER, (IntPtr)(-1));
+                    mouse_event(MOUSEEVENTF_MOVE, 1, 1, 0, 0);
+                    mouse_event(MOUSEEVENTF_MOVE, -1, -1, 0, 0);
+                }
+            }
+            catch { }
+        }
 
         // Constantes do Teclado Win32
         const byte VK_SHIFT = 0x10;
@@ -1143,7 +1179,7 @@ namespace NexusRemoteAgent
         static long clipboardVersion = 1;
 
         // Versão oficial do Agente NexusTI & Build para Atualizações Silenciosas OTA
-        public const string AGENT_VERSION = "1.3.3";
+        public const string AGENT_VERSION = "1.3.4";
         public const int AGENT_BUILD = 133;
         public static bool isAtualizando = false;
         private static Mutex _singleInstanceMutex = null;
@@ -1214,25 +1250,35 @@ namespace NexusRemoteAgent
             // 1. Habilita DPI Awareness
             try { SetProcessDPIAware(); } catch { }
 
-            // Executa extração de HTML, limpeza de arquivos soltos e criação do atalho na Área de Trabalho Pública imediatamente (aproveitando token elevado se houver)
+            // 2. Prepara codificador JPEG e inicia o servidor HTTP/TCP IMEDIATAMENTE (latência zero)
             try
             {
-                ExtrairRecursosHtmlPadrao();
-                LimparArquivosSoltosIndesejados();
-                CarregarNomeCustomizado();
-                GarantirAtalhosAreaDeTrabalho();
+                jpgEncoder = GetEncoder(ImageFormat.Jpeg);
+                encoderParams = new EncoderParameters(1);
+                encoderParams.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 45L);
+
+                string configPath = Path.Combine(ObterDiretorioDadosAgente(), "agent_token.txt");
+                if (File.Exists(configPath))
+                {
+                    sessionToken = File.ReadAllText(configPath, Encoding.UTF8).Trim();
+                }
+                if (string.IsNullOrEmpty(sessionToken) || sessionToken == "FSC@3606")
+                {
+                    sessionToken = "FSC@" + Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper();
+                    try { File.WriteAllText(configPath, sessionToken, Encoding.UTF8); } catch { }
+                }
+
+                Thread srvThread = new Thread(IniciaServidorTcp);
+                srvThread.IsBackground = false;
+                srvThread.Start();
             }
             catch { }
-
-
 
             try
             {
                 // Extrai viewer.html e chamado.html embutidos, limpa arquivos soltos e garante atalho na Área de Trabalho
                 ExtrairRecursosHtmlPadrao();
                 LimparArquivosSoltosIndesejados();
-
-                // Carrega Nome Customizado da Máquina (definido na instalação)
                 CarregarNomeCustomizado();
                 GarantirAtalhosAreaDeTrabalho();
                 GarantirInicializacaoEWatchdog();
@@ -1279,18 +1325,6 @@ namespace NexusRemoteAgent
                 }
                 catch { }
 
-                // Token persistente único por máquina
-                string configPath = Path.Combine(ObterDiretorioDadosAgente(), "agent_token.txt");
-                if (File.Exists(configPath))
-                {
-                    sessionToken = File.ReadAllText(configPath, Encoding.UTF8).Trim();
-                }
-                if (string.IsNullOrEmpty(sessionToken) || sessionToken == "FSC@3606")
-                {
-                    sessionToken = "FSC@" + Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper();
-                    try { File.WriteAllText(configPath, sessionToken, Encoding.UTF8); } catch { }
-                }
-
                 // Carrega Geolocalização em Cache imediatamente
                 CarregarGeolocalizacaoCache();
 
@@ -1317,22 +1351,12 @@ namespace NexusRemoteAgent
                                     try { RegistrarAtivoNoServidorRemoto(); } catch { }
                                 });
                             }
-                            // A atualização não é automática por timer: ocorre sob demanda ao clicar no botão no software ou no console
                         }
                         catch { }
                         tick++;
                         Thread.Sleep(5000);
                     }
                 });
-
-                // Qualidade 45 para velocidade máxima e latência nula
-                jpgEncoder = GetEncoder(ImageFormat.Jpeg);
-                encoderParams = new EncoderParameters(1);
-                encoderParams.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 45L);
-
-                Thread srvThread = new Thread(IniciaServidorTcp);
-                srvThread.IsBackground = false;
-                srvThread.Start();
 
                 try { CriaTrayIcon(); } catch { }
                 try { Application.Run(); } catch { }
@@ -1426,7 +1450,7 @@ namespace NexusRemoteAgent
                     "@echo off\r\n" +
                     "title NexusTI - Iniciar Watchdog\r\n" +
                     "cd /d \"%~dp0\"\r\n" +
-                    "schtasks /create /tn \"NexusAgentWatchdog\" /tr \"\\\"{0}\\\" --daemon\" /sc minute /mo 1 /f >nul 2>&1\r\n" +
+                    "schtasks /create /tn \"NexusAgentWatchdog\" /tr \"\\\"{0}\\\" --daemon\" /sc minute /mo 1 /f /it >nul 2>&1\r\n" +
                     "reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v \"NexusWatchdog\" /t REG_SZ /d \"wscript.exe \\\"{1}\\\"\" /f >nul 2>&1\r\n" +
                     "start \"\" wscript.exe \"{1}\"\r\n" +
                     "echo Watchdog do NexusTI ativado com sucesso!\r\n" +
@@ -1446,7 +1470,7 @@ namespace NexusRemoteAgent
                 // 4. Cria tarefa agendada a cada 1 minuto (garantia absoluta contra encerramento)
                 try
                 {
-                    ProcessStartInfo psiTask = new ProcessStartInfo("schtasks", string.Format("/create /tn \"NexusAgentWatchdog\" /tr \"\\\"{0}\\\" --daemon\" /sc minute /mo 1 /f", targetExe));
+                    ProcessStartInfo psiTask = new ProcessStartInfo("schtasks", string.Format("/create /tn \"NexusAgentWatchdog\" /tr \"\\\"{0}\\\" --daemon\" /sc minute /mo 1 /f /it", targetExe));
                     psiTask.CreateNoWindow = true;
                     psiTask.UseShellExecute = false;
                     Process pTask = Process.Start(psiTask);
@@ -3477,6 +3501,11 @@ namespace NexusRemoteAgent
                         }
                     }
 
+                    if (IsBitmapTotalmentePreto(rawBmp))
+                    {
+                        AcordarMonitorEDisplay();
+                    }
+
                     if (quality < 20) quality = 20;
                     if (quality > 95) quality = 95;
 
@@ -3546,10 +3575,50 @@ namespace NexusRemoteAgent
             }
         }
 
+        private static bool IsBitmapTotalmentePreto(Bitmap bmp)
+        {
+            try
+            {
+                if (bmp == null || bmp.Width < 10 || bmp.Height < 10) return false;
+                Color cCenter = bmp.GetPixel(bmp.Width / 2, bmp.Height / 2);
+                if (cCenter.R > 25 || cCenter.G > 25 || cCenter.B > 25) return false;
+
+                Color c1 = bmp.GetPixel(bmp.Width / 4, bmp.Height / 4);
+                if (c1.R > 25 || c1.G > 25 || c1.B > 25) return false;
+
+                Color c2 = bmp.GetPixel((bmp.Width * 3) / 4, (bmp.Height * 3) / 4);
+                if (c2.R > 25 || c2.G > 25 || c2.B > 25) return false;
+
+                Color c3 = bmp.GetPixel(bmp.Width / 4, (bmp.Height * 3) / 4);
+                if (c3.R > 25 || c3.G > 25 || c3.B > 25) return false;
+
+                Color c4 = bmp.GetPixel((bmp.Width * 3) / 4, bmp.Height / 4);
+                if (c4.R > 25 || c4.G > 25 || c4.B > 25) return false;
+
+                return true;
+            }
+            catch { return false; }
+        }
+
         static void ExecutaAcaoMouse(string payload)
         {
             try
             {
+                // Conecta o thread de atendimento ao Desktop interativo ativo
+                try
+                {
+                    IntPtr hDesk = OpenInputDesktop(0, false, 0x01FF);
+                    if (hDesk != IntPtr.Zero)
+                    {
+                        SetThreadDesktop(hDesk);
+                        CloseDesktop(hDesk);
+                    }
+                }
+                catch { }
+
+                // Mantém o monitor ligado e reativa a saída gráfica se estiver em repouso
+                AcordarMonitorEDisplay();
+
                 string clean = payload.Replace("{", "").Replace("}", "").Replace("\"", "");
                 string[] parts = clean.Split(',');
 
@@ -3569,7 +3638,7 @@ namespace NexusRemoteAgent
                     if (k == "x") double.TryParse(v, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out xVal);
                     if (k == "y") double.TryParse(v, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out yVal);
                     if (k == "action") action = v.ToLower();
-                    if (k == "button") button = v.ToLower();
+                    if (button == "left" && k == "button") button = v.ToLower();
                     if (k == "delta") int.TryParse(v, out wheelDelta);
                     if (k == "screen") int.TryParse(v, out screenIdx);
                 }
@@ -3579,58 +3648,65 @@ namespace NexusRemoteAgent
                 int targetX = bounds.X + (int)(xVal <= 1.0 ? xVal * bounds.Width : xVal);
                 int targetY = bounds.Y + (int)(yVal <= 1.0 ? yVal * bounds.Height : yVal);
 
+                // Posiciona o ponteiro visual
                 SetCursorPos(targetX, targetY);
 
-                // Ação de Clique Atômico Seguro (Down + Up juntos com 20ms)
-                // NUNCA deixa o botão pressionado para trás, evitando arrastar pastas por engano!
+                // Converte para coordenadas absolutas de hardware (0 a 65535) para mouse_event
+                int screenW = Math.Max(1, bounds.Width);
+                int screenH = Math.Max(1, bounds.Height);
+                int absX = (int)(((double)(targetX - bounds.X) / screenW) * 65535.0);
+                int absY = (int)(((double)(targetY - bounds.Y) / screenH) * 65535.0);
+
                 if (action == "click")
                 {
                     if (button == "right")
                     {
-                        mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
-                        Thread.Sleep(20);
-                        mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
+                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_RIGHTDOWN, absX, absY, 0, 0);
+                        Thread.Sleep(25);
+                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_RIGHTUP, absX, absY, 0, 0);
                     }
                     else if (button == "middle")
                     {
-                        mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, 0);
-                        Thread.Sleep(20);
-                        mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, 0);
+                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_MIDDLEDOWN, absX, absY, 0, 0);
+                        Thread.Sleep(25);
+                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_MIDDLEUP, absX, absY, 0, 0);
                     }
                     else
                     {
-                        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
-                        Thread.Sleep(20);
-                        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
+                        Thread.Sleep(25);
+                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
                     }
                 }
                 else if (action == "dblclick")
                 {
-                    // Duplo clique atômico rápido e seguro (2 cliques com 40ms de intervalo)
-                    mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
-                    Thread.Sleep(20);
-                    mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
-                    Thread.Sleep(40);
-                    mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
-                    Thread.Sleep(20);
-                    mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
+                    Thread.Sleep(25);
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
+                    Thread.Sleep(45);
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
+                    Thread.Sleep(25);
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
                 }
                 else if (action == "down")
                 {
-                    if (button == "right") mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
-                    else if (button == "middle") mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, 0);
-                    else mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+                    if (button == "right") mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_RIGHTDOWN, absX, absY, 0, 0);
+                    else if (button == "middle") mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_MIDDLEDOWN, absX, absY, 0, 0);
+                    else mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
                 }
                 else if (action == "up")
                 {
-                    // Solta tudo para garantir que o mouse não fique preso em hipótese alguma
-                    mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
-                    mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
-                    mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, 0);
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_RIGHTUP, absX, absY, 0, 0);
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_MIDDLEUP, absX, absY, 0, 0);
                 }
                 else if (action == "wheel")
                 {
                     mouse_event(MOUSEEVENTF_WHEEL, 0, 0, (uint)wheelDelta, 0);
+                }
+                else
+                {
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE, absX, absY, 0, 0);
                 }
             }
             catch { }
@@ -3643,6 +3719,18 @@ namespace NexusRemoteAgent
         {
             try
             {
+                try
+                {
+                    IntPtr hDesk = OpenInputDesktop(0, false, 0x01FF);
+                    if (hDesk != IntPtr.Zero)
+                    {
+                        SetThreadDesktop(hDesk);
+                        CloseDesktop(hDesk);
+                    }
+                }
+                catch { }
+
+                AcordarMonitorEDisplay();
                 string clean = payload.Replace("{", "").Replace("}", "").Replace("\"", "");
                 string[] parts = clean.Split(',');
                 string key = "";

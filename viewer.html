@@ -250,6 +250,7 @@
         onmousemove="tratarMouseMove(event)"
         onmousedown="tratarMouseDown(event)"
         onmouseup="tratarMouseUp(event)"
+        ondblclick="tratarDblClick(event)"
         onwheel="tratarScrollMouse(event)"
       />
     </div>
@@ -730,11 +731,35 @@
       const img = document.getElementById('remote-stream-img');
       const rect = img.getBoundingClientRect();
 
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      // Corrige proporção de aspecto e letterboxing interno do elemento img
+      const naturalW = img.naturalWidth || rect.width;
+      const naturalH = img.naturalHeight || rect.height;
 
-      const normX = Math.max(0, Math.min(1, x / rect.width));
-      const normY = Math.max(0, Math.min(1, y / rect.height));
+      let renderedW = rect.width;
+      let renderedH = rect.height;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (naturalW > 0 && naturalH > 0 && rect.width > 0 && rect.height > 0) {
+        const imgAspect = naturalW / naturalH;
+        const boxAspect = rect.width / rect.height;
+
+        if (boxAspect > imgAspect) {
+          // Barras nas laterais (pillarbox)
+          renderedW = rect.height * imgAspect;
+          offsetX = (rect.width - renderedW) / 2;
+        } else {
+          // Barras em cima e embaixo (letterbox)
+          renderedH = rect.width / imgAspect;
+          offsetY = (rect.height - renderedH) / 2;
+        }
+      }
+
+      const x = e.clientX - rect.left - offsetX;
+      const y = e.clientY - rect.top - offsetY;
+
+      const normX = Math.max(0, Math.min(1, x / (renderedW || 1)));
+      const normY = Math.max(0, Math.min(1, y / (renderedH || 1)));
 
       return { normX, normY };
     }
@@ -756,7 +781,7 @@
         button: buttonStr
       };
 
-      // Se o usuário segurar sem soltar por mais de 350ms, inicia o arraste (ex: seleção de múltiplos ícones)
+      // Se o usuário segurar por mais de 350ms, inicia o modo arraste (ex: arrastar janela ou selecionar)
       clearTimeout(dragHoldTimeout);
       dragHoldTimeout = setTimeout(() => {
         if (isMouseDown && !isDragging) {
@@ -771,10 +796,10 @@
       if (!sessaoAtiva) return;
       const { normX, normY } = calcularCoordenadasNorm(e);
 
-      // Se o botão está pressionado, verifica se ultrapassou o limiar de arraste (> 5px)
+      // Se o botão está pressionado, verifica se ultrapassou o limiar de arraste (> 6px)
       if (isMouseDown && !isDragging) {
         const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
-        if (dist > 5) {
+        if (dist > 6) {
           isDragging = true;
           clearTimeout(dragHoldTimeout);
           // Inicia o arraste deliberado
@@ -803,14 +828,25 @@
         // Estava arrastando: solta o item no destino
         enviarComandoMouse('up', buttonStr, normX, normY);
       } else {
-        // Foi um CLIQUE ESTACIONÁRIO puro!
-        // Envia 'click' atômico: o agente pressiona e solta em 20ms com segurança absoluta.
-        // O mouse NUNCA fica preso e NUNCA arrasta pastas sem querer!
+        // Clique estacionário puro atômico
         enviarComandoMouse('click', buttonStr, normX, normY);
       }
 
       isMouseDown = false;
       isDragging = false;
+    }
+
+    function tratarDblClick(e) {
+      if (!sessaoAtiva) return;
+      e.preventDefault();
+      clearTimeout(dragHoldTimeout);
+      isMouseDown = false;
+      isDragging = false;
+
+      const { normX, normY } = calcularCoordenadasNorm(e);
+      let buttonStr = 'left';
+      if (e.button === 2) buttonStr = 'right';
+      enviarComandoMouse('dblclick', buttonStr, normX, normY);
     }
 
     async function processarFilaMovimentoMouse() {
@@ -847,7 +883,9 @@
           y: y,
           screen: currentScreenIndex
         })
-      }).catch(() => {});
+      }).catch(err => {
+        console.warn('Mouse command failed:', err);
+      });
     }
 
     function tratarScrollMouse(e) {

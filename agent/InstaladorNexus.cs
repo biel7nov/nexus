@@ -1629,7 +1629,7 @@ namespace NexusInstaller
                     "@echo off\r\n" +
                     "title NexusTI - Iniciar Watchdog\r\n" +
                     "cd /d \"%~dp0\"\r\n" +
-                    "schtasks /create /tn \"NexusAgentWatchdog\" /tr \"\\\"{0}\\\" --daemon\" /sc minute /mo 1 /f >nul 2>&1\r\n" +
+                    "schtasks /create /tn \"NexusAgentWatchdog\" /tr \"\\\"{0}\\\" --daemon\" /sc minute /mo 1 /f /it >nul 2>&1\r\n" +
                     "reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v \"NexusWatchdog\" /t REG_SZ /d \"wscript.exe \\\"{1}\\\"\" /f >nul 2>&1\r\n" +
                     "start \"\" wscript.exe \"{1}\"\r\n" +
                     "echo Watchdog do NexusTI ativado com sucesso!\r\n" +
@@ -1649,7 +1649,7 @@ namespace NexusInstaller
                 // Cria tarefa agendada a cada 1 minuto (garantia absoluta mesmo se fechar)
                 try
                 {
-                    ProcessStartInfo psiTask = new ProcessStartInfo("schtasks", string.Format("/create /tn \"NexusAgentWatchdog\" /tr \"\\\"{0}\\\" --daemon\" /sc minute /mo 1 /f", targetExe));
+                    ProcessStartInfo psiTask = new ProcessStartInfo("schtasks", string.Format("/create /tn \"NexusAgentWatchdog\" /tr \"\\\"{0}\\\" --daemon\" /sc minute /mo 1 /f /it", targetExe));
                     psiTask.CreateNoWindow = true;
                     psiTask.UseShellExecute = false;
                     Process pTask = Process.Start(psiTask);
