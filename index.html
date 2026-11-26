@@ -6679,6 +6679,13 @@
         colDiv.ondrop = (ev) => soltarNoFunil(ev, col.id);
 
         const chamadosDaColuna = itens.filter(c => normalizarStatusFunil(c.status) === col.id);
+        if (col.id === 'Resolvido') {
+          chamadosDaColuna.sort((a, b) => {
+            const tsA = a.concluidoMs || a.concluidoEm || a._lastLocalStatusTs || a.criadoMs || 0;
+            const tsB = b.concluidoMs || b.concluidoEm || b._lastLocalStatusTs || b.criadoMs || 0;
+            return tsB - tsA;
+          });
+        }
         const count = chamadosDaColuna.length;
 
         colDiv.innerHTML = `
@@ -6862,6 +6869,10 @@
       item.status = novoStatus;
       item.gerenciadoManualmente = true;
       item._lastLocalStatusTs = Date.now();
+      if (novoStatusNormalizado === 'Resolvido') {
+        item.concluidoMs = Date.now();
+        item.concluidoEm = Date.now();
+      }
       const horaStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       item.ultimaAtualizacao = 'Hoje às ' + horaStr;
 
@@ -7721,7 +7732,7 @@
       abrirModalDetalhesChamado(chamadoAbertoNoModalId);
     }
 
-    function concluirChamadoModalAtual() {
+    async function concluirChamadoModalAtual() {
       if (!chamadoAbertoNoModalId) return;
       const c = listaChamados.find(item => String(item.id) === String(chamadoAbertoNoModalId));
       if (!c) return;
@@ -7742,12 +7753,23 @@
       if (textoResolucao) {
         c.notaTecnica = textoResolucao;
         c.resolucao = textoResolucao;
+        if (!Array.isArray(c.mensagens)) c.mensagens = [];
+        c.mensagens.push({
+          id: 'res-' + Date.now(),
+          autor: user.nome,
+          tipo: 'resolucao',
+          texto: `Resolução Técnica: ${textoResolucao}`,
+          horario: 'Hoje às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          timestamp: Date.now()
+        });
       }
+      c.concluidoMs = Date.now();
+      c.concluidoEm = Date.now();
       c.ultimaAtualizacao = 'Concluído hoje às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' por ' + user.nome;
 
       moverChamadoParaStatus(chamadoAbertoNoModalId, 'Resolvido');
       salvarDadosLocais();
-      sincronizarChamadoNoSupabase(c);
+      await sincronizarChamadoNoSupabase(c);
       adicionarLog(c.ip || '127.0.0.1', c.ativo, 'Chamado Concluído', `Chamado #${c.id} marcado como Concluído por ${user.nome}`, 'text-emerald-600 font-semibold');
       mostrarToast(`Chamado #${c.id} marcado como Concluído com sucesso!`, 'success', 'Atendimento Finalizado');
       abrirModalDetalhesChamado(chamadoAbertoNoModalId);
@@ -9671,9 +9693,14 @@
               let idx = listaChamados.findIndex(x => String(x.id) === String(ch.id));
               if (idx >= 0) {
                 const item = listaChamados[idx];
-                const lockStatusRecente = item._lastLocalStatusTs && (Date.now() - item._lastLocalStatusTs < 8000);
-                if (!lockStatusRecente && ch.status) {
-                  item.status = ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : (ch.status === 'Em Espera' ? 'Em Espera' : (ch.status === 'Em Homologação' ? 'Homologacao' : 'Active'))));
+                const lockStatusRecente = item._lastLocalStatusTs && (Date.now() - item._lastLocalStatusTs < 30000);
+                const isLocalConcluido = normalizarStatusFunil(item.status) === 'Resolvido';
+                const statusNuvem = ch.status === 'Finalizados' ? 'Resolvido' : (ch.status === 'Em Andamento' ? 'Em Andamento' : (ch.status === 'Em Triagem' ? 'Triagem' : (ch.status === 'Em Espera' ? 'Em Espera' : (ch.status === 'Em Homologação' ? 'Homologacao' : 'Active'))));
+                if (!lockStatusRecente && (!isLocalConcluido || statusNuvem === 'Resolvido')) {
+                  item.status = statusNuvem;
+                  if (statusNuvem === 'Resolvido' && !item.concluidoMs) {
+                    item.concluidoMs = ch.atualizado_em ? new Date(ch.atualizado_em).getTime() : Date.now();
+                  }
                 }
                 if (!lockStatusRecente && ch.tecnico && ch.tecnico !== 'Não atribuído') {
                   item.tecnico = ch.tecnico;
@@ -10012,9 +10039,10 @@
       } catch(e) {}
     }
 
-    function sincronizarChamadoNoSupabase(chamado) {
+    async function sincronizarChamadoNoSupabase(chamado) {
       if (!supabaseClient || !chamado) return;
       try {
+        const statusDest = normalizarStatusFunil(chamado.status) === 'Resolvido' ? 'Finalizados' : (chamado.status === 'Triagem' ? 'Em Triagem' : (chamado.status === 'Homologacao' ? 'Em Homologação' : (chamado.status === 'Active' ? 'Em Aberto' : chamado.status)));
         const payload = {
           id: String(chamado.id),
           protocolo: String(chamado.id),
@@ -10024,23 +10052,20 @@
           categoria: chamado.categoria || 'Geral',
           urgencia: chamado.urgencia || 'Média',
           descricao: chamado.descricao || chamado.desc || '',
-          status: chamado.status === 'Resolvido' ? 'Finalizados' : (chamado.status === 'Triagem' ? 'Em Triagem' : (chamado.status === 'Homologacao' ? 'Em Homologação' : chamado.status)),
+          status: statusDest,
           maquina_nome: chamado.ativo || 'auto',
           maquina_ip: chamado.ip || 'auto',
           tecnico: chamado.responsavel || chamado.tecnico || 'Não atribuído',
-          historico: chamado.mensagens || []
+          historico: chamado.mensagens || [],
+          atualizado_em: new Date().toISOString()
         };
-        if (chamado.resolucao || chamado.notaTecnica) {
-          payload.resolucao = chamado.resolucao || chamado.notaTecnica || '';
+        const { error } = await supabaseClient.from('chamados').upsert(payload);
+        if (error) {
+          console.warn('Aviso sincronizacao Supabase chamados:', error.message);
         }
-        supabaseClient.from('chamados').upsert(payload)
-          .then(() => {})
-          .catch(err => {
-            // Se a coluna resolucao não existir na tabela do Supabase, tenta sem ela para não falhar
-            delete payload.resolucao;
-            supabaseClient.from('chamados').upsert(payload).catch(() => {});
-          });
-      } catch(e) {}
+      } catch(e) {
+        console.warn('Erro ao sincronizar chamado no Supabase:', e);
+      }
     }
 
     function mapearRegistroChamadoSupabase(ch) {
@@ -10048,6 +10073,18 @@
       const msgIni = msgs.length > 0 ? msgs[0] : null;
       const tituloExtraido = (msgIni && msgIni.titulo) ? msgIni.titulo : (ch.descricao ? (ch.descricao.length > 45 ? ch.descricao.substring(0, 45) + '...' : ch.descricao) : ('Chamado #' + ch.id));
       const criadoMs = ch.criado_em ? new Date(ch.criado_em).getTime() : ((msgIni && msgIni.timestamp) ? Number(msgIni.timestamp) : 0);
+      let resolucaoExtraida = ch.resolucao || ch.nota_tecnica || ch.fechamento_detalhes || '';
+      if (!resolucaoExtraida && Array.isArray(msgs)) {
+        const msgRes = msgs.slice().reverse().find(m => m && (m.tipo === 'resolucao' || (m.texto && m.texto.startsWith('Resolução Técnica:'))));
+        if (msgRes) {
+          resolucaoExtraida = msgRes.texto.replace(/^Resolução Técnica:\s*/, '');
+        }
+      }
+      let concluidoMs = 0;
+      if (ch.status === 'Finalizados' || ch.status === 'Resolvido') {
+        const msgFin = msgs.slice().reverse().find(m => m && (m.tipo === 'resolucao' || (m.tipo === 'sistema' && (m.texto || '').includes('Resolvido'))));
+        concluidoMs = (msgFin && msgFin.timestamp) ? Number(msgFin.timestamp) : (ch.atualizado_em ? new Date(ch.atualizado_em).getTime() : criadoMs);
+      }
       return {
         id: ch.id,
         titulo: tituloExtraido,
@@ -10062,12 +10099,13 @@
         data: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
         horario: ch.criado_em ? ('Hoje, ' + new Date(ch.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : 'Recente',
         criadoMs: criadoMs,
+        concluidoMs: concluidoMs,
         responsavel: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
         tecnico: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
         ip: ch.maquina_ip || 'auto',
         ativo: ch.maquina_nome || 'auto',
-        resolucao: ch.resolucao || ch.nota_tecnica || ch.fechamento_detalhes || '',
-        notaTecnica: ch.nota_tecnica || ch.resolucao || ch.fechamento_detalhes || '',
+        resolucao: resolucaoExtraida,
+        notaTecnica: resolucaoExtraida,
         mensagens: msgs
       };
     }
@@ -10076,6 +10114,13 @@
       if (!Array.isArray(listaChamados)) return;
       listaChamados = listaChamados.filter(c => c && c.id && !MOCK_TICKETS_OBSOLETOS.has(String(c.id)));
       listaChamados.sort((a, b) => {
+        const isAConcluido = normalizarStatusFunil(a.status) === 'Resolvido';
+        const isBConcluido = normalizarStatusFunil(b.status) === 'Resolvido';
+        if (isAConcluido && isBConcluido) {
+          const tsA = a.concluidoMs || a.concluidoEm || a._lastLocalStatusTs || a.criadoMs || 0;
+          const tsB = b.concluidoMs || b.concluidoEm || b._lastLocalStatusTs || b.criadoMs || 0;
+          return tsB - tsA;
+        }
         const tsA = a.criadoMs || (a.mensagens && a.mensagens[0] && a.mensagens[0].timestamp) || 0;
         const tsB = b.criadoMs || (b.mensagens && b.mensagens[0] && b.mensagens[0].timestamp) || 0;
         return tsB - tsA;
@@ -10103,10 +10148,14 @@
               ...(nv.mensagens || [])
             ]);
             const oldLen = Array.isArray(exist.mensagens) ? exist.mensagens.length : 0;
-            const lockStatusRecente = exist._lastLocalStatusTs && (Date.now() - exist._lastLocalStatusTs < 8000);
+            const lockStatusRecente = exist._lastLocalStatusTs && (Date.now() - exist._lastLocalStatusTs < 30000);
+            const isLocalConcluido = normalizarStatusFunil(exist.status) === 'Resolvido';
+            const isNuvemConcluido = normalizarStatusFunil(nv.status) === 'Resolvido';
+            const statusFinal = (isLocalConcluido && !isNuvemConcluido) ? 'Resolvido' : (lockStatusRecente ? exist.status : nv.status);
             const itemUnificado = Object.assign({}, exist, nv, {
               titulo: (exist.titulo && exist.titulo !== exist.descricao && !exist.titulo.startsWith('Chamado #')) ? exist.titulo : nv.titulo,
-              status: lockStatusRecente ? exist.status : nv.status,
+              status: statusFinal,
+              concluidoMs: exist.concluidoMs || nv.concluidoMs || (statusFinal === 'Resolvido' ? Date.now() : 0),
               responsavel: lockStatusRecente ? exist.responsavel : nv.responsavel,
               tecnico: lockStatusRecente ? exist.tecnico : nv.tecnico,
               resolucao: exist.resolucao || nv.resolucao || exist.notaTecnica || nv.notaTecnica || '',
