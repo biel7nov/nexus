@@ -1180,8 +1180,8 @@ namespace NexusRemoteAgent
         static long clipboardVersion = 1;
 
         // Versão oficial do Agente NexusTI & Build para Atualizações Silenciosas OTA
-        public const string AGENT_VERSION = "1.3.5";
-        public const int AGENT_BUILD = 135;
+        public const string AGENT_VERSION = "1.3.6";
+        public const int AGENT_BUILD = 136;
         public static bool isAtualizando = false;
         private static Mutex _singleInstanceMutex = null;
 
@@ -3674,6 +3674,17 @@ namespace NexusRemoteAgent
         {
             try
             {
+                // Garante que o thread worker está acoplado ao desktop de entrada interativo da sessão
+                try
+                {
+                    IntPtr hDesk = OpenInputDesktop(0, false, 0x01FF);
+                    if (hDesk != IntPtr.Zero)
+                    {
+                        SetThreadDesktop(hDesk);
+                    }
+                }
+                catch { }
+
                 string action = ExtrairParam(rawUrl, payload, "action", "move").ToLower();
                 string button = ExtrairParam(rawUrl, payload, "button", ExtrairParam(rawUrl, payload, "btn", "left")).ToLower();
                 string xStr = ExtrairParam(rawUrl, payload, "x", "0");
@@ -3690,56 +3701,70 @@ namespace NexusRemoteAgent
                 int.TryParse(screenStr, out screenIdx);
 
                 Rectangle bounds = ObterBoundsTela(screenIdx);
+                if (bounds.Width <= 0 || bounds.Height <= 0) bounds = Screen.PrimaryScreen.Bounds;
+                if (bounds.Width <= 0 || bounds.Height <= 0) bounds = new Rectangle(0, 0, 1920, 1080);
 
                 int targetX = bounds.X + (int)(xVal <= 1.0 ? xVal * bounds.Width : xVal);
                 int targetY = bounds.Y + (int)(yVal <= 1.0 ? yVal * bounds.Height : yVal);
 
-                // 1. Posiciona o cursor do Windows no ponto exato
-                SetCursorPos(targetX, targetY);
+                if (targetX < bounds.X) targetX = bounds.X;
+                if (targetX >= bounds.Right) targetX = bounds.Right - 1;
+                if (targetY < bounds.Y) targetY = bounds.Y;
+                if (targetY >= bounds.Bottom) targetY = bounds.Bottom - 1;
 
-                // 2. Dispara o evento de mouse no ponto exato (relativo 0,0 garante clique sem desvios de DPI ou multi-monitor)
+                // Coordenadas absolutas normalizadas (0 a 65535) para mouse_event
+                int virtW = Math.Max(1, SystemInformation.VirtualScreen.Width);
+                int virtH = Math.Max(1, SystemInformation.VirtualScreen.Height);
+                int absX = (int)((targetX * 65535.0) / virtW);
+                int absY = (int)((targetY * 65535.0) / virtH);
+
+                // 1. Posiciona o cursor do Windows em nível de hardware driver e Win32
+                SetCursorPos(targetX, targetY);
+                mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE, absX, absY, 0, 0);
+
+                // 2. Dispara o evento de mouse no ponto exato
                 if (action == "click")
                 {
                     if (button == "right")
                     {
-                        mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
-                        Thread.Sleep(20);
-                        mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
+                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_RIGHTDOWN, absX, absY, 0, 0);
+                        Thread.Sleep(30);
+                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_RIGHTUP, absX, absY, 0, 0);
                     }
                     else if (button == "middle")
                     {
-                        mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, 0);
-                        Thread.Sleep(20);
-                        mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, 0);
+                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MIDDLEDOWN, absX, absY, 0, 0);
+                        Thread.Sleep(30);
+                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MIDDLEUP, absX, absY, 0, 0);
                     }
                     else
                     {
-                        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
-                        Thread.Sleep(20);
-                        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
+                        Thread.Sleep(30);
+                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
                     }
                 }
                 else if (action == "dblclick")
                 {
-                    mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
-                    Thread.Sleep(20);
-                    mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
-                    Thread.Sleep(45);
-                    mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
-                    Thread.Sleep(20);
-                    mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
+                    Thread.Sleep(30);
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
+                    Thread.Sleep(60);
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
+                    Thread.Sleep(30);
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
                 }
                 else if (action == "down")
                 {
-                    if (button == "right") mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
-                    else if (button == "middle") mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, 0);
-                    else mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+                    if (button == "right") mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_RIGHTDOWN, absX, absY, 0, 0);
+                    else if (button == "middle") mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MIDDLEDOWN, absX, absY, 0, 0);
+                    else mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
                 }
                 else if (action == "up")
                 {
-                    mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
-                    mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
-                    mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, 0);
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_RIGHTUP, absX, absY, 0, 0);
+                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MIDDLEUP, absX, absY, 0, 0);
                 }
                 else if (action == "wheel")
                 {
@@ -3747,7 +3772,7 @@ namespace NexusRemoteAgent
                 }
                 else
                 {
-                    // Movimento suave - SetCursorPos já moveu
+                    // Movimento de cursor já executado acima com SetCursorPos e mouse_event
                 }
             }
             catch { }

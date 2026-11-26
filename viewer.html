@@ -698,8 +698,8 @@
       const rect = img.getBoundingClientRect();
 
       // Corrige proporção de aspecto e letterboxing interno do elemento img
-      const naturalW = img.naturalWidth || rect.width;
-      const naturalH = img.naturalHeight || rect.height;
+      const naturalW = img.naturalWidth || window._remoteWidth || 1920;
+      const naturalH = img.naturalHeight || window._remoteHeight || 1080;
 
       let renderedW = rect.width;
       let renderedH = rect.height;
@@ -747,29 +747,18 @@
         button: buttonStr
       };
 
-      // Se o usuário segurar por mais de 350ms, inicia o modo arraste (ex: arrastar janela ou selecionar)
-      clearTimeout(dragHoldTimeout);
-      dragHoldTimeout = setTimeout(() => {
-        if (isMouseDown && !isDragging) {
-          isDragging = true;
-          const { normX, normY } = calcularCoordenadasNorm(e);
-          enviarComandoMouse('down', buttonStr, normX, normY);
-        }
-      }, 350);
+      const { normX, normY } = calcularCoordenadasNorm(e);
+      enviarComandoMouse('down', buttonStr, normX, normY);
     }
 
     function tratarMouseMove(e) {
       if (!sessaoAtiva) return;
       const { normX, normY } = calcularCoordenadasNorm(e);
 
-      // Se o botão está pressionado, verifica se ultrapassou o limiar de arraste (> 6px)
       if (isMouseDown && !isDragging) {
         const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
-        if (dist > 6) {
+        if (dist > 5) {
           isDragging = true;
-          clearTimeout(dragHoldTimeout);
-          // Inicia o arraste deliberado
-          enviarComandoMouse('down', mouseDownPos.button, normX, normY);
         }
       }
 
@@ -783,18 +772,16 @@
     function tratarMouseUp(e) {
       if (!sessaoAtiva || !isMouseDown) return;
       e.preventDefault();
-      clearTimeout(dragHoldTimeout);
 
       const { normX, normY } = calcularCoordenadasNorm(e);
       let buttonStr = 'left';
       if (e.button === 2) buttonStr = 'right';
       if (e.button === 1) buttonStr = 'middle';
 
-      if (isDragging) {
-        // Estava arrastando: solta o item no destino
-        enviarComandoMouse('up', buttonStr, normX, normY);
-      } else {
-        // Clique estacionário puro atômico
+      enviarComandoMouse('up', buttonStr, normX, normY);
+
+      const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
+      if (dist < 6 && (Date.now() - mouseDownPos.time) < 400) {
         enviarComandoMouse('click', buttonStr, normX, normY);
       }
 
@@ -805,7 +792,6 @@
     function tratarDblClick(e) {
       if (!sessaoAtiva) return;
       e.preventDefault();
-      clearTimeout(dragHoldTimeout);
       isMouseDown = false;
       isDragging = false;
 
@@ -829,28 +815,33 @@
     }
 
     async function processarFilaMovimentoMouse() {
-      if (!pendingMouseMove || !sessaoAtiva) return;
+      if (!pendingMouseMove || !sessaoAtiva || mouseHttpBusy) return;
 
       mouseHttpBusy = true;
       const { normX, normY } = pendingMouseMove;
       pendingMouseMove = null;
 
       const payload = { action: 'move', x: normX, y: normY, screen: currentScreenIndex };
-      enviarBeacon('/api/mouse', payload);
-
-      try {
-        await fetch(`${agentUrl}/api/mouse`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-FSC-Token': window.agentSessionToken || 'FSC-CORP-SEC-TOKEN-91823' },
-          body: JSON.stringify(payload)
-        });
-      } catch (err) {}
-
-      mouseHttpBusy = false;
-
-      // Se houve novo movimento enquanto o anterior voava, despacha o mais recente imediatamente
-      if (pendingMouseMove) {
-        processarFilaMovimentoMouse();
+      const isMixedContent = window.location.protocol === 'https:' && agentUrl.startsWith('http:');
+      
+      if (isMixedContent) {
+        enviarBeacon('/api/mouse', payload);
+        setTimeout(() => {
+          mouseHttpBusy = false;
+          if (pendingMouseMove) processarFilaMovimentoMouse();
+        }, 50);
+      } else {
+        try {
+          await fetch(`${agentUrl}/api/mouse`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-FSC-Token': window.agentSessionToken || 'FSC-CORP-SEC-TOKEN-91823' },
+            body: JSON.stringify(payload)
+          });
+        } catch (err) {}
+        setTimeout(() => {
+          mouseHttpBusy = false;
+          if (pendingMouseMove) processarFilaMovimentoMouse();
+        }, 30);
       }
     }
 
@@ -863,17 +854,18 @@
         screen: currentScreenIndex
       };
 
-      // 1. Despacho Imediato via Beacon Image (Bypass Total de Políticas Restritivas de Mixed Content do Chrome)
-      enviarBeacon('/api/mouse', payload);
-
-      // 2. Despacho Direto via Fetch POST (Para redes locais ou agentes HTTP)
-      fetch(`${agentUrl}/api/mouse`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-FSC-Token': window.agentSessionToken || 'FSC-CORP-SEC-TOKEN-91823' },
-        body: JSON.stringify(payload)
-      }).catch(err => {
-        // Silencioso se o fetch falhar devido a mixed content, pois o Image beacon já foi executado
-      });
+      const isMixedContent = window.location.protocol === 'https:' && agentUrl.startsWith('http:');
+      if (isMixedContent) {
+        enviarBeacon('/api/mouse', payload);
+      } else {
+        fetch(`${agentUrl}/api/mouse`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-FSC-Token': window.agentSessionToken || 'FSC-CORP-SEC-TOKEN-91823' },
+          body: JSON.stringify(payload)
+        }).catch(() => {
+          enviarBeacon('/api/mouse', payload);
+        });
+      }
     }
 
     function tratarScrollMouse(e) {
