@@ -7728,8 +7728,16 @@
       if (normalizarStatusFunil(c.status) === 'Resolvido') return;
 
       const elNota = document.getElementById('detalhe-chamado-nota-interna');
-      const textoResolucao = elNota ? elNota.value.trim() : '';
+      let textoResolucao = elNota ? elNota.value.trim() : '';
       const user = obterUsuarioLogado();
+
+      if (!textoResolucao) {
+        const solucaoPrompt = prompt('Informe a resolução técnica / parecer da solução para este chamado (ou deixe em branco se não houver parecer):', '');
+        if (solucaoPrompt !== null && solucaoPrompt.trim()) {
+          textoResolucao = solucaoPrompt.trim();
+          if (elNota) elNota.value = textoResolucao;
+        }
+      }
 
       if (textoResolucao) {
         c.notaTecnica = textoResolucao;

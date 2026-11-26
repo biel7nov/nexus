@@ -1104,12 +1104,6 @@ namespace NexusRemoteAgent
                     mouse_event(MOUSEEVENTF_MOVE, -1, -1, 0, 0);
                 }
                 catch { }
-
-                if ((DateTime.Now - _ultimoAcordoDisplay).TotalSeconds > 5)
-                {
-                    _ultimoAcordoDisplay = DateTime.Now;
-                    SendNotifyMessage(HWND_BROADCAST, WM_SYSCOMMAND, (IntPtr)SC_MONITORPOWER, (IntPtr)(-1));
-                }
             }
             catch { }
         }
@@ -1164,6 +1158,7 @@ namespace NexusRemoteAgent
         public static string customEmpresa = "Aço Móveis";
         public static bool isServerMachine = false;
         private static readonly object dbLock = new object();
+        private static readonly object screenLock = new object();
 
         public static string NormalizarTextoEmpresa(string texto)
         {
@@ -1200,9 +1195,21 @@ namespace NexusRemoteAgent
                 return;
             }
 
-            // 0. Instância Única Global Segura via Mutex
-            // Se já existe uma instância do agente em execução, a nova execução encerra imediatamente em silêncio.
-            // Isso impede que watchdogs ou tarefas agendadas fiquem matando e recriando o processo em loop!
+            // 0. Instância Única Global Segura
+            try
+            {
+                Process currentProc = Process.GetCurrentProcess();
+                foreach (Process p in Process.GetProcessesByName(currentProc.ProcessName))
+                {
+                    if (p.Id != currentProc.Id)
+                    {
+                        // Instância já em execução saudável. Sai silenciosamente.
+                        return;
+                    }
+                }
+            }
+            catch { }
+
             bool isSingleInstance = false;
             try
             {
@@ -1215,7 +1222,6 @@ namespace NexusRemoteAgent
 
             if (!isSingleInstance)
             {
-                // Instância já em execução saudável. Sai silenciosamente sem qualquer notificação.
                 return;
             }
 
@@ -1424,77 +1430,51 @@ namespace NexusRemoteAgent
                 }
                 catch { }
 
-                // 2. Cria scripts de supervisão (watchdog)
-                string vbsPath = Path.Combine(targetDir, "nexus_watchdog.vbs");
-                string vbsContent = string.Format(
-                    "' NexusTI Watchdog Supervisor - Mantem o agente permanentemente ativo em segundo plano\r\n" +
-                    "Set WshShell = CreateObject(\"WScript.Shell\")\r\n" +
-                    "Do\r\n" +
-                    "    Set col = GetObject(\"winmgmts:\").ExecQuery(\"Select * from Win32_Process Where Name = 'NexusRemoteAgent.exe'\")\r\n" +
-                    "    If col.Count = 0 Then\r\n" +
-                    "        WshShell.Run \"\"\"{0}\"\" --daemon\", 0, False\r\n" +
-                    "    End If\r\n" +
-                    "    WScript.Sleep 4000\r\n" +
-                    "Loop\r\n", targetExe);
-                File.WriteAllText(vbsPath, vbsContent, Encoding.Default);
+                // 2. Limpeza de scripts de watchdog legados que causavam travamento de porta
+                try
+                {
+                    string vbsPath = Path.Combine(targetDir, "nexus_watchdog.vbs");
+                    string batPath = Path.Combine(targetDir, "nexus_watchdog.bat");
+                    string iniBatPath = Path.Combine(targetDir, "iniciar_watchdog.bat");
+                    if (File.Exists(vbsPath)) File.Delete(vbsPath);
+                    if (File.Exists(batPath)) File.Delete(batPath);
+                    if (File.Exists(iniBatPath)) File.Delete(iniBatPath);
+                }
+                catch { }
 
-                string batPath = Path.Combine(targetDir, "nexus_watchdog.bat");
-                string batContent = string.Format(
-                    "@echo off\r\n" +
-                    "title NexusTI Watchdog Supervisor\r\n" +
-                    ":loop\r\n" +
-                    "tasklist /fi \"imagename eq NexusRemoteAgent.exe\" 2>NUL | find /i \"NexusRemoteAgent.exe\" >nul\r\n" +
-                    "if errorlevel 1 (\r\n" +
-                    "    start \"\" \"{0}\" --daemon\r\n" +
-                    ")\r\n" +
-                    "timeout /t 4 /nobreak >nul\r\n" +
-                    "goto loop\r\n", targetExe);
-                File.WriteAllText(batPath, batContent, Encoding.Default);
+                // 3. Remove tarefa agendada legada que executava a cada minuto
+                try
+                {
+                    ProcessStartInfo psiDel = new ProcessStartInfo("schtasks", "/delete /tn \"NexusAgentWatchdog\" /f");
+                    psiDel.CreateNoWindow = true;
+                    psiDel.UseShellExecute = false;
+                    Process pDel = Process.Start(psiDel);
+                    if (pDel != null) pDel.WaitForExit(2000);
+                }
+                catch { }
 
-                string iniBatPath = Path.Combine(targetDir, "iniciar_watchdog.bat");
-                string iniBatContent = string.Format(
-                    "@echo off\r\n" +
-                    "title NexusTI - Iniciar Watchdog\r\n" +
-                    "cd /d \"%~dp0\"\r\n" +
-                    "schtasks /create /tn \"NexusAgentWatchdog\" /tr \"\\\"{0}\\\" --daemon\" /sc minute /mo 1 /f /it >nul 2>&1\r\n" +
-                    "reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /v \"NexusWatchdog\" /t REG_SZ /d \"wscript.exe \\\"{1}\\\"\" /f >nul 2>&1\r\n" +
-                    "start \"\" wscript.exe \"{1}\"\r\n" +
-                    "echo Watchdog do NexusTI ativado com sucesso!\r\n" +
-                    "timeout /t 3 >nul\r\n", targetExe, vbsPath);
-                File.WriteAllText(iniBatPath, iniBatContent, Encoding.Default);
-
-                // 3. Registra Watchdog no Registry Run
+                // 4. Registra inicialização limpa no Registry Run do usuário
                 try
                 {
                     using (Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
                     {
-                        if (key != null) key.SetValue("NexusWatchdog", "wscript.exe \"" + vbsPath + "\"");
+                        if (key != null)
+                        {
+                            key.DeleteValue("NexusWatchdog", false);
+                            key.SetValue("NexusRemoteAgent", "\"" + targetExe + "\" --daemon");
+                        }
                     }
                 }
                 catch { }
 
-                // 4. Cria tarefa agendada a cada 1 minuto (garantia absoluta contra encerramento)
+                // 5. Garante tarefa agendada limpa ao fazer Logon (interativa, executada 1 vez por sessão)
                 try
                 {
-                    ProcessStartInfo psiTask = new ProcessStartInfo("schtasks", string.Format("/create /tn \"NexusAgentWatchdog\" /tr \"\\\"{0}\\\" --daemon\" /sc minute /mo 1 /f /it", targetExe));
+                    ProcessStartInfo psiTask = new ProcessStartInfo("schtasks", string.Format("/create /tn \"NexusAgent_Startup\" /tr \"\\\"{0}\\\" --daemon\" /sc onlogon /f /it", targetExe));
                     psiTask.CreateNoWindow = true;
                     psiTask.UseShellExecute = false;
                     Process pTask = Process.Start(psiTask);
                     if (pTask != null) pTask.WaitForExit(3000);
-                }
-                catch { }
-
-                // 5. Inicia o supervisor VBS silenciosamente em segundo plano se não houver wscript rodando
-                try
-                {
-                    Process[] procs = Process.GetProcessesByName("wscript");
-                    if (procs.Length == 0)
-                    {
-                        ProcessStartInfo psiVbs = new ProcessStartInfo("wscript.exe", "\"" + vbsPath + "\"");
-                        psiVbs.CreateNoWindow = true;
-                        psiVbs.UseShellExecute = false;
-                        Process.Start(psiVbs);
-                    }
                 }
                 catch { }
             }
@@ -2061,6 +2041,8 @@ namespace NexusRemoteAgent
                 try
                 {
                     tcpServer = new TcpListener(IPAddress.Any, port);
+                    tcpServer.ExclusiveAddressUse = false;
+                    tcpServer.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                     tcpServer.Server.NoDelay = true;
                     ThreadPool.SetMinThreads(100, 100);
                     ThreadPool.SetMaxThreads(1000, 1000);
@@ -2085,7 +2067,9 @@ namespace NexusRemoteAgent
                 {
                     TcpClient client = tcpServer.AcceptTcpClient();
                     client.NoDelay = true;
-                    ThreadPool.QueueUserWorkItem((c) => ProcessaCliente((TcpClient)c), client);
+                    Thread clientThread = new Thread(() => ProcessaCliente(client));
+                    clientThread.IsBackground = true;
+                    clientThread.Start();
                 }
                 catch { }
             }
@@ -2099,29 +2083,39 @@ namespace NexusRemoteAgent
                 client.ReceiveTimeout = 15000;
                 client.SendTimeout = 15000;
 
+                string clientEp = "";
+                try { clientEp = client.Client.RemoteEndPoint.ToString(); } catch { }
+                try { File.AppendAllText(@"C:\Nexus-Agent\http.log", DateTime.Now.ToString("HH:mm:ss.fff") + " [CONNECT] " + clientEp + "\r\n"); } catch { }
+
                 using (NetworkStream stream = client.GetStream())
                 {
-                byte[] buffer = new byte[16384];
-                while (client.Connected)
-                {
-                    int bytesRead = 0;
-                    try
+                    byte[] buffer = new byte[16384];
+                    while (client.Connected)
                     {
-                        bytesRead = stream.Read(buffer, 0, buffer.Length);
-                    }
-                    catch { break; }
-                    if (bytesRead <= 0) break;
+                        int bytesRead = 0;
+                        try
+                        {
+                            bytesRead = stream.Read(buffer, 0, buffer.Length);
+                        }
+                        catch (Exception ex)
+                        {
+                            try { File.AppendAllText(@"C:\Nexus-Agent\http.log", DateTime.Now.ToString("HH:mm:ss.fff") + " [READ ERR] " + ex.Message + "\r\n"); } catch { }
+                            break;
+                        }
+                        if (bytesRead <= 0) break;
 
-                    string headerStr = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                    string[] lines = headerStr.Split(new string[] { "\r\n" }, StringSplitOptions.None);
-                    if (lines.Length == 0) break;
+                        string headerStr = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                        string[] lines = headerStr.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+                        if (lines.Length == 0) break;
 
-                    string[] requestLine = lines[0].Split(' ');
-                    if (requestLine.Length < 2) break;
+                        string[] requestLine = lines[0].Split(' ');
+                        if (requestLine.Length < 2) break;
 
-                    string method = requestLine[0].ToUpper();
-                    string rawUrl = requestLine[1];
-                    string path = (rawUrl.Contains("?") ? rawUrl.Split('?')[0] : rawUrl).ToLower();
+                        string method = requestLine[0].ToUpper();
+                        string rawUrl = requestLine[1];
+                        string path = (rawUrl.Contains("?") ? rawUrl.Split('?')[0] : rawUrl).ToLower();
+
+                        try { File.AppendAllText(@"C:\Nexus-Agent\http.log", DateTime.Now.ToString("HH:mm:ss.fff") + " [REQ] " + method + " " + path + "\r\n"); } catch { }
 
                     bool keepAlive = true;
                     foreach (string l in lines)
@@ -3226,6 +3220,7 @@ namespace NexusRemoteAgent
                 stream.Write(data, 0, data.Length);
             }
             stream.Flush();
+            try { File.AppendAllText(@"C:\Nexus-Agent\http.log", DateTime.Now.ToString("HH:mm:ss.fff") + " [RESP SENT] code=" + code + " bytes=" + data.Length + "\r\n"); } catch { }
         }
 
         static string ObterQueryParam(string url, string key)
@@ -3351,18 +3346,40 @@ namespace NexusRemoteAgent
             return ok;
         }
 
+        static Rectangle _cachedBounds = Rectangle.Empty;
+        static DateTime _lastBoundsCheck = DateTime.MinValue;
+
         static Rectangle ObterBoundsTela(int screenIdx)
         {
-            Screen[] screens = Screen.AllScreens;
-            if (screenIdx == -1)
+            try
             {
-                return SystemInformation.VirtualScreen;
+                if (screenIdx <= 0 && _cachedBounds.Width > 0 && (DateTime.UtcNow - _lastBoundsCheck).TotalSeconds < 10)
+                {
+                    return _cachedBounds;
+                }
+                Screen[] screens = Screen.AllScreens;
+                if (screenIdx == -1)
+                {
+                    return SystemInformation.VirtualScreen;
+                }
+                if (screenIdx >= 0 && screens != null && screenIdx < screens.Length)
+                {
+                    if (screenIdx == 0)
+                    {
+                        _cachedBounds = screens[0].Bounds;
+                        _lastBoundsCheck = DateTime.UtcNow;
+                    }
+                    return screens[screenIdx].Bounds;
+                }
+                Rectangle prim = Screen.PrimaryScreen.Bounds;
+                _cachedBounds = prim;
+                _lastBoundsCheck = DateTime.UtcNow;
+                return prim;
             }
-            if (screenIdx >= 0 && screenIdx < screens.Length)
+            catch
             {
-                return screens[screenIdx].Bounds;
+                return new Rectangle(0, 0, 1920, 1080);
             }
-            return Screen.PrimaryScreen.Bounds;
         }
 
         // ---------------------------------------------------------------------
@@ -3418,18 +3435,19 @@ namespace NexusRemoteAgent
 
         static byte[] CapturaTelaBytes(int screenIdx, bool drawCursor, float scaleFactor = 1.0f, int quality = 45)
         {
-            try
+            lock (screenLock)
             {
                 try
                 {
-                    IntPtr hDesk = OpenInputDesktop(0, false, 0x01FF);
-                    if (hDesk != IntPtr.Zero)
+                    try
                     {
-                        SetThreadDesktop(hDesk);
-                        CloseDesktop(hDesk);
+                        IntPtr hDesk = OpenInputDesktop(0, false, 0x01FF);
+                        if (hDesk != IntPtr.Zero)
+                        {
+                            SetThreadDesktop(hDesk);
+                        }
                     }
-                }
-                catch { }
+                    catch { }
 
                 Rectangle bounds = ObterBoundsTela(screenIdx);
                 if (bounds.Width <= 0 || bounds.Height <= 0) bounds = Screen.PrimaryScreen.Bounds;
@@ -3445,11 +3463,11 @@ namespace NexusRemoteAgent
                         try
                         {
                             g.CopyFromScreen(bounds.X, bounds.Y, 0, 0, bounds.Size, CopyPixelOperation.SourceCopy);
-                            if (!IsBitmapTotalmentePreto(rawBmp)) capturou = true;
+                            capturou = true;
                         }
                         catch { }
 
-                        // Camada 2: CreateDC("DISPLAY") com CAPTUREBLT (ideal para Windows Server e monitores virtuais)
+                        // Camada 2: CreateDC("DISPLAY") se CopyFromScreen falhou
                         if (!capturou)
                         {
                             try
@@ -3461,7 +3479,7 @@ namespace NexusRemoteAgent
                                     BitBlt(hdcDest, 0, 0, bounds.Width, bounds.Height, hdcDisplay, bounds.X, bounds.Y, 0x00CC0020 | 0x40000000);
                                     g.ReleaseHdc(hdcDest);
                                     DeleteDC(hdcDisplay);
-                                    if (!IsBitmapTotalmentePreto(rawBmp)) capturou = true;
+                                    capturou = true;
                                 }
                             }
                             catch { }
@@ -3480,7 +3498,7 @@ namespace NexusRemoteAgent
                                     BitBlt(hdcDest, 0, 0, bounds.Width, bounds.Height, hdcDesk, bounds.X, bounds.Y, 0x00CC0020 | 0x40000000);
                                     g.ReleaseHdc(hdcDest);
                                     ReleaseDC(hDesktopWnd, hdcDesk);
-                                    if (!IsBitmapTotalmentePreto(rawBmp)) capturou = true;
+                                    capturou = true;
                                 }
                             }
                             catch { }
@@ -3498,7 +3516,7 @@ namespace NexusRemoteAgent
                                     BitBlt(hdcDest, 0, 0, bounds.Width, bounds.Height, hdcScreen, bounds.X, bounds.Y, 0x00CC0020);
                                     g.ReleaseHdc(hdcDest);
                                     ReleaseDC(IntPtr.Zero, hdcScreen);
-                                    if (!IsBitmapTotalmentePreto(rawBmp)) capturou = true;
+                                    capturou = true;
                                 }
                             }
                             catch { }
@@ -3542,26 +3560,6 @@ namespace NexusRemoteAgent
                     if (IsBitmapTotalmentePreto(rawBmp))
                     {
                         AcordarMonitorEDisplay();
-                        try
-                        {
-                            using (Graphics gAlert = Graphics.FromImage(rawBmp))
-                            {
-                                using (Brush bgBrush = new SolidBrush(Color.FromArgb(10, 15, 26)))
-                                {
-                                    gAlert.FillRectangle(bgBrush, 0, 0, bounds.Width, bounds.Height);
-                                }
-                                using (Font fTitle = new Font("Segoe UI", 22, FontStyle.Bold))
-                                using (Font fSub = new Font("Segoe UI", 12, FontStyle.Regular))
-                                {
-                                    int startX = Math.Max(20, bounds.Width / 2 - 260);
-                                    int startY = Math.Max(20, bounds.Height / 2 - 60);
-                                    gAlert.DrawString("🖥️ " + customMachineName + " — Sessão em Espera", fTitle, Brushes.White, startX, startY);
-                                    gAlert.DrawString("O display do servidor está em modo de proteção ou tela de bloqueio.", fSub, Brushes.LightGray, startX, startY + 45);
-                                    gAlert.DrawString("Dê um clique na tela ou use 'Atalhos' acima para interagir e reativar o desktop.", fSub, Brushes.LightSkyBlue, startX, startY + 75);
-                                }
-                            }
-                        }
-                        catch { }
                     }
 
                     if (quality < 20) quality = 20;
@@ -3631,6 +3629,7 @@ namespace NexusRemoteAgent
                 catch { }
                 return new byte[0];
             }
+            }
         }
 
         private static bool IsBitmapTotalmentePreto(Bitmap bmp)
@@ -3671,23 +3670,8 @@ namespace NexusRemoteAgent
         {
             try
             {
-                // Conecta o thread de atendimento ao Desktop interativo ativo
-                try
-                {
-                    IntPtr hDesk = OpenInputDesktop(0, false, 0x01FF);
-                    if (hDesk != IntPtr.Zero)
-                    {
-                        SetThreadDesktop(hDesk);
-                        CloseDesktop(hDesk);
-                    }
-                }
-                catch { }
-
-                // Mantém o monitor ligado e reativa a saída gráfica se estiver em repouso
-                AcordarMonitorEDisplay();
-
                 string action = ExtrairParam(rawUrl, payload, "action", "move").ToLower();
-                string button = ExtrairParam(rawUrl, payload, "button", "left").ToLower();
+                string button = ExtrairParam(rawUrl, payload, "button", ExtrairParam(rawUrl, payload, "btn", "left")).ToLower();
                 string xStr = ExtrairParam(rawUrl, payload, "x", "0");
                 string yStr = ExtrairParam(rawUrl, payload, "y", "0");
                 string deltaStr = ExtrairParam(rawUrl, payload, "delta", "0");
@@ -3772,19 +3756,6 @@ namespace NexusRemoteAgent
         {
             try
             {
-                try
-                {
-                    IntPtr hDesk = OpenInputDesktop(0, false, 0x01FF);
-                    if (hDesk != IntPtr.Zero)
-                    {
-                        SetThreadDesktop(hDesk);
-                        CloseDesktop(hDesk);
-                    }
-                }
-                catch { }
-
-                AcordarMonitorEDisplay();
-
                 string key = ExtrairParam(rawUrl, payload, "key", "");
                 string shortcut = ExtrairParam(rawUrl, payload, "shortcut", "").ToUpper();
                 string keyCodeStr = ExtrairParam(rawUrl, payload, "keyCode", "0");
@@ -3800,9 +3771,36 @@ namespace NexusRemoteAgent
 
                 if (!string.IsNullOrEmpty(shortcut))
                 {
-                    if (shortcut == "CTRL_ALT_DEL")
+                    if (shortcut == "CTRL_ALT_DEL" || shortcut == "DESBLOQUEAR" || shortcut == "UNLOCK" || shortcut == "TSCON")
                     {
-                        System.Diagnostics.Process.Start("taskmgr.exe");
+                        try
+                        {
+                            // Tenta reconectar sessao desconectada de volta ao console grafico do servidor
+                            ProcessStartInfo psiTscon = new ProcessStartInfo("cmd.exe", "/c for /f \"tokens=3\" %i in ('qwinsta ^| findstr /i \"administrador\"') do tscon %i /dest:console");
+                            psiTscon.CreateNoWindow = true;
+                            psiTscon.UseShellExecute = false;
+                            Process.Start(psiTscon);
+                        }
+                        catch { }
+
+                        try
+                        {
+                            // Pressiona espaco e enter para dispensar a tela de protecao/bloqueio do Windows
+                            keybd_event(0x20, 0, 0, 0); // VK_SPACE
+                            Thread.Sleep(30);
+                            keybd_event(0x20, 0, KEYEVENTF_KEYUP, 0);
+                            Thread.Sleep(50);
+                            keybd_event(0x0D, 0, 0, 0); // VK_RETURN
+                            Thread.Sleep(30);
+                            keybd_event(0x0D, 0, KEYEVENTF_KEYUP, 0);
+                        }
+                        catch { }
+
+                        try
+                        {
+                            System.Diagnostics.Process.Start("taskmgr.exe");
+                        }
+                        catch { }
                     }
                     else if (shortcut == "ALT_TAB")
                     {
