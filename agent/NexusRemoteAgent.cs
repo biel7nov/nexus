@@ -1097,7 +1097,15 @@ namespace NexusRemoteAgent
             {
                 SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED);
 
-                if ((DateTime.Now - _ultimoAcordoDisplay).TotalSeconds > 10)
+                // Mexe o cursor suavemente para acordar qualquer protetor de tela ou monitor em standby
+                try
+                {
+                    mouse_event(MOUSEEVENTF_MOVE, 1, 1, 0, 0);
+                    mouse_event(MOUSEEVENTF_MOVE, -1, -1, 0, 0);
+                }
+                catch { }
+
+                if ((DateTime.Now - _ultimoAcordoDisplay).TotalSeconds > 5)
                 {
                     _ultimoAcordoDisplay = DateTime.Now;
                     SendNotifyMessage(HWND_BROADCAST, WM_SYSCOMMAND, (IntPtr)SC_MONITORPOWER, (IntPtr)(-1));
@@ -3437,11 +3445,11 @@ namespace NexusRemoteAgent
                         try
                         {
                             g.CopyFromScreen(bounds.X, bounds.Y, 0, 0, bounds.Size, CopyPixelOperation.SourceCopy);
-                            capturou = true;
+                            if (!IsBitmapTotalmentePreto(rawBmp)) capturou = true;
                         }
                         catch { }
 
-                        // Camada 2: CreateDC("DISPLAY") com CAPTUREBLT (ideal para Server 2025 e sessões virtuais)
+                        // Camada 2: CreateDC("DISPLAY") com CAPTUREBLT (ideal para Windows Server e monitores virtuais)
                         if (!capturou)
                         {
                             try
@@ -3453,7 +3461,7 @@ namespace NexusRemoteAgent
                                     BitBlt(hdcDest, 0, 0, bounds.Width, bounds.Height, hdcDisplay, bounds.X, bounds.Y, 0x00CC0020 | 0x40000000);
                                     g.ReleaseHdc(hdcDest);
                                     DeleteDC(hdcDisplay);
-                                    capturou = true;
+                                    if (!IsBitmapTotalmentePreto(rawBmp)) capturou = true;
                                 }
                             }
                             catch { }
@@ -3472,7 +3480,7 @@ namespace NexusRemoteAgent
                                     BitBlt(hdcDest, 0, 0, bounds.Width, bounds.Height, hdcDesk, bounds.X, bounds.Y, 0x00CC0020 | 0x40000000);
                                     g.ReleaseHdc(hdcDest);
                                     ReleaseDC(hDesktopWnd, hdcDesk);
-                                    capturou = true;
+                                    if (!IsBitmapTotalmentePreto(rawBmp)) capturou = true;
                                 }
                             }
                             catch { }
@@ -3490,7 +3498,7 @@ namespace NexusRemoteAgent
                                     BitBlt(hdcDest, 0, 0, bounds.Width, bounds.Height, hdcScreen, bounds.X, bounds.Y, 0x00CC0020);
                                     g.ReleaseHdc(hdcDest);
                                     ReleaseDC(IntPtr.Zero, hdcScreen);
-                                    capturou = true;
+                                    if (!IsBitmapTotalmentePreto(rawBmp)) capturou = true;
                                 }
                             }
                             catch { }
@@ -3534,6 +3542,26 @@ namespace NexusRemoteAgent
                     if (IsBitmapTotalmentePreto(rawBmp))
                     {
                         AcordarMonitorEDisplay();
+                        try
+                        {
+                            using (Graphics gAlert = Graphics.FromImage(rawBmp))
+                            {
+                                using (Brush bgBrush = new SolidBrush(Color.FromArgb(10, 15, 26)))
+                                {
+                                    gAlert.FillRectangle(bgBrush, 0, 0, bounds.Width, bounds.Height);
+                                }
+                                using (Font fTitle = new Font("Segoe UI", 22, FontStyle.Bold))
+                                using (Font fSub = new Font("Segoe UI", 12, FontStyle.Regular))
+                                {
+                                    int startX = Math.Max(20, bounds.Width / 2 - 260);
+                                    int startY = Math.Max(20, bounds.Height / 2 - 60);
+                                    gAlert.DrawString("🖥️ " + customMachineName + " — Sessão em Espera", fTitle, Brushes.White, startX, startY);
+                                    gAlert.DrawString("O display do servidor está em modo de proteção ou tela de bloqueio.", fSub, Brushes.LightGray, startX, startY + 45);
+                                    gAlert.DrawString("Dê um clique na tela ou use 'Atalhos' acima para interagir e reativar o desktop.", fSub, Brushes.LightSkyBlue, startX, startY + 75);
+                                }
+                            }
+                        }
+                        catch { }
                     }
 
                     if (quality < 20) quality = 20;
@@ -3609,21 +3637,30 @@ namespace NexusRemoteAgent
         {
             try
             {
-                if (bmp == null || bmp.Width < 10 || bmp.Height < 10) return false;
+                if (bmp == null || bmp.Width < 20 || bmp.Height < 20) return false;
+
+                // 1. Centro da tela
                 Color cCenter = bmp.GetPixel(bmp.Width / 2, bmp.Height / 2);
                 if (cCenter.R > 25 || cCenter.G > 25 || cCenter.B > 25) return false;
 
+                // 2. Barra de Tarefas inferior (no Windows ela tem cor cinza/branca ou ícones)
+                Color cTaskbar = bmp.GetPixel(bmp.Width / 2, Math.Max(0, bmp.Height - 15));
+                if (cTaskbar.R > 25 || cTaskbar.G > 25 || cTaskbar.B > 25) return false;
+
+                // 3. Relógio e bandeja no canto inferior direito
+                Color cClock = bmp.GetPixel(Math.Max(0, bmp.Width - 40), Math.Max(0, bmp.Height - 15));
+                if (cClock.R > 25 || cClock.G > 25 || cClock.B > 25) return false;
+
+                // 4. Região de ícones da área de trabalho no canto superior esquerdo
+                Color cIcon = bmp.GetPixel(Math.Min(60, bmp.Width - 1), Math.Min(100, bmp.Height - 1));
+                if (cIcon.R > 25 || cIcon.G > 25 || cIcon.B > 25) return false;
+
+                // 5. Quadrantes médios
                 Color c1 = bmp.GetPixel(bmp.Width / 4, bmp.Height / 4);
                 if (c1.R > 25 || c1.G > 25 || c1.B > 25) return false;
 
                 Color c2 = bmp.GetPixel((bmp.Width * 3) / 4, (bmp.Height * 3) / 4);
                 if (c2.R > 25 || c2.G > 25 || c2.B > 25) return false;
-
-                Color c3 = bmp.GetPixel(bmp.Width / 4, (bmp.Height * 3) / 4);
-                if (c3.R > 25 || c3.G > 25 || c3.B > 25) return false;
-
-                Color c4 = bmp.GetPixel((bmp.Width * 3) / 4, bmp.Height / 4);
-                if (c4.R > 25 || c4.G > 25 || c4.B > 25) return false;
 
                 return true;
             }
