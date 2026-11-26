@@ -1180,8 +1180,8 @@ namespace NexusRemoteAgent
         static long clipboardVersion = 1;
 
         // Versão oficial do Agente NexusTI & Build para Atualizações Silenciosas OTA
-        public const string AGENT_VERSION = "1.3.4";
-        public const int AGENT_BUILD = 133;
+        public const string AGENT_VERSION = "1.3.5";
+        public const int AGENT_BUILD = 135;
         public static bool isAtualizando = false;
         private static Mutex _singleInstanceMutex = null;
 
