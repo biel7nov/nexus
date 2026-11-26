@@ -98,7 +98,7 @@
     </div>
 
     <!-- INDICADOR DE SINCRONIZAÇÃO DE CLIPBOARD BIDIRECIONAL -->
-    <div id="clipboard-badge" class="flex items-center gap-1.5 bg-[#030806]/90 px-2 py-1 rounded-lg border border-emerald-800/60 text-[10px] font-mono text-emerald-300 flex-shrink-0" title="Ctrl+C / Ctrl+V sincronizado automaticamente entre seu PC e o computador remoto">
+    <div id="clipboard-badge" onclick="sincronizarClipboardManual()" class="flex items-center gap-1.5 bg-[#030806]/90 px-2 py-1 rounded-lg border border-emerald-800/60 text-[10px] font-mono text-emerald-300 flex-shrink-0 cursor-pointer hover:bg-emerald-950/80 transition" title="Clique para Injetar ou Sincronizar Área de Transferência (Ctrl+C / Ctrl+V)">
       <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
       <span id="clipboard-status-text">Ctrl+C/V Sincronizado</span>
     </div>
@@ -120,7 +120,7 @@
           <span class="text-[8px]">▼</span>
         </button>
 
-        <div id="keys-dropdown" class="hidden absolute right-0 mt-2 w-52 bg-[#07130d] border border-emerald-800 rounded-xl shadow-2xl p-1.5 z-50 space-y-1 text-xs font-mono">
+        <div id="keys-dropdown" class="hidden absolute right-0 mt-2 w-56 bg-[#07130d] border border-emerald-800 rounded-xl shadow-2xl p-1.5 z-50 space-y-1 text-xs font-mono">
           <button onclick="enviarAtalho('CTRL_ALT_DEL')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-950 text-slate-200 hover:text-white flex items-center justify-between">
             <span>Ctrl + Alt + Del</span>
             <span class="text-[8px] text-slate-500">Desbloquear</span>
@@ -129,13 +129,33 @@
             <span>Reconectar Console</span>
             <span class="text-[8px] text-slate-500">tscon</span>
           </button>
+          <button onclick="enviarAtalho('CTRL_SHIFT_ESC')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-950 text-slate-200 hover:text-white flex items-center justify-between">
+            <span>Gerenciador Tarefas</span>
+            <span class="text-[8px] text-slate-500">Ctrl+Shift+Esc</span>
+          </button>
           <button onclick="enviarAtalho('ALT_TAB')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-950 text-slate-200 hover:text-white flex items-center justify-between">
             <span>Alt + Tab</span>
             <span class="text-[8px] text-slate-500">Janelas</span>
           </button>
+          <button onclick="enviarAtalho('WIN_D')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-950 text-slate-200 hover:text-white flex items-center justify-between">
+            <span>Área de Trabalho</span>
+            <span class="text-[8px] text-slate-500">Win + D</span>
+          </button>
+          <button onclick="enviarAtalho('WIN_E')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-950 text-slate-200 hover:text-white flex items-center justify-between">
+            <span>Explorador Arquivos</span>
+            <span class="text-[8px] text-slate-500">Win + E</span>
+          </button>
+          <button onclick="enviarAtalho('WIN_R')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-950 text-slate-200 hover:text-white flex items-center justify-between">
+            <span>Executar</span>
+            <span class="text-[8px] text-slate-500">Win + R</span>
+          </button>
           <button onclick="enviarAtalho('WIN')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-950 text-slate-200 hover:text-white flex items-center justify-between">
             <span>Tecla Windows</span>
-            <span class="text-[8px] text-slate-500">Menu</span>
+            <span class="text-[8px] text-slate-500">Menu Iniciar</span>
+          </button>
+          <button onclick="enviarAtalho('LOCK')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-950 text-slate-200 hover:text-white flex items-center justify-between">
+            <span>Bloquear Estação</span>
+            <span class="text-[8px] text-slate-500">Win + L</span>
           </button>
           <button onclick="enviarAtalho('ESC')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-950 text-slate-200 hover:text-white flex items-center justify-between">
             <span>Tecla ESC</span>
@@ -433,12 +453,10 @@
       document.getElementById('target-os-badge').innerText = data.os ? data.os.substring(0, 16) : 'Windows';
       document.title = `FSC Remote — ${data.hostname} [${usandoRelay ? 'Túnel Reverso' : 'Direta'}]`;
 
-      if (data.screens && data.screens.length > 1) {
-        telasDisponiveis = data.screens;
-        configurarBotoesTelas(data.screens, data.currentScreen || 0);
-      } else {
-        telasDisponiveis = data.screens || [];
-      }
+      telasDisponiveis = data.screens && data.screens.length > 0 
+        ? data.screens 
+        : [{ id: 0, width: data.screenWidth || 1920, height: data.screenHeight || 1080 }];
+      configurarBotoesTelas(telasDisponiveis, data.currentScreen || 0);
 
       recarregarStreamTela(currentScreenIndex);
 
@@ -515,30 +533,40 @@
       const group = document.getElementById('screen-buttons-group');
       group.innerHTML = '';
 
+      if (!screens || screens.length === 0) {
+        screens = [{ id: 0, width: 1920, height: 1080 }];
+      }
+
       screens.forEach((sc, idx) => {
         const btn = document.createElement('button');
         btn.id = `btn-screen-${idx}`;
+        const w = sc.width || 1920;
+        const h = sc.height || 1080;
+        const label = screens.length > 1 ? `Tela ${idx + 1}` : `Tela 1 (${w}x${h})`;
         btn.className = `px-2 py-1 rounded-lg text-[10px] font-mono transition ${
           idx === telaAtiva 
             ? 'bg-[#2ea853] text-white font-bold shadow' 
             : 'bg-[#091f14] hover:bg-emerald-950 text-slate-300'
         }`;
-        btn.innerText = `Tela ${idx + 1}`;
+        btn.innerText = label;
+        btn.title = `Monitor ${idx + 1}: ${w}x${h}`;
         btn.onclick = () => alternarMonitor(idx);
         group.appendChild(btn);
       });
 
-      const btnAll = document.createElement('button');
-      btnAll.id = 'btn-screen-all';
-      btnAll.className = `px-2 py-1 rounded-lg text-[10px] font-mono transition ${
-        telaAtiva === -1 
-          ? 'bg-[#2ea853] text-white font-bold shadow' 
-          : 'bg-[#091f14] hover:bg-emerald-950 text-slate-300'
-      }`;
-      btnAll.innerText = 'Todas';
-      btnAll.title = 'Visualizar todas as telas combinadas';
-      btnAll.onclick = () => alternarMonitor(-1);
-      group.appendChild(btnAll);
+      if (screens.length > 1) {
+        const btnAll = document.createElement('button');
+        btnAll.id = 'btn-screen-all';
+        btnAll.className = `px-2 py-1 rounded-lg text-[10px] font-mono transition ${
+          telaAtiva === -1 
+            ? 'bg-[#2ea853] text-white font-bold shadow' 
+            : 'bg-[#091f14] hover:bg-emerald-950 text-slate-300'
+        }`;
+        btnAll.innerText = 'Todas';
+        btnAll.title = 'Visualizar todas as telas combinadas';
+        btnAll.onclick = () => alternarMonitor(-1);
+        group.appendChild(btnAll);
+      }
 
       container.classList.remove('hidden');
     }
@@ -565,7 +593,7 @@
       recarregarStreamTela(screenIdx);
     }
 
-    let modoTurbo = true; // Modo Turbo 60 FPS com latência ultra-baixa ativado por padrão
+    let modoTurbo = true; // Turbo por padrão para fluidez ultra rápida e baixa latência
 
     function alternarQualidadeStream() {
       modoTurbo = !modoTurbo;
@@ -574,15 +602,15 @@
       const label = document.getElementById('turbo-mode-label');
 
       if (modoTurbo) {
-        if (icon) icon.innerText = '🚀';
-        if (label) label.innerText = 'Turbo 60 FPS';
+        if (icon) icon.innerText = '⚡';
+        if (label) label.innerText = 'Turbo 40 FPS';
         if (btn) btn.className = 'px-2 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-600/80 text-xs font-mono text-emerald-300 hover:text-white transition flex items-center gap-1 shadow';
-        exibirToast('⚡ Modo Turbo Ativado: 60 FPS, resposta instantânea!');
+        exibirToast('⚡ Modo Turbo: Imagem nítida e resposta imediata (Zero Delay)');
       } else {
-        if (icon) icon.innerText = '🖥️';
-        if (label) label.innerText = 'HD 100%';
+        if (icon) icon.innerText = '💎';
+        if (label) label.innerText = 'HD Cristalino';
         if (btn) btn.className = 'px-2 py-1.5 rounded-lg bg-[#0b1b13] hover:bg-emerald-900/60 border border-emerald-800/60 text-xs font-mono text-slate-300 hover:text-white transition flex items-center gap-1';
-        exibirToast('🖥️ Modo HD Ativado: Resolução nativa 100%');
+        exibirToast('💎 Modo HD Cristalino: Resolução nativa 100% e máxima fidelidade');
       }
 
       recarregarStreamTela(currentScreenIndex);
@@ -600,8 +628,9 @@
       clearTimeout(frameLoopTimer);
 
       const drawCursorParam = modoMouseSemLag ? '0' : '1';
-      const scaleParam = modoTurbo ? '0.75' : '1.0';
-      const qualityParam = modoTurbo ? '40' : '65';
+      // Escala 1.0 garante que o texto nunca fique borrado ou pixelado!
+      const scaleParam = '1.0';
+      const qualityParam = modoTurbo ? '72' : '88';
 
       let frameCarregou = false;
       streamImg.onload = () => {
@@ -640,9 +669,8 @@
         busy = true;
 
         const drawCursorParam = modoMouseSemLag ? '0' : '1';
-        const scaleParam = modoTurbo ? '0.75' : '1.0';
-        const qualityParam = modoTurbo ? '40' : '65';
-        // Sempre usa a tela atual em tempo real (permite alternar tela instantaneamente)
+        const scaleParam = '1.0';
+        const qualityParam = modoTurbo ? '72' : '88';
         const targetScreen = currentScreenIndex;
 
         fetcher.onload = () => {
@@ -653,7 +681,7 @@
         };
         fetcher.onerror = () => {
           busy = false;
-          if (fallbackLoopRodando) setTimeout(proximoQuadro, 100);
+          if (fallbackLoopRodando) setTimeout(proximoQuadro, 80);
         };
         fetcher.src = `${agentUrl}/api/screen?screen=${targetScreen}&drawcursor=${drawCursorParam}&scale=${scaleParam}&quality=${qualityParam}&t=${Date.now()}`;
       }
@@ -780,11 +808,6 @@
 
       enviarComandoMouse('up', buttonStr, normX, normY);
 
-      const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
-      if (dist < 6 && (Date.now() - mouseDownPos.time) < 400) {
-        enviarComandoMouse('click', buttonStr, normX, normY);
-      }
-
       isMouseDown = false;
       isDragging = false;
     }
@@ -829,7 +852,7 @@
         setTimeout(() => {
           mouseHttpBusy = false;
           if (pendingMouseMove) processarFilaMovimentoMouse();
-        }, 50);
+        }, 25);
       } else {
         try {
           await fetch(`${agentUrl}/api/mouse`, {
@@ -841,7 +864,7 @@
         setTimeout(() => {
           mouseHttpBusy = false;
           if (pendingMouseMove) processarFilaMovimentoMouse();
-        }, 30);
+        }, 20);
       }
     }
 
@@ -936,8 +959,18 @@
       }
     }
 
-    // Leitura / Envio Manual pelo botão Ctrl+V da barra
-    function sincronizarClipboardManual() {
+    // Leitura / Envio pelo botão Ctrl+V da barra
+    async function sincronizarClipboardManual() {
+      try {
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          const text = await navigator.clipboard.readText();
+          if (text && text.trim().length > 0) {
+            document.getElementById('clipboard-text-input').value = text;
+            enviarClipboardConfirmado();
+            return;
+          }
+        }
+      } catch (e) {}
       abrirModalClipboard();
     }
 
@@ -1011,6 +1044,17 @@
       }
     }
 
+    // Fecha menu de atalhos ao clicar fora
+    window.addEventListener('click', (e) => {
+      const menu = document.getElementById('keys-dropdown');
+      const btn = document.getElementById('btn-keys-menu');
+      if (menu && !menu.classList.contains('hidden')) {
+        if (!menu.contains(e.target) && !btn.contains(e.target)) {
+          menu.classList.add('hidden');
+        }
+      }
+    });
+
     // Modal Clipboard
     function abrirModalClipboard() {
       document.getElementById('modal-clipboard').classList.remove('hidden');
@@ -1065,20 +1109,45 @@
       }
     }
 
-    // Print
-    function capturarScreenshot() {
-      const img = document.getElementById('remote-stream-img');
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth || 1920;
-      canvas.height = img.naturalHeight || 1080;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    // Print em Alta Definição (sem problema de Cross-Origin / Canvas Taint)
+    async function capturarScreenshot() {
+      exibirToast('📸 Capturando screenshot em alta definição...');
+      try {
+        const targetScreen = currentScreenIndex;
+        const res = await fetch(`${agentUrl}/api/screen?screen=${targetScreen}&scale=1.0&quality=95&drawcursor=1&t=${Date.now()}`);
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.download = `Print_${targetName}_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+          link.href = url;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+          exibirToast('📸 Screenshot salvo com sucesso!');
+          return;
+        }
+      } catch (err) {
+        console.warn('Fallback canvas print:', err);
+      }
 
-      const link = document.createElement('a');
-      link.download = `FSC_Print_${targetName}_${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-      exibirToast('📸 Screenshot capturado e salvo!');
+      try {
+        const img = document.getElementById('remote-stream-img');
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || 1920;
+        canvas.height = img.naturalHeight || 1080;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const link = document.createElement('a');
+        link.download = `Print_${targetName}_${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        exibirToast('📸 Screenshot salvo via canvas!');
+      } catch (e) {
+        exibirToast('Erro ao salvar screenshot.');
+      }
     }
 
     // Controles de Janela

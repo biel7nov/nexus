@@ -1180,8 +1180,8 @@ namespace NexusRemoteAgent
         static long clipboardVersion = 1;
 
         // Versão oficial do Agente NexusTI & Build para Atualizações Silenciosas OTA
-        public const string AGENT_VERSION = "1.3.6";
-        public const int AGENT_BUILD = 136;
+        public const string AGENT_VERSION = "1.3.7";
+        public const int AGENT_BUILD = 137;
         public static bool isAtualizando = false;
         private static Mutex _singleInstanceMutex = null;
 
@@ -2940,13 +2940,13 @@ namespace NexusRemoteAgent
                             if (scaleFactor <= 0.1f || scaleFactor > 1.0f) scaleFactor = 1.0f;
                         }
 
-                        // Qualidade JPEG selecionável (ex: 40 no modo turbo para latência zero)
-                        int quality = 45;
+                        // Qualidade JPEG selecionável (ex: 72 no modo turbo, 88 no modo HD)
+                        int quality = 75;
                         string qQuality = ObterQueryParam(rawUrl, "quality");
                         if (!string.IsNullOrEmpty(qQuality))
                         {
                             int.TryParse(qQuality, out quality);
-                            if (quality < 20 || quality > 95) quality = 45;
+                            if (quality < 20 || quality > 98) quality = 75;
                         }
 
                         try
@@ -2968,7 +2968,7 @@ namespace NexusRemoteAgent
                                 sw.Restart();
                                 int activeScreen = hasExplicitScreen ? explicitScreen : currentScreenIndex;
                                 byte[] imgBytes = CapturaTelaBytes(activeScreen, drawCursor, scaleFactor, quality);
-                                if (imgBytes == null || imgBytes.Length == 0) { Thread.Sleep(100); continue; }
+                                if (imgBytes == null || imgBytes.Length == 0) { Thread.Sleep(80); continue; }
 
                                 string frameHdr = "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " + imgBytes.Length + "\r\n\r\n";
                                 byte[] frameHdrBytes = Encoding.ASCII.GetBytes(frameHdr);
@@ -2980,7 +2980,8 @@ namespace NexusRemoteAgent
 
                                 sw.Stop();
                                 int elapsed = (int)sw.ElapsedMilliseconds;
-                                int targetDelay = (scaleFactor < 0.95f) ? 20 : 25; // 50 FPS no Turbo, 40 FPS no HD
+                                // 30-35 FPS sustentados para garantir latência ultra baixa sem acumular buffer TCP
+                                int targetDelay = (scaleFactor < 0.95f) ? 25 : 30;
                                 int delay = targetDelay - elapsed;
                                 if (delay > 2) Thread.Sleep(delay);
                             }
@@ -3100,13 +3101,37 @@ namespace NexusRemoteAgent
                         string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
                         string target = Path.Combine(desktop, filename);
 
+                        long contentLength = 0;
+                        foreach (string line in lines)
+                        {
+                            if (line.ToLower().StartsWith("content-length:"))
+                            {
+                                long.TryParse(line.Substring(15).Trim(), out contentLength);
+                                break;
+                            }
+                        }
+
                         int bodyIndex = headerStr.IndexOf("\r\n\r\n");
                         if (bodyIndex >= 0)
                         {
                             int bodyOffset = bodyIndex + 4;
+                            int firstChunkSize = bytesRead - bodyOffset;
                             using (FileStream fs = new FileStream(target, FileMode.Create, FileAccess.Write))
                             {
-                                fs.Write(buffer, bodyOffset, bytesRead - bodyOffset);
+                                if (firstChunkSize > 0)
+                                {
+                                    fs.Write(buffer, bodyOffset, firstChunkSize);
+                                }
+                                long remaining = contentLength > 0 ? (contentLength - firstChunkSize) : 0;
+                                byte[] fileBuf = new byte[65536];
+                                while (remaining > 0)
+                                {
+                                    int toRead = (int)Math.Min(remaining, fileBuf.Length);
+                                    int r = stream.Read(fileBuf, 0, toRead);
+                                    if (r <= 0) break;
+                                    fs.Write(fileBuf, 0, r);
+                                    remaining -= r;
+                                }
                             }
                         }
 
@@ -3416,6 +3441,9 @@ namespace NexusRemoteAgent
         [DllImport("user32.dll", SetLastError = true)]
         static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
 
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool LockWorkStation();
+
         [DllImport("gdi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         static extern IntPtr CreateDC(string lpszDriver, string lpszDevice, string lpszOutput, IntPtr lpInitData);
 
@@ -3713,10 +3741,12 @@ namespace NexusRemoteAgent
                 if (targetY >= bounds.Bottom) targetY = bounds.Bottom - 1;
 
                 // Coordenadas absolutas normalizadas (0 a 65535) para mouse_event
+                int virtL = SystemInformation.VirtualScreen.Left;
+                int virtT = SystemInformation.VirtualScreen.Top;
                 int virtW = Math.Max(1, SystemInformation.VirtualScreen.Width);
                 int virtH = Math.Max(1, SystemInformation.VirtualScreen.Height);
-                int absX = (int)((targetX * 65535.0) / virtW);
-                int absY = (int)((targetY * 65535.0) / virtH);
+                int absX = (int)(((targetX - virtL) * 65535.0) / virtW);
+                int absY = (int)(((targetY - virtT) * 65535.0) / virtH);
 
                 // 1. Posiciona o cursor do Windows em nível de hardware driver e Win32
                 SetCursorPos(targetX, targetY);
@@ -3728,30 +3758,30 @@ namespace NexusRemoteAgent
                     if (button == "right")
                     {
                         mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_RIGHTDOWN, absX, absY, 0, 0);
-                        Thread.Sleep(30);
+                        Thread.Sleep(15);
                         mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_RIGHTUP, absX, absY, 0, 0);
                     }
                     else if (button == "middle")
                     {
                         mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MIDDLEDOWN, absX, absY, 0, 0);
-                        Thread.Sleep(30);
+                        Thread.Sleep(15);
                         mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MIDDLEUP, absX, absY, 0, 0);
                     }
                     else
                     {
                         mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
-                        Thread.Sleep(30);
+                        Thread.Sleep(15);
                         mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
                     }
                 }
                 else if (action == "dblclick")
                 {
                     mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
-                    Thread.Sleep(30);
+                    Thread.Sleep(15);
                     mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
-                    Thread.Sleep(60);
+                    Thread.Sleep(40);
                     mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
-                    Thread.Sleep(30);
+                    Thread.Sleep(15);
                     mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
                 }
                 else if (action == "down")
@@ -3762,9 +3792,9 @@ namespace NexusRemoteAgent
                 }
                 else if (action == "up")
                 {
-                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
-                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_RIGHTUP, absX, absY, 0, 0);
-                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MIDDLEUP, absX, absY, 0, 0);
+                    if (button == "right") mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_RIGHTUP, absX, absY, 0, 0);
+                    else if (button == "middle") mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MIDDLEUP, absX, absY, 0, 0);
+                    else mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
                 }
                 else if (action == "wheel")
                 {
@@ -3834,6 +3864,44 @@ namespace NexusRemoteAgent
                         Thread.Sleep(40);
                         keybd_event(0x09, 0, KEYEVENTF_KEYUP, 0);
                         keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0);
+                    }
+                    else if (shortcut == "WIN_D")
+                    {
+                        keybd_event(VK_LWIN, 0, 0, 0);
+                        keybd_event(0x44, 0, 0, 0); // 'D'
+                        Thread.Sleep(30);
+                        keybd_event(0x44, 0, KEYEVENTF_KEYUP, 0);
+                        keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, 0);
+                    }
+                    else if (shortcut == "WIN_R")
+                    {
+                        keybd_event(VK_LWIN, 0, 0, 0);
+                        keybd_event(0x52, 0, 0, 0); // 'R'
+                        Thread.Sleep(30);
+                        keybd_event(0x52, 0, KEYEVENTF_KEYUP, 0);
+                        keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, 0);
+                    }
+                    else if (shortcut == "WIN_E")
+                    {
+                        keybd_event(VK_LWIN, 0, 0, 0);
+                        keybd_event(0x45, 0, 0, 0); // 'E'
+                        Thread.Sleep(30);
+                        keybd_event(0x45, 0, KEYEVENTF_KEYUP, 0);
+                        keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, 0);
+                    }
+                    else if (shortcut == "CTRL_SHIFT_ESC")
+                    {
+                        keybd_event(VK_CONTROL, 0, 0, 0);
+                        keybd_event(VK_SHIFT, 0, 0, 0);
+                        keybd_event(0x1B, 0, 0, 0); // ESC
+                        Thread.Sleep(30);
+                        keybd_event(0x1B, 0, KEYEVENTF_KEYUP, 0);
+                        keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYUP, 0);
+                        keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+                    }
+                    else if (shortcut == "LOCK" || shortcut == "WIN_L")
+                    {
+                        try { LockWorkStation(); } catch { }
                     }
                     else if (shortcut == "WIN")
                     {
