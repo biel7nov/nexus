@@ -225,16 +225,30 @@ namespace NexusRemoteAgent
             return "12h 30m";
         }
 
+        static long _lastTcpCountTicks = 0;
+        static int _cachedTcpCount = 28;
         static int ObterConexoesTcpAtivas()
         {
             try
             {
-                var props = System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties();
-                var conns = props.GetActiveTcpConnections();
-                if (conns != null) return conns.Length;
+                long now = DateTime.UtcNow.Ticks;
+                if ((now - _lastTcpCountTicks) < TimeSpan.FromSeconds(60).Ticks)
+                {
+                    return _cachedTcpCount;
+                }
+                _lastTcpCountTicks = now;
+                ThreadPool.QueueUserWorkItem(_ => {
+                    try
+                    {
+                        var props = System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties();
+                        var conns = props.GetActiveTcpConnections();
+                        if (conns != null) _cachedTcpCount = conns.Length;
+                    }
+                    catch { }
+                });
             }
             catch { }
-            return 24;
+            return _cachedTcpCount;
         }
 
         static long _lastDisksCacheTicks = 0;
@@ -819,7 +833,7 @@ namespace NexusRemoteAgent
                 string[] strayNames = new string[] {
                     "empresa.txt", "machine_name.txt", "machine_tag.txt", "machine_empresa.txt",
                     "is_server.txt", "agent_token.txt", "server_ip.txt", "machine_location.txt",
-                    "avisos_vistos.txt", "empresas.json", "setores.json", "chamados.json",
+                    "empresas.json", "setores.json", "chamados.json",
                     "assets_registry.json", "avisos_historico.json", "avisos_confirmados.json",
                     "enquetes_respostas.json", "startup_error.log", "port_error.log",
                     "capture_error.log", "aviso_err.log", "aviso_error.log"
@@ -1129,13 +1143,50 @@ namespace NexusRemoteAgent
         static long clipboardVersion = 1;
 
         // Versão oficial do Agente NexusTI & Build para Atualizações Silenciosas OTA
-        public const string AGENT_VERSION = "1.3.2";
-        public const int AGENT_BUILD = 132;
+        public const string AGENT_VERSION = "1.3.3";
+        public const int AGENT_BUILD = 133;
         public static bool isAtualizando = false;
+        private static Mutex _singleInstanceMutex = null;
 
         [STAThread]
         static void Main(string[] args)
         {
+            // Se chamado para abrir tela de chamado direto (via Área de Trabalho ou linha de comando)
+            if (args != null && args.Length > 0 && (args[0].ToLower() == "-chamado" || args[0].ToLower() == "-ticket" || args[0].ToLower() == "/chamado"))
+            {
+                AbrirChamadoUI();
+                return;
+            }
+
+            // 0. Instância Única Global Segura via Mutex
+            // Se já existe uma instância do agente em execução, a nova execução encerra imediatamente em silêncio.
+            // Isso impede que watchdogs ou tarefas agendadas fiquem matando e recriando o processo em loop!
+            bool isSingleInstance = false;
+            try
+            {
+                _singleInstanceMutex = new Mutex(true, "Global\\NexusRemoteAgent_SingleInstance_Mutex_v2", out isSingleInstance);
+            }
+            catch
+            {
+                try { _singleInstanceMutex = new Mutex(true, "Local\\NexusRemoteAgent_SingleInstance_Mutex_v2", out isSingleInstance); } catch { }
+            }
+
+            if (!isSingleInstance)
+            {
+                // Instância já em execução saudável. Sai silenciosamente sem qualquer notificação.
+                return;
+            }
+
+            // Encerra apenas processos do agente legado antigo (FSCRemoteAgent) se existirem
+            try
+            {
+                foreach (var p in Process.GetProcessesByName("FSCRemoteAgent"))
+                {
+                    try { p.Kill(); } catch { }
+                }
+            }
+            catch { }
+
             // Proteção contra encerramento inesperado com reinicialização automática e log
             AppDomain.CurrentDomain.UnhandledException += (s, e) => {
                 try { File.WriteAllText(Path.Combine(ObterDiretorioDadosAgente(), "startup_error.log"), e.ExceptionObject != null ? e.ExceptionObject.ToString() : "Unknown exception"); } catch {}
@@ -1163,30 +1214,6 @@ namespace NexusRemoteAgent
             // 1. Habilita DPI Awareness
             try { SetProcessDPIAware(); } catch { }
 
-            // Se chamado para abrir tela de chamado direto (via Área de Trabalho ou linha de comando)
-            if (args != null && args.Length > 0 && (args[0].ToLower() == "-chamado" || args[0].ToLower() == "-ticket" || args[0].ToLower() == "/chamado"))
-            {
-                AbrirChamadoUI();
-                return;
-            }
-
-            // Garante que apenas esta instância permaneça ativa
-            try
-            {
-                Process currentProc = Process.GetCurrentProcess();
-                List<Process> existingProcs = new List<Process>();
-                existingProcs.AddRange(Process.GetProcessesByName("NexusRemoteAgent"));
-                existingProcs.AddRange(Process.GetProcessesByName("FSCRemoteAgent"));
-                foreach (var p in existingProcs)
-                {
-                    if (p.Id != currentProc.Id)
-                    {
-                        try { p.Kill(); p.WaitForExit(1500); } catch { }
-                    }
-                }
-            }
-            catch { }
-
             // Executa extração de HTML, limpeza de arquivos soltos e criação do atalho na Área de Trabalho Pública imediatamente (aproveitando token elevado se houver)
             try
             {
@@ -1197,30 +1224,7 @@ namespace NexusRemoteAgent
             }
             catch { }
 
-            // Se iniciado sem --daemon (ex: via cmd.exe de OTA), relança via ShellExecute (bInheritHandles=false)
-            // para liberar 100% quaisquer handles de socket herdados na porta 8090
-            bool isDaemon = false;
-            if (args != null)
-            {
-                foreach (string a in args)
-                {
-                    if (a != null && a.ToLower() == "--daemon") isDaemon = true;
-                }
-            }
-            if (!isDaemon)
-            {
-                try
-                {
-                    Thread.Sleep(500);
-                    ProcessStartInfo psiClean = new ProcessStartInfo(Application.ExecutablePath, "--daemon");
-                    psiClean.UseShellExecute = true;
-                    psiClean.WorkingDirectory = Path.GetDirectoryName(Application.ExecutablePath);
-                    Process.Start(psiClean);
-                    Environment.Exit(0);
-                    return;
-                }
-                catch { }
-            }
+
 
             try
             {
@@ -1302,7 +1306,10 @@ namespace NexusRemoteAgent
                                 AtualizarGeolocalizacao();
                             }
 
-                            VerificarComunicadosSupabase();
+                            if (tick % 12 == 0) // Verifica novos comunicados oficiais a cada 60s (evita spam e sobrecarga)
+                            {
+                                VerificarComunicadosSupabase();
+                            }
                             if (tick % 6 == 0)
                             {
                                 ThreadPool.QueueUserWorkItem(state => {
@@ -1607,13 +1614,16 @@ namespace NexusRemoteAgent
                                     RegistrarAvisoVisto(id);
 
                                     // Descarta avisos emitidos no passado (antes do agente iniciar ou há mais de 10 minutos)
-                                    DateTime criadoEm;
-                                    if (!string.IsNullOrEmpty(criadoEmStr) && DateTime.TryParse(criadoEmStr, out criadoEm))
+                                    DateTime criadoEm = DateTime.MinValue;
+                                    bool parsed = false;
+                                    if (!string.IsNullOrEmpty(criadoEmStr))
                                     {
-                                        if (criadoEm.ToUniversalTime() < agentStartTimeUtc.AddMinutes(-5))
-                                        {
-                                            continue;
-                                        }
+                                        parsed = DateTime.TryParse(criadoEmStr, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out criadoEm)
+                                                 || DateTime.TryParse(criadoEmStr, out criadoEm);
+                                    }
+                                    if (!parsed || criadoEm.ToUniversalTime() < agentStartTimeUtc.AddMinutes(-5))
+                                    {
+                                        continue;
                                     }
 
                                     bool destinatarioValido = (string.IsNullOrEmpty(destinatario) || destinatario == "broadcast" || destinatario.ToLower() == "todas" || destinatario.ToLower().Contains("todas"));
@@ -1938,11 +1948,6 @@ namespace NexusRemoteAgent
             trayIcon.Icon = ObterIconeNexus();
             trayIcon.Text = "NexusTI Agent — " + customMachineName + " (" + localIpAddress + ":" + port + ")";
             trayIcon.Visible = true;
-
-            trayIcon.BalloonTipTitle = "NexusTI Remote Agent Ativo";
-            trayIcon.BalloonTipText = "Ativo: " + customMachineName + "\nIP: " + localIpAddress + ":" + port + "\nNexusTI Suporte & Chamados ativo.";
-            trayIcon.BalloonTipIcon = ToolTipIcon.Info;
-            trayIcon.ShowBalloonTip(3000);
 
             trayIcon.DoubleClick += (s, e) => {
                 AbrirChamadoUI();
