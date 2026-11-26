@@ -327,44 +327,6 @@
     let mouseHttpBusy = false;
     let pendingMouseMove = null;
 
-    // Se o viewer estiver em HTTPS na nuvem e o agente em HTTP na rede local
-    if (window.location.protocol === 'https:' && agentUrl && agentUrl.startsWith('http://')) {
-      const targetLocal = agentUrl + '/viewer.html' + window.location.search;
-      console.log('Ambiente HTTPS detectado com agente HTTP local:', targetLocal);
-      
-      // Cria tela de transição com botão direto (garante conexão mesmo se o navegador restringir redirect automático)
-      window.addEventListener('DOMContentLoaded', () => {
-        const overlay = document.createElement('div');
-        overlay.id = 'https-notice-overlay';
-        overlay.className = 'fixed inset-0 z-50 bg-[#020503] flex flex-col items-center justify-center p-4 text-center';
-        overlay.innerHTML = `
-          <div class="max-w-md w-full bg-[#07130d] border border-emerald-500/40 rounded-2xl p-6 shadow-2xl space-y-4">
-            <div class="w-12 h-12 mx-auto rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            </div>
-            <h3 class="text-white font-bold text-base">Conexão Remota de Alta Performance</h3>
-            <p class="text-xs text-slate-300 leading-relaxed">
-              O painel foi aberto pela nuvem (HTTPS). Para taxa máxima de 60 FPS com latência zero e sem restrições de rede mista, conecte-se diretamente ao agente local:
-            </p>
-            <a href="${targetLocal}" target="_self" rel="noreferrer" class="block w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl shadow-lg transition">
-              🚀 Conectar Diretamente ao Servidor (${targetName})
-            </a>
-            <button onclick="document.getElementById('https-notice-overlay').remove(); tentarConexaoRelayForcada();" class="text-xs text-slate-400 hover:text-white underline transition">
-              Ou continuar via Túnel Reverso na Nuvem (Relay)
-            </button>
-          </div>
-        `;
-        document.body.appendChild(overlay);
-      });
-
-      // Tentativa suave de navegação direta
-      try {
-        window.location.href = targetLocal;
-      } catch (e) {
-        console.warn('Navegação automática restrita pelo navegador:', e);
-      }
-    }
-
     window.addEventListener('DOMContentLoaded', () => {
       document.title = `FSC Remote — ${targetName} (${agentUrl.replace(/^https?:\/\//, '')})`;
       document.getElementById('target-name-display').innerText = targetName;

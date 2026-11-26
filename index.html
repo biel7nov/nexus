@@ -4494,7 +4494,43 @@
           </div>
         </div>
 
-        
+        <!-- RESOLUÇÃO TÉCNICA / PARECER DO ATENDIMENTO -->
+        <div class="space-y-2 pt-2 border-t border-slate-200/80">
+          <div class="flex items-center justify-between">
+            <label class="block font-bold text-slate-800 text-xs flex items-center gap-1.5">
+              <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Resolução Técnica / Parecer do Atendimento</span>
+            </label>
+            <span id="detalhe-chamado-resolucao-badge" class="hidden text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+              <i data-lucide="check" class="w-3 h-3"></i>
+              <span>Solução Registrada</span>
+            </span>
+          </div>
+
+          <div class="relative">
+            <textarea 
+              id="detalhe-chamado-nota-interna" 
+              rows="4" 
+              placeholder="Descreva detalhadamente o parecer técnico, procedimentos executados e a solução aplicada neste chamado..."
+              class="w-full p-3.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs font-sans transition resize-y leading-relaxed placeholder:text-slate-400"
+            ></textarea>
+          </div>
+
+          <div class="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+            <span id="detalhe-chamado-ultima-atualizacao" class="italic flex items-center gap-1 text-[11px] text-slate-500">
+              <i data-lucide="clock" class="w-3 h-3 text-slate-400"></i>
+              <span>Sem registros técnicos prévios</span>
+            </span>
+            <button 
+              type="button" 
+              onclick="salvarNotaTecnicaChamadoModal()" 
+              class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs transition cursor-pointer border border-blue-200 shadow-2xs"
+            >
+              <i data-lucide="save" class="w-3.5 h-3.5"></i>
+              <span>Salvar Parecer</span>
+            </button>
+          </div>
+        </div>
 
         <!-- ATALHO ELEGANTE PARA O CHAT NA OUTRA ABA -->
         <div class="pt-2.5 flex items-center justify-between text-xs border-t border-slate-200/80">
@@ -5572,17 +5608,16 @@
                         '&relay=' + encodeURIComponent('http://' + centralSrv) + 
                         '&mode=' + encodeURIComponent(modoEscolhido);
 
-      // URL direta do agente (Transmissão nativa 60 FPS sem mixed content)
+      // URL primária do Viewer na mesma origem (carrega instantaneamente sem travar no Chrome com about:blank)
+      const primaryViewerUrl = cloudViewerUrl;
       const directViewerUrl = `http://${targetIp}:8090/viewer.html${queryParams}`;
-      // URL na nuvem (fallback)
-      const cloudViewerUrl = `viewer.html${queryParams}`;
 
       adicionarLog('127.0.0.1', targetName, 'Conexão Remota', 'Acesso remoto aberto para ' + targetName + ' (' + targetIp + ') [Modo: ' + modoEscolhido + ']', 'text-blue-600');
 
-      // Tenta abrir em nova aba limpa (sem features de popup que o Chrome trava em about:blank)
+      // Tenta abrir em nova aba limpa
       let opened = false;
       try {
-        const win = window.open(directViewerUrl, '_blank');
+        const win = window.open(primaryViewerUrl, '_blank');
         if (win && !win.closed) {
           opened = true;
           try { win.focus(); } catch(e) {}
@@ -5595,7 +5630,7 @@
       if (!opened) {
         try {
           const a = document.createElement('a');
-          a.href = directViewerUrl;
+          a.href = primaryViewerUrl;
           a.target = '_blank';
           a.rel = 'noreferrer';
           document.body.appendChild(a);
@@ -5606,10 +5641,10 @@
       }
 
       // Exibe toast interativo com botão direto caso o navegador tenha bloqueado popups
-      mostrarToastAcessoRemoto(targetName, targetIp, directViewerUrl, cloudViewerUrl);
+      mostrarToastAcessoRemoto(targetName, targetIp, primaryViewerUrl, directViewerUrl);
     }
 
-    function mostrarToastAcessoRemoto(targetName, targetIp, directUrl, cloudUrl) {
+    function mostrarToastAcessoRemoto(targetName, targetIp, viewerUrl, directUrl) {
       let container = document.getElementById('toast-container');
       if (!container) {
         container = document.createElement('div');
@@ -5633,11 +5668,11 @@
             </div>
             <p class="text-[11px] text-slate-300 mt-1 leading-snug">Sessão remota iniciada. Se a aba não abriu automaticamente:</p>
             <div class="flex items-center gap-1.5 mt-2.5">
-              <a href="${directUrl}" target="_blank" rel="noreferrer" class="flex-1 py-1.5 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] text-center shadow transition flex items-center justify-center gap-1">
-                <span>🚀 Abrir Acesso Direto</span>
+              <a href="${viewerUrl}" target="_blank" rel="noreferrer" class="flex-1 py-1.5 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] text-center shadow transition flex items-center justify-center gap-1">
+                <span>🚀 Abrir Acesso Remoto</span>
               </a>
-              <a href="${cloudUrl}" target="_blank" rel="noreferrer" class="py-1.5 px-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white font-medium text-[10px] border border-white/10 transition" title="Conectar via Nuvem (Relay)">
-                Nuvem
+              <a href="${directUrl}" target="_blank" rel="noreferrer" class="py-1.5 px-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white font-medium text-[10px] border border-white/10 transition" title="Abrir diretamente pelo IP local">
+                IP Direto
               </a>
             </div>
           </div>
@@ -7268,8 +7303,18 @@
       if (elIp) elIp.textContent = (c.ip || '127.0.0.1') + ':8090';
 
       if (elDesc) elDesc.textContent = c.descricao || c.desc || 'Nenhuma descrição detalhada enviada pelo usuário.';
-      if (elNota) elNota.value = c.notaTecnica || '';
-      if (elUltAt) elUltAt.textContent = c.ultimaAtualizacao ? `Última atualização: ${c.ultimaAtualizacao}` : 'Sem registros técnicos prévios';
+      if (elNota) elNota.value = c.resolucao || c.notaTecnica || '';
+      if (elUltAt) elUltAt.innerHTML = c.ultimaAtualizacao ? `<i data-lucide="clock" class="w-3 h-3 text-slate-400"></i><span>${c.ultimaAtualizacao}</span>` : '<i data-lucide="clock" class="w-3 h-3 text-slate-400"></i><span>Sem registros técnicos prévios</span>';
+
+      const badgeRes = document.getElementById('detalhe-chamado-resolucao-badge');
+      if (badgeRes) {
+        if (c.resolucao || c.notaTecnica) {
+          badgeRes.classList.remove('hidden');
+          badgeRes.innerHTML = `<i data-lucide="check-check" class="w-3 h-3 text-emerald-600"></i><span>${isConcluido ? 'Concluído com Solução' : 'Parecer Registrado'}</span>`;
+        } else {
+          badgeRes.classList.add('hidden');
+        }
+      }
 
       // Exibição da Avaliação CSAT do Solicitante no Drawer
       const boxAvaliacao = document.getElementById('drawer-secao-avaliacao-cliente');
@@ -7662,13 +7707,16 @@
       const c = listaChamados.find(item => String(item.id) === String(chamadoAbertoNoModalId));
       if (!c) return;
 
-      const nota = document.getElementById('detalhe-chamado-nota-interna').value.trim();
+      const elNota = document.getElementById('detalhe-chamado-nota-interna');
+      const nota = elNota ? elNota.value.trim() : '';
       const user = obterUsuarioLogado();
       c.notaTecnica = nota;
-      c.ultimaAtualizacao = 'Hoje às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' por ' + user.nome;
+      c.resolucao = nota;
+      c.ultimaAtualizacao = 'Atualizado hoje às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' por ' + user.nome;
 
       salvarDadosLocais();
-      adicionarLog(c.ip || '127.0.0.1', c.ativo, 'Parecer Técnico Salvo', `Nota técnica registrada para #${c.id} por ${user.nome}`, 'text-blue-600 font-semibold');
+      sincronizarChamadoNoSupabase(c);
+      adicionarLog(c.ip || '127.0.0.1', c.ativo, 'Parecer Técnico Salvo', `Parecer técnico/resolução registrado para #${c.id} por ${user.nome}`, 'text-blue-600 font-semibold');
       mostrarToast(`Parecer técnico do chamado #${c.id} salvo com sucesso!`, 'success', 'Parecer Registrado');
       abrirModalDetalhesChamado(chamadoAbertoNoModalId);
     }
@@ -7679,7 +7727,21 @@
       if (!c) return;
       if (normalizarStatusFunil(c.status) === 'Resolvido') return;
 
+      const elNota = document.getElementById('detalhe-chamado-nota-interna');
+      const textoResolucao = elNota ? elNota.value.trim() : '';
+      const user = obterUsuarioLogado();
+
+      if (textoResolucao) {
+        c.notaTecnica = textoResolucao;
+        c.resolucao = textoResolucao;
+      }
+      c.ultimaAtualizacao = 'Concluído hoje às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' por ' + user.nome;
+
       moverChamadoParaStatus(chamadoAbertoNoModalId, 'Resolvido');
+      salvarDadosLocais();
+      sincronizarChamadoNoSupabase(c);
+      adicionarLog(c.ip || '127.0.0.1', c.ativo, 'Chamado Concluído', `Chamado #${c.id} marcado como Concluído por ${user.nome}`, 'text-emerald-600 font-semibold');
+      mostrarToast(`Chamado #${c.id} marcado como Concluído com sucesso!`, 'success', 'Atendimento Finalizado');
       abrirModalDetalhesChamado(chamadoAbertoNoModalId);
     }
 
@@ -9945,7 +10007,7 @@
     function sincronizarChamadoNoSupabase(chamado) {
       if (!supabaseClient || !chamado) return;
       try {
-        supabaseClient.from('chamados').upsert({
+        const payload = {
           id: String(chamado.id),
           protocolo: String(chamado.id),
           empresa: chamado.empresa || 'Aço Móveis',
@@ -9959,7 +10021,17 @@
           maquina_ip: chamado.ip || 'auto',
           tecnico: chamado.responsavel || chamado.tecnico || 'Não atribuído',
           historico: chamado.mensagens || []
-        }).then(() => {}).catch(err => console.warn('Erro ao atualizar chamado no Supabase:', err));
+        };
+        if (chamado.resolucao || chamado.notaTecnica) {
+          payload.resolucao = chamado.resolucao || chamado.notaTecnica || '';
+        }
+        supabaseClient.from('chamados').upsert(payload)
+          .then(() => {})
+          .catch(err => {
+            // Se a coluna resolucao não existir na tabela do Supabase, tenta sem ela para não falhar
+            delete payload.resolucao;
+            supabaseClient.from('chamados').upsert(payload).catch(() => {});
+          });
       } catch(e) {}
     }
 
@@ -9986,6 +10058,8 @@
         tecnico: ch.tecnico && ch.tecnico !== 'Não atribuído' ? ch.tecnico : '',
         ip: ch.maquina_ip || 'auto',
         ativo: ch.maquina_nome || 'auto',
+        resolucao: ch.resolucao || ch.nota_tecnica || ch.fechamento_detalhes || '',
+        notaTecnica: ch.nota_tecnica || ch.resolucao || ch.fechamento_detalhes || '',
         mensagens: msgs
       };
     }
@@ -10027,6 +10101,9 @@
               status: lockStatusRecente ? exist.status : nv.status,
               responsavel: lockStatusRecente ? exist.responsavel : nv.responsavel,
               tecnico: lockStatusRecente ? exist.tecnico : nv.tecnico,
+              resolucao: exist.resolucao || nv.resolucao || exist.notaTecnica || nv.notaTecnica || '',
+              notaTecnica: exist.notaTecnica || nv.notaTecnica || exist.resolucao || nv.resolucao || '',
+              ultimaAtualizacao: exist.ultimaAtualizacao || nv.ultimaAtualizacao || '',
               mensagens: mergedMsgs
             });
             novaLista.push(itemUnificado);
