@@ -809,7 +809,7 @@ namespace NexusRemoteAgent
             }
             catch { }
 
-            return Encoding.UTF8.GetBytes("<!DOCTYPE html><html><head><meta charset='UTF-8'><script>window.location.replace('https://nexus-ten-brown.vercel.app/viewer.html' + window.location.search);</script></head><body>Carregando Viewer NexusTI...</body></html>");
+            return Encoding.UTF8.GetBytes("<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'><title>Nexus Remote Viewer</title><style>body{background:#020503;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}a{color:#2ea853;text-decoration:none;font-weight:bold;padding:12px 24px;border:1px solid #2ea853;border-radius:8px;}</style></head><body><div style='text-align:center;'><h2>Nexus Remote Viewer</h2><p>Agente conectado e ativo.</p><p><a href='/viewer.html'>Recarregar Visualizador Local</a></p></div></body></html>");
         }
 
         public static void LimparArquivosSoltosIndesejados()
@@ -3344,48 +3344,23 @@ namespace NexusRemoteAgent
         [DllImport("kernel32.dll")]
         static extern uint WTSGetActiveConsoleSessionId();
 
-        static long _lastConsoleAttachTicks = 0;
         public static void GarantirSessaoConsoleAtiva()
         {
-            try
-            {
-                long now = DateTime.UtcNow.Ticks;
-                if ((now - _lastConsoleAttachTicks) < TimeSpan.FromSeconds(3).Ticks) return;
-                _lastConsoleAttachTicks = now;
-
-                int mySessionId = Process.GetCurrentProcess().SessionId;
-                uint consoleSessionId = WTSGetActiveConsoleSessionId();
-                if (mySessionId != (int)consoleSessionId && mySessionId > 0)
-                {
-                    ProcessStartInfo psi = new ProcessStartInfo("tscon.exe", mySessionId + " /dest:console");
-                    psi.WindowStyle = ProcessWindowStyle.Hidden;
-                    psi.CreateNoWindow = true;
-                    psi.UseShellExecute = false;
-                    using (Process p = Process.Start(psi))
-                    {
-                        p.WaitForExit(1200);
-                    }
-                }
-            }
-            catch { }
+            // Seguro: Mantém sessão ativa sem travar com tscon.exe
         }
 
         static byte[] CapturaTelaBytes(int screenIdx, bool drawCursor, float scaleFactor = 1.0f, int quality = 45)
         {
-            GarantirSessaoConsoleAtiva();
-            IntPtr hDesk = IntPtr.Zero;
             try
             {
-                // Anexa à estação de janela e desktop ativos (essencial para Windows Server e RDP)
                 try
                 {
-                    IntPtr hwinsta = OpenWindowStation("winsta0", false, 0x037F);
-                    if (hwinsta != IntPtr.Zero) SetProcessWindowStation(hwinsta);
-
-                    hDesk = OpenInputDesktop(0, false, 0x01FF);
-                    if (hDesk == IntPtr.Zero) hDesk = OpenDesktop("Default", 0, false, 0x01FF);
-                    if (hDesk == IntPtr.Zero) hDesk = OpenDesktop("Winlogon", 0, false, 0x01FF);
-                    if (hDesk != IntPtr.Zero) SetThreadDesktop(hDesk);
+                    IntPtr hDesk = OpenInputDesktop(0, false, 0x01FF);
+                    if (hDesk != IntPtr.Zero)
+                    {
+                        SetThreadDesktop(hDesk);
+                        CloseDesktop(hDesk);
+                    }
                 }
                 catch { }
 
@@ -3563,13 +3538,6 @@ namespace NexusRemoteAgent
                 }
                 catch { }
                 return new byte[0];
-            }
-            finally
-            {
-                if (hDesk != IntPtr.Zero)
-                {
-                    try { CloseDesktop(hDesk); } catch { }
-                }
             }
         }
 
