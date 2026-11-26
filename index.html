@@ -5609,7 +5609,7 @@
                         '&mode=' + encodeURIComponent(modoEscolhido);
 
       // URL primária do Viewer na mesma origem (carrega instantaneamente sem travar no Chrome com about:blank)
-      const primaryViewerUrl = cloudViewerUrl;
+      const primaryViewerUrl = `viewer.html${queryParams}`;
       const directViewerUrl = `http://${targetIp}:8090/viewer.html${queryParams}`;
 
       adicionarLog('127.0.0.1', targetName, 'Conexão Remota', 'Acesso remoto aberto para ' + targetName + ' (' + targetIp + ') [Modo: ' + modoEscolhido + ']', 'text-blue-600');
