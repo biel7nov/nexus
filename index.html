@@ -9638,7 +9638,8 @@
             }
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'computadores' }, () => {
-            sincronizarComputadoresDoSupabase();
+            // Atualização estabilizada: evita que o flood de heartbeats faça a tabela de estações piscar.
+            // A sincronização dos dados das máquinas ocorre rigorosamente de 2 em 2 minutos via timer.
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'empresas' }, async () => {
             const { data } = await supabaseClient.from('empresas').select('nome').order('criado_em', { ascending: true });
@@ -11611,18 +11612,18 @@
 
       if (badgeEmp) {
         if (podeEmpresa) {
-          badgeEmp.className = 'p-3.5 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-100 flex items-center justify-between text-xs transition shadow-sm';
+          badgeEmp.className = 'p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-500/40 text-slate-800 dark:text-emerald-100 flex items-center justify-between text-xs transition shadow-sm';
           badgeEmp.innerHTML = `
             <div class="flex items-center gap-3">
-              <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold shrink-0">
-                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+              <div class="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30 flex items-center justify-center font-bold shrink-0">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
               </div>
               <div>
-                <span class="font-bold text-white text-xs">Permissão de Gestor Ativa:</span>
-                <span class="text-emerald-200/90 text-xs ml-1 font-normal">Sua conta possui autorização para editar o nome da organização, e-mail corporativo e gerenciar os setores cadastrados.</span>
+                <span class="font-bold text-slate-900 dark:text-white text-xs">Permissão de Gestor Ativa:</span>
+                <span class="text-slate-700 dark:text-emerald-200 text-xs ml-1 font-medium">Sua conta possui autorização para editar o nome da organização, e-mail corporativo e gerenciar os setores cadastrados.</span>
               </div>
             </div>
-            <span class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[11px] border border-emerald-500/40 shrink-0">Gestor do Setup</span>
+            <span class="px-3 py-1 rounded-full bg-emerald-600 text-white dark:bg-emerald-500/20 dark:text-emerald-300 font-bold text-[11px] border border-emerald-700 dark:border-emerald-500/40 shrink-0 shadow-xs">Gestor do Setup</span>
           `;
           if (elEmpNome) elEmpNome.removeAttribute('readonly');
           if (elEmpEmail) elEmpEmail.removeAttribute('readonly');

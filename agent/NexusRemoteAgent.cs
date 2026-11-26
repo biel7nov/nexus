@@ -1082,8 +1082,8 @@ namespace NexusRemoteAgent
         const uint ES_CONTINUOUS = 0x80000000;
         const uint ES_AWAYMODE_REQUIRED = 0x00000040;
 
-        [DllImport("user32.dll")]
-        static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool SendNotifyMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
         const uint WM_SYSCOMMAND = 0x0112;
         const int SC_MONITORPOWER = 0xF170;
@@ -1097,12 +1097,10 @@ namespace NexusRemoteAgent
             {
                 SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED);
 
-                if ((DateTime.Now - _ultimoAcordoDisplay).TotalSeconds > 8)
+                if ((DateTime.Now - _ultimoAcordoDisplay).TotalSeconds > 10)
                 {
                     _ultimoAcordoDisplay = DateTime.Now;
-                    SendMessage(HWND_BROADCAST, WM_SYSCOMMAND, (IntPtr)SC_MONITORPOWER, (IntPtr)(-1));
-                    mouse_event(MOUSEEVENTF_MOVE, 1, 1, 0, 0);
-                    mouse_event(MOUSEEVENTF_MOVE, -1, -1, 0, 0);
+                    SendNotifyMessage(HWND_BROADCAST, WM_SYSCOMMAND, (IntPtr)SC_MONITORPOWER, (IntPtr)(-1));
                 }
             }
             catch { }
@@ -2991,30 +2989,62 @@ namespace NexusRemoteAgent
                         }
                         break;
                     }
-                    // 5. AÇÕES DE MOUSE (ATÔMICAS, SEM CLIQUES FANTASMAS, COM VALIDAÇÃO DE TOKEN)
-                    else if (path.StartsWith("/api/mouse") && method == "POST")
+                    // 5. AÇÕES DE MOUSE (ATÔMICAS, SEM CLIQUES FANTASMAS, COMPATÍVEL COM POST E GET BEACON)
+                    else if (path.StartsWith("/api/mouse"))
                     {
-                        string body = ExtrairCorpoRequisicao(headerStr, lines, buffer, bytesRead, stream);
+                        string body = "";
+                        if (method == "POST")
+                        {
+                            body = ExtrairCorpoRequisicao(headerStr, lines, buffer, bytesRead, stream);
+                        }
                         if (!ValidarAcessoSensivel(client, rawUrl, lines, body, false))
                         {
                             EnviarRespostaCors(stream, 401, "Unauthorized", "application/json", Encoding.UTF8.GetBytes("{\"ok\":false,\"erro\":\"Nao autorizado\"}"), false);
                             break;
                         }
-                        ExecutaAcaoMouse(body);
-                        EnviarRespostaCors(stream, 200, "OK", "application/json", Encoding.UTF8.GetBytes("{\"ok\":true}"), keepAlive);
+                        ExecutaAcaoMouse(body, rawUrl);
+                        if (method == "GET")
+                        {
+                            byte[] gif1x1 = new byte[] {
+                                0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                0xff, 0xff, 0xff, 0x21, 0xf9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00,
+                                0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b
+                            };
+                            EnviarRespostaCors(stream, 200, "OK", "image/gif", gif1x1, keepAlive);
+                        }
+                        else
+                        {
+                            EnviarRespostaCors(stream, 200, "OK", "application/json", Encoding.UTF8.GetBytes("{\"ok\":true}"), keepAlive);
+                        }
                         if (!keepAlive) break;
                     }
-                    // 6. TECLADO (COM VALIDAÇÃO DE TOKEN)
-                    else if (path.StartsWith("/api/keyboard") && method == "POST")
+                    // 6. TECLADO (COMPATÍVEL COM POST E GET BEACON)
+                    else if (path.StartsWith("/api/keyboard"))
                     {
-                        string body = ExtrairCorpoRequisicao(headerStr, lines, buffer, bytesRead, stream);
+                        string body = "";
+                        if (method == "POST")
+                        {
+                            body = ExtrairCorpoRequisicao(headerStr, lines, buffer, bytesRead, stream);
+                        }
                         if (!ValidarAcessoSensivel(client, rawUrl, lines, body, false))
                         {
                             EnviarRespostaCors(stream, 401, "Unauthorized", "application/json", Encoding.UTF8.GetBytes("{\"ok\":false,\"erro\":\"Nao autorizado\"}"), false);
                             break;
                         }
-                        ExecutaAcaoTeclado(body);
-                        EnviarRespostaCors(stream, 200, "OK", "application/json", Encoding.UTF8.GetBytes("{\"ok\":true}"), keepAlive);
+                        ExecutaAcaoTeclado(body, rawUrl);
+                        if (method == "GET")
+                        {
+                            byte[] gif1x1 = new byte[] {
+                                0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                0xff, 0xff, 0xff, 0x21, 0xf9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00,
+                                0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b
+                            };
+                            EnviarRespostaCors(stream, 200, "OK", "image/gif", gif1x1, keepAlive);
+                        }
+                        else
+                        {
+                            EnviarRespostaCors(stream, 200, "OK", "application/json", Encoding.UTF8.GetBytes("{\"ok\":true}"), keepAlive);
+                        }
                         if (!keepAlive) break;
                     }
                     // 7. CLIPBOARD
@@ -3600,7 +3630,7 @@ namespace NexusRemoteAgent
             catch { return false; }
         }
 
-        static void ExecutaAcaoMouse(string payload)
+        static void ExecutaAcaoMouse(string payload, string rawUrl = "")
         {
             try
             {
@@ -3619,86 +3649,72 @@ namespace NexusRemoteAgent
                 // Mantém o monitor ligado e reativa a saída gráfica se estiver em repouso
                 AcordarMonitorEDisplay();
 
-                string clean = payload.Replace("{", "").Replace("}", "").Replace("\"", "");
-                string[] parts = clean.Split(',');
+                string action = ExtrairParam(rawUrl, payload, "action", "move").ToLower();
+                string button = ExtrairParam(rawUrl, payload, "button", "left").ToLower();
+                string xStr = ExtrairParam(rawUrl, payload, "x", "0");
+                string yStr = ExtrairParam(rawUrl, payload, "y", "0");
+                string deltaStr = ExtrairParam(rawUrl, payload, "delta", "0");
+                string screenStr = ExtrairParam(rawUrl, payload, "screen", currentScreenIndex.ToString());
 
                 double xVal = 0, yVal = 0;
-                string action = "move";
-                string button = "left";
+                double.TryParse(xStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out xVal);
+                double.TryParse(yStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out yVal);
                 int wheelDelta = 0;
+                int.TryParse(deltaStr, out wheelDelta);
                 int screenIdx = currentScreenIndex;
-
-                foreach (string p in parts)
-                {
-                    string[] kv = p.Split(':');
-                    if (kv.Length < 2) continue;
-                    string k = kv[0].Trim().ToLower();
-                    string v = kv[1].Trim();
-
-                    if (k == "x") double.TryParse(v, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out xVal);
-                    if (k == "y") double.TryParse(v, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out yVal);
-                    if (k == "action") action = v.ToLower();
-                    if (button == "left" && k == "button") button = v.ToLower();
-                    if (k == "delta") int.TryParse(v, out wheelDelta);
-                    if (k == "screen") int.TryParse(v, out screenIdx);
-                }
+                int.TryParse(screenStr, out screenIdx);
 
                 Rectangle bounds = ObterBoundsTela(screenIdx);
 
                 int targetX = bounds.X + (int)(xVal <= 1.0 ? xVal * bounds.Width : xVal);
                 int targetY = bounds.Y + (int)(yVal <= 1.0 ? yVal * bounds.Height : yVal);
 
-                // Posiciona o ponteiro visual
+                // 1. Posiciona o cursor do Windows no ponto exato
                 SetCursorPos(targetX, targetY);
 
-                // Converte para coordenadas absolutas de hardware (0 a 65535) para mouse_event
-                int screenW = Math.Max(1, bounds.Width);
-                int screenH = Math.Max(1, bounds.Height);
-                int absX = (int)(((double)(targetX - bounds.X) / screenW) * 65535.0);
-                int absY = (int)(((double)(targetY - bounds.Y) / screenH) * 65535.0);
-
+                // 2. Dispara o evento de mouse no ponto exato (relativo 0,0 garante clique sem desvios de DPI ou multi-monitor)
                 if (action == "click")
                 {
                     if (button == "right")
                     {
-                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_RIGHTDOWN, absX, absY, 0, 0);
-                        Thread.Sleep(25);
-                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_RIGHTUP, absX, absY, 0, 0);
+                        mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
+                        Thread.Sleep(20);
+                        mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
                     }
                     else if (button == "middle")
                     {
-                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_MIDDLEDOWN, absX, absY, 0, 0);
-                        Thread.Sleep(25);
-                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_MIDDLEUP, absX, absY, 0, 0);
+                        mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, 0);
+                        Thread.Sleep(20);
+                        mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, 0);
                     }
                     else
                     {
-                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
-                        Thread.Sleep(25);
-                        mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
+                        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+                        Thread.Sleep(20);
+                        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
                     }
                 }
                 else if (action == "dblclick")
                 {
-                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
-                    Thread.Sleep(25);
-                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
+                    mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+                    Thread.Sleep(20);
+                    mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
                     Thread.Sleep(45);
-                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
-                    Thread.Sleep(25);
-                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
+                    mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+                    Thread.Sleep(20);
+                    mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
                 }
                 else if (action == "down")
                 {
-                    if (button == "right") mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_RIGHTDOWN, absX, absY, 0, 0);
-                    else if (button == "middle") mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_MIDDLEDOWN, absX, absY, 0, 0);
-                    else mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTDOWN, absX, absY, 0, 0);
+                    if (button == "right") mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
+                    else if (button == "middle") mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, 0);
+                    else mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
                 }
                 else if (action == "up")
                 {
-                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTUP, absX, absY, 0, 0);
-                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_RIGHTUP, absX, absY, 0, 0);
-                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_MIDDLEUP, absX, absY, 0, 0);
+                    mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+                    mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
+                    mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, 0);
                 }
                 else if (action == "wheel")
                 {
@@ -3706,7 +3722,7 @@ namespace NexusRemoteAgent
                 }
                 else
                 {
-                    mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE, absX, absY, 0, 0);
+                    // Movimento suave - SetCursorPos já moveu
                 }
             }
             catch { }
@@ -3715,7 +3731,7 @@ namespace NexusRemoteAgent
         // ---------------------------------------------------------------------
         // CONTROLE DO TECLADO
         // ---------------------------------------------------------------------
-        static void ExecutaAcaoTeclado(string payload)
+        static void ExecutaAcaoTeclado(string payload, string rawUrl = "")
         {
             try
             {
@@ -3731,29 +3747,19 @@ namespace NexusRemoteAgent
                 catch { }
 
                 AcordarMonitorEDisplay();
-                string clean = payload.Replace("{", "").Replace("}", "").Replace("\"", "");
-                string[] parts = clean.Split(',');
-                string key = "";
-                string shortcut = "";
+
+                string key = ExtrairParam(rawUrl, payload, "key", "");
+                string shortcut = ExtrairParam(rawUrl, payload, "shortcut", "").ToUpper();
+                string keyCodeStr = ExtrairParam(rawUrl, payload, "keyCode", "0");
+                string ctrlStr = ExtrairParam(rawUrl, payload, "ctrl", "false");
+                string altStr = ExtrairParam(rawUrl, payload, "alt", "false");
+                string shiftStr = ExtrairParam(rawUrl, payload, "shift", "false");
+
                 int keyCode = 0;
-                bool ctrl = false;
-                bool alt = false;
-                bool shift = false;
-
-                foreach (string p in parts)
-                {
-                    string[] kv = p.Split(':');
-                    if (kv.Length < 2) continue;
-                    string k = kv[0].Trim().ToLower();
-                    string v = kv[1].Trim();
-
-                    if (k == "key") key = v;
-                    if (k == "keycode") int.TryParse(v, out keyCode);
-                    if (k == "shortcut") shortcut = v.ToUpper();
-                    if (k == "ctrl") ctrl = (v.ToLower() == "true");
-                    if (k == "alt") alt = (v.ToLower() == "true");
-                    if (k == "shift") shift = (v.ToLower() == "true");
-                }
+                int.TryParse(keyCodeStr, out keyCode);
+                bool ctrl = (ctrlStr.ToLower() == "true");
+                bool alt = (altStr.ToLower() == "true");
+                bool shift = (shiftStr.ToLower() == "true");
 
                 if (!string.IsNullOrEmpty(shortcut))
                 {

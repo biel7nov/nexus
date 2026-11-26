@@ -847,7 +847,7 @@ namespace NexusInstaller
             cbTag.BackColor = Color.FromArgb(15, 23, 42);
             cbTag.ForeColor = Color.FromArgb(248, 250, 252);
             cbTag.FlatStyle = FlatStyle.Flat;
-            cbTag.DropDownStyle = ComboBoxStyle.DropDown;
+            cbTag.DropDownStyle = ComboBoxStyle.DropDownList;
             cbTag.Location = new Point(20, curY);
             cbTag.Size = new Size(480, 28);
             
