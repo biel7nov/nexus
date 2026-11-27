@@ -47,6 +47,22 @@
         window.location.replace("login.html");
       }
     })();
+
+    // PRE-RENDER VIEW RESTORATION: Evita que a tela inicial (dashboard) pisque se o usuário estava em outra aba ao atualizar (F5)
+    (function() {
+      try {
+        var hash = window.location.hash ? window.location.hash.replace('#', '') : '';
+        var params = new URLSearchParams(window.location.search);
+        var saved = localStorage.getItem('nexus_active_view') || localStorage.getItem('fsc_kintsugi_active_view');
+        var targetView = params.get('view') || hash || saved;
+        if (targetView && targetView !== 'view-dashboard' && targetView !== 'dashboard') {
+          var style = document.createElement('style');
+          style.id = 'pre-render-view-style';
+          style.textContent = '#view-dashboard { display: none !important; }';
+          document.head.appendChild(style);
+        }
+      } catch(e) {}
+    })();
   </script>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -5553,16 +5569,75 @@
       } catch(e) {}
     }, 60000);
 
+    // Restauração imediata da aba e sub-aba após recarregar a página (F5) ou navegação direta
+    function restaurarAbaAtiva() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const hashAlvo = window.location.hash ? window.location.hash.replace('#', '') : '';
+        const savedView = localStorage.getItem('nexus_active_view') || localStorage.getItem('fsc_kintsugi_active_view');
+        let viewAlvo = params.get('view') || (hashAlvo && document.getElementById(hashAlvo) ? hashAlvo : null) || savedView || 'view-dashboard';
+
+        // Mapeamento de apelidos comuns para os IDs reais dos painéis
+        const mapaAliasViews = {
+          'dashboard': 'view-dashboard',
+          'chamados': 'view-chamados',
+          'ativos': 'view-ativos',
+          'todos': 'view-ativos',
+          'servidores': 'view-servidores',
+          'remote': 'view-remote',
+          'comunicados': 'view-comunicados',
+          'licencas': 'view-licencas',
+          'logs': 'view-logs',
+          'deploy': 'view-deploy',
+          'configuracoes': 'view-configuracoes'
+        };
+        if (mapaAliasViews[viewAlvo]) {
+          viewAlvo = mapaAliasViews[viewAlvo];
+        }
+
+        // Remove estilo temporário de pre-render para exibição limpa
+        const preStyle = document.getElementById('pre-render-view-style');
+        if (preStyle) preStyle.remove();
+
+        if (viewAlvo === 'todos' || viewAlvo === 'view-ativos') {
+          selecionarFiltroAtivo('todos');
+        } else if (viewAlvo === 'qua01' || viewAlvo === 'QUA-01' || viewAlvo === 'view-ativo-detalhe') {
+          selecionarFiltroAtivo(listaAtivos && listaAtivos.length > 0 ? listaAtivos[0].host : 'TI-0001');
+        } else if (viewAlvo === 'servidores' || viewAlvo === 'view-servidores') {
+          selecionarFiltroAtivo('servidores');
+        } else if (document.getElementById(viewAlvo)) {
+          navegarParaAba(viewAlvo);
+        } else {
+          navegarParaAba('view-dashboard');
+        }
+
+        // Restaura a sub-aba de configurações (ex: 'empresa') se estava nela
+        const savedSub = localStorage.getItem('nexus_active_cfg_subtab');
+        if (savedSub && (viewAlvo === 'view-configuracoes' || savedView === 'view-configuracoes')) {
+          if (typeof alternarAbaConfig === 'function') alternarAbaConfig(savedSub);
+        }
+      } catch (err) {
+        console.warn('Erro ao restaurar aba ativa:', err);
+      }
+    }
+    window.restaurarAbaAtiva = restaurarAbaAtiva;
+    window.addEventListener('hashchange', restaurarAbaAtiva);
+    window.addEventListener('popstate', restaurarAbaAtiva);
+
     // INICIALIZAÇÃO
     document.addEventListener('DOMContentLoaded', () => {
       if (!verificarSessaoAtiva()) return;
       inicializarTemaFundo();
       atualizarLinksDeploy();
       carregarDadosLocais();
-      sincronizarComSupabase();
-      inicializarNotificacoes();
       popularSelectsSetores();
       sincronizarSessaoAutenticada();
+
+      // Restauração imediata para evitar tela inicial piscar
+      restaurarAbaAtiva();
+
+      sincronizarComSupabase();
+      inicializarNotificacoes();
       carregarAtivosDinamicos();
       renderizarGridPastas();
       atualizarIconesLucide();
@@ -5576,31 +5651,8 @@
       renderizarTagsDepartamentos();
       sincronizarChamados(); // Puxa chamados locais e da rede imediatamente
 
-      // Restauração da aba e sub-aba após recarregar a página (F5) ou deep link
-      setTimeout(() => {
-        const params = new URLSearchParams(window.location.search);
-        const hashAlvo = window.location.hash ? window.location.hash.replace('#', '') : '';
-        const savedView = localStorage.getItem('nexus_active_view') || localStorage.getItem('fsc_kintsugi_active_view');
-        const viewAlvo = params.get('view') || (hashAlvo && document.getElementById(hashAlvo) ? hashAlvo : null) || savedView;
-
-        if (viewAlvo) {
-          if (viewAlvo === 'todos' || viewAlvo === 'view-ativos') {
-            selecionarFiltroAtivo('todos');
-          } else if (viewAlvo === 'qua01' || viewAlvo === 'QUA-01' || viewAlvo === 'view-ativo-detalhe') {
-            selecionarFiltroAtivo(listaAtivos && listaAtivos.length > 0 ? listaAtivos[0].host : 'TI-0001');
-          } else if (viewAlvo === 'servidores' || viewAlvo === 'view-servidores') {
-            selecionarFiltroAtivo('servidores');
-          } else if (document.getElementById(viewAlvo)) {
-            navegarParaAba(viewAlvo);
-          }
-        }
-
-        // Restaura a sub-aba de configurações (ex: 'empresa') se estava nela
-        const savedSub = localStorage.getItem('nexus_active_cfg_subtab');
-        if (savedSub && (viewAlvo === 'view-configuracoes' || savedView === 'view-configuracoes')) {
-          if (typeof alternarAbaConfig === 'function') alternarAbaConfig(savedSub);
-        }
-      }, 80);
+      // Confirmação rápida da aba após carregamento completo
+      setTimeout(restaurarAbaAtiva, 20);
 
       // Consulta de telemetria ao vivo enviada pelo software e chamados (2 em 2 minutos)
       setInterval(atualizarDadosDoAgenteEmTempoReal, 120000);
@@ -5745,6 +5797,7 @@
       // Persistência da aba ativa no localStorage e hash da URL para manter a página no F5
       try {
         localStorage.setItem('nexus_active_view', viewId);
+        localStorage.setItem('fsc_kintsugi_active_view', viewId);
         if (window.location.hash !== '#' + viewId) {
           history.replaceState(null, '', '#' + viewId);
         }
@@ -7026,12 +7079,45 @@
 
       const isAdmin = usuarioLogadoIsAdmin();
 
-      colunasKanban.forEach(col => {
+      colunasKanban.forEach((col, colIdx) => {
         const colDiv = document.createElement('div');
-        colDiv.className = `kanban-col-track rounded-xl p-3 sm:p-3.5 border border-slate-200/80 flex flex-col min-h-[500px] transition shadow-2xs min-w-[220px]`;
-        colDiv.ondragover = (ev) => permitirDropFunil(ev, colDiv);
-        colDiv.ondragleave = (ev) => sairDropFunil(colDiv, ev);
-        colDiv.ondrop = (ev) => soltarNoFunil(ev, col.id);
+        colDiv.className = `kanban-col-track rounded-xl p-3 sm:p-3.5 border border-slate-200/80 flex flex-col min-h-[500px] transition shadow-2xs min-w-[220px] select-none`;
+        colDiv.setAttribute('data-col-idx', String(colIdx));
+        colDiv.setAttribute('data-col-id', String(col.id));
+
+        colDiv.ondragover = (ev) => {
+          ev.preventDefault();
+          if (window._arrastandoColunaKanbanIdx !== null && window._arrastandoColunaKanbanIdx !== undefined) {
+            if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+            colDiv.classList.add('ring-2', 'ring-indigo-500', 'bg-indigo-50/20', 'border-indigo-400');
+          } else {
+            permitirDropFunil(ev, colDiv);
+          }
+        };
+
+        colDiv.ondragleave = (ev) => {
+          if (ev && ev.relatedTarget && colDiv.contains(ev.relatedTarget)) return;
+          colDiv.classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-50/20', 'border-indigo-400');
+          sairDropFunil(colDiv, ev);
+        };
+
+        colDiv.ondrop = (ev) => {
+          ev.preventDefault();
+          colDiv.classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-50/20', 'border-indigo-400');
+          sairDropFunil(colDiv, ev);
+
+          if (window._arrastandoColunaKanbanIdx !== null && window._arrastandoColunaKanbanIdx !== undefined) {
+            const fromIdx = Number(window._arrastandoColunaKanbanIdx);
+            const toIdx = colIdx;
+            window._arrastandoColunaKanbanIdx = null;
+            if (!isNaN(fromIdx) && fromIdx !== toIdx) {
+              reordenarColunaKanban(fromIdx, toIdx);
+            }
+            return;
+          }
+
+          soltarNoFunil(ev, col.id);
+        };
 
         const chamadosDaColuna = itens.filter(c => normalizarStatusFunil(c.status) === col.id);
         if (col.id === 'Resolvido') {
@@ -7044,15 +7130,28 @@
         const count = chamadosDaColuna.length;
 
         colDiv.innerHTML = `
-          <div class="flex items-center justify-between pb-2.5 border-b border-slate-200/60 mb-2.5">
-            <div class="flex items-center gap-2 min-w-0 pr-1">
+          <div class="kanban-col-header flex items-center justify-between pb-2.5 border-b border-slate-200/60 mb-2.5 cursor-grab active:cursor-grabbing rounded p-1 -m-1 transition hover:bg-slate-100/50" draggable="true" data-col-idx="${colIdx}" title="Segure e arraste para movimentar esta aba e todos os cards juntos">
+            <div class="flex items-center gap-1.5 min-w-0 pr-1">
+              <span class="cursor-grab active:cursor-grabbing text-slate-400 hover:text-blue-600 transition shrink-0" title="Arraste para mover esta aba livremente">
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
+              </span>
               <span class="w-2 h-2 rounded-full shrink-0 ${col.bullet || 'bg-blue-500'} shadow-xs"></span>
               <h3 class="font-bold text-slate-800 text-[11px] uppercase tracking-wider truncate" title="${col.nome}">${col.nome}</h3>
             </div>
-            <div class="flex items-center gap-1 shrink-0">
+            <div class="flex items-center gap-0.5 shrink-0" onclick="event.stopPropagation()">
+              ${colIdx > 0 ? `
+                <button type="button" onclick="event.stopPropagation(); moverColunaKanban(${colIdx}, -1);" class="p-1 rounded text-slate-400 hover:text-slate-800 hover:bg-slate-200/70 transition" title="Mover aba para a esquerda (cards vão junto)">
+                  <i data-lucide="chevron-left" class="w-3 h-3"></i>
+                </button>
+              ` : ''}
+              ${colIdx < colunasKanban.length - 1 ? `
+                <button type="button" onclick="event.stopPropagation(); moverColunaKanban(${colIdx}, 1);" class="p-1 rounded text-slate-400 hover:text-slate-800 hover:bg-slate-200/70 transition" title="Mover aba para a direita (cards vão junto)">
+                  <i data-lucide="chevron-right" class="w-3 h-3"></i>
+                </button>
+              ` : ''}
               <span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200/80">${count}</span>
               ${isAdmin ? `
-                <button type="button" onclick="abrirModalEditarColunaKanban('${col.id}')" class="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-100 transition" title="Editar nome da aba (Administrador)">
+                <button type="button" onclick="event.stopPropagation(); abrirModalEditarColunaKanban('${col.id}')" class="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition" title="Editar nome da aba (Administrador)">
                   <i data-lucide="pencil" class="w-3 h-3"></i>
                 </button>
               ` : ''}
@@ -7061,6 +7160,26 @@
           <div class="coluna-cards-area flex-1 space-y-2.5 min-h-[380px] max-h-[calc(100vh-270px)] overflow-y-auto pr-1 transition custom-scroll" data-coluna-id="${col.id}">
           </div>
         `;
+
+        const headerEl = colDiv.querySelector('.kanban-col-header');
+        if (headerEl) {
+          headerEl.ondragstart = (ev) => {
+            window._arrastandoColunaKanbanIdx = colIdx;
+            window._arrastandoCardChamado = false;
+            if (ev.dataTransfer) {
+              ev.dataTransfer.effectAllowed = 'move';
+              ev.dataTransfer.setData('text/kanban-col-idx', String(colIdx));
+            }
+            colDiv.classList.add('opacity-40', 'scale-[0.98]');
+          };
+          headerEl.ondragend = (ev) => {
+            window._arrastandoColunaKanbanIdx = null;
+            colDiv.classList.remove('opacity-40', 'scale-[0.98]');
+            document.querySelectorAll('.kanban-col-track').forEach(el => {
+              el.classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-50/20', 'border-indigo-400');
+            });
+          };
+        }
 
         const cardsContainer = colDiv.querySelector('.coluna-cards-area');
         if (count === 0) {
@@ -7077,6 +7196,28 @@
       atualizarBadges();
       atualizarIconesLucide();
     }
+
+    // Gerenciador de movimentação e maleabilidade das abas/colunas do Kanban
+    window._arrastandoColunaKanbanIdx = null;
+
+    window.reordenarColunaKanban = function(fromIdx, toIdx) {
+      if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || fromIdx >= colunasKanban.length || toIdx >= colunasKanban.length) return;
+      const colMovida = colunasKanban.splice(fromIdx, 1)[0];
+      colunasKanban.splice(toIdx, 0, colMovida);
+      salvarDadosLocais();
+      renderizarChamados();
+      mostrarToast(`Aba "${colMovida.nome}" reposicionada com sucesso!`, 'sucesso', 'Kanban Reordenado');
+    };
+
+    window.moverColunaKanban = function(idx, direcao) {
+      const novoIdx = idx + direcao;
+      if (novoIdx < 0 || novoIdx >= colunasKanban.length) return;
+      const colMovida = colunasKanban.splice(idx, 1)[0];
+      colunasKanban.splice(novoIdx, 0, colMovida);
+      salvarDadosLocais();
+      renderizarChamados();
+      mostrarToast(`Aba "${colMovida.nome}" movida com sucesso!`, 'sucesso', 'Kanban Reordenado');
+    };
 
     function renderizarTabelaChamados(itens) {
       if (!Array.isArray(itens)) {
@@ -7177,7 +7318,7 @@
 
       let id = ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : null;
       if (!id) id = chamadoArrastadoId;
-      if (!id) return;
+      if (!id || String(id).startsWith('kanban-col') || String(id).includes('kanban-col')) return;
 
       const item = listaChamados.find(c => String(c.id) === String(id));
       if (item) {
