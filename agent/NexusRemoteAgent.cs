@@ -1154,11 +1154,18 @@ namespace NexusRemoteAgent
 
         // Identificação Amigável da Máquina (Configurada no Instalador)
         public static string customMachineName = "";
+        public static string customUserName = "";
         static string customMachineTag = "Ativos-Nexus";
         public static string customEmpresa = "Aço Móveis";
         public static bool isServerMachine = false;
         private static readonly object dbLock = new object();
         private static readonly object screenLock = new object();
+
+        public static string ObterUsuarioAtivo()
+        {
+            if (!string.IsNullOrEmpty(customUserName)) return customUserName;
+            return !string.IsNullOrEmpty(Environment.UserName) ? Environment.UserName : "Usuário";
+        }
 
         public static string NormalizarTextoEmpresa(string texto)
         {
@@ -1180,8 +1187,8 @@ namespace NexusRemoteAgent
         static long clipboardVersion = 1;
 
         // Versão oficial do Agente NexusTI & Build para Atualizações Silenciosas OTA
-        public const string AGENT_VERSION = "1.3.7";
-        public const int AGENT_BUILD = 137;
+        public const string AGENT_VERSION = "1.3.8";
+        public const int AGENT_BUILD = 138;
         public static bool isAtualizando = false;
         private static Mutex _singleInstanceMutex = null;
 
@@ -1800,7 +1807,7 @@ namespace NexusRemoteAgent
             {
                 string osName = ObterNomeSO();
                 string devType = DetectarTipoDispositivo();
-                CadastrarAtivoCentral(customMachineName, customMachineTag, localIpAddress, Environment.UserName, osName, devType, customEmpresa, isServerMachine);
+                CadastrarAtivoCentral(customMachineName, customMachineTag, localIpAddress, ObterUsuarioAtivo(), osName, devType, customEmpresa, isServerMachine);
 
                 string srvIp = "192.168.18.122:8090";
                 string srvFile = Path.Combine(ObterDiretorioDadosAgente(), "server_ip.txt");
@@ -1819,7 +1826,7 @@ namespace NexusRemoteAgent
                         Uri.EscapeDataString(customMachineName ?? ""),
                         Uri.EscapeDataString(customMachineTag ?? ""),
                         Uri.EscapeDataString(localIpAddress ?? ""),
-                        Uri.EscapeDataString(Environment.UserName ?? ""),
+                        Uri.EscapeDataString(ObterUsuarioAtivo() ?? ""),
                         Uri.EscapeDataString(osName ?? ""),
                         Uri.EscapeDataString(devType ?? "Desktop"),
                         Uri.EscapeDataString(customEmpresa ?? "Aço Móveis"),
@@ -1851,6 +1858,20 @@ namespace NexusRemoteAgent
                 {
                     string n = File.ReadAllText(nameFile, Encoding.UTF8).Trim();
                     if (!string.IsNullOrEmpty(n)) customMachineName = n;
+                }
+
+                string userFile = Path.Combine(baseDir, "custom_user.txt");
+                if (!File.Exists(userFile)) userFile = Path.Combine(baseDir, "user.txt");
+                if (!File.Exists(userFile) && Directory.Exists(localAppDir))
+                {
+                    userFile = Path.Combine(localAppDir, "custom_user.txt");
+                    if (!File.Exists(userFile)) userFile = Path.Combine(localAppDir, "user.txt");
+                }
+
+                if (File.Exists(userFile))
+                {
+                    string u = File.ReadAllText(userFile, Encoding.UTF8).Trim();
+                    if (!string.IsNullOrEmpty(u)) customUserName = u;
                 }
 
                 string tagFile = Path.Combine(baseDir, "machine_tag.txt");
@@ -1914,7 +1935,7 @@ namespace NexusRemoteAgent
             string emp = !string.IsNullOrEmpty(customEmpresa) ? customEmpresa : "Aço Móveis";
             string set = !string.IsNullOrEmpty(customMachineTag) ? customMachineTag.Replace("#", "").Trim() : "TI";
             string hst = !string.IsNullOrEmpty(customMachineName) ? customMachineName : Environment.MachineName;
-            string usr = Environment.UserName ?? "";
+            string usr = ObterUsuarioAtivo();
             return string.Format(
                 "https://nexus-ten-brown.vercel.app/chamado.html?empresa={0}&setor={1}&ativo={2}&solicitante={3}&ip={4}",
                 Uri.EscapeDataString(emp),
@@ -2762,7 +2783,7 @@ namespace NexusRemoteAgent
                             customMachineName,
                             Environment.MachineName,
                             devType,
-                            Environment.UserName,
+                            ObterUsuarioAtivo(),
                             Environment.UserDomainName,
                             locDesc.Replace("\"", "'"),
                             customMachineTag,
@@ -2843,6 +2864,28 @@ namespace NexusRemoteAgent
                             if (trayIcon != null) trayIcon.Text = "NexusTI Agent — " + customMachineName + " (" + localIpAddress + ":" + port + ")";
                         }
                         EnviarRespostaCors(stream, 200, "OK", "application/json", Encoding.UTF8.GetBytes("{\"ok\":true,\"name\":\"" + customMachineName + "\"}"), keepAlive);
+                        if (!keepAlive) break;
+                    }
+                    // 2b. CONFIGURAR NOME DO USUÁRIO DO ATIVO VIA API
+                    else if ((path.StartsWith("/api/setuser") || path.StartsWith("/api/usuario/set") || path.StartsWith("/api/setusuario")) && (method == "POST" || method == "GET"))
+                    {
+                        string body = ExtrairCorpoRequisicao(headerStr, lines, buffer, bytesRead, stream);
+                        string novoUser = ExtrairParam(rawUrl, body, "user", "");
+                        if (string.IsNullOrEmpty(novoUser)) novoUser = ExtrairParam(rawUrl, body, "usuario", "");
+                        if (string.IsNullOrEmpty(novoUser)) novoUser = body.Replace("\"", "").Trim();
+
+                        if (!string.IsNullOrEmpty(novoUser))
+                        {
+                            customUserName = novoUser.Trim();
+                            try
+                            {
+                                string baseDir = ObterDiretorioDadosAgente();
+                                File.WriteAllText(Path.Combine(baseDir, "custom_user.txt"), customUserName, Encoding.UTF8);
+                            }
+                            catch { }
+                        }
+                        string respUserJson = "{\"ok\":true,\"user\":\"" + ObterUsuarioAtivo().Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"}";
+                        EnviarRespostaCors(stream, 200, "OK", "application/json", Encoding.UTF8.GetBytes(respUserJson), keepAlive);
                         if (!keepAlive) break;
                     }
                     // 3. MUDANÇA DE TELA (MULTI-MONITORES TELA 1 / TELA 2 / TODAS AS TELAS)

@@ -260,6 +260,7 @@ namespace NexusInstaller
         private Panel pnlSuccess;
         private ComboBox cbEmpresa;
         private TextBox txtNome;
+        private TextBox txtUsuario;
         private ComboBox cbTag;
         private TextBox txtDiretorio;
         private Button btnProcurarDir;
@@ -274,7 +275,7 @@ namespace NexusInstaller
         public FormInstalador()
         {
             this.Text = "NexusTI — Instalador Nexus Remote Agent";
-            this.ClientSize = new Size(570, 710);
+            this.ClientSize = new Size(570, 770);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -761,14 +762,14 @@ namespace NexusInstaller
             // 2. Painel de Entrada de Dados (Abaixo do Header)
             pnlInput = new Panel();
             pnlInput.Location = new Point(0, 84);
-            pnlInput.Size = new Size(570, 626);
+            pnlInput.Size = new Size(570, 686);
             pnlInput.BackColor = Color.FromArgb(11, 15, 25);
             this.Controls.Add(pnlInput);
 
             // Card Principal Central
             Panel pnlCard = new Panel();
             pnlCard.Location = new Point(24, 16);
-            pnlCard.Size = new Size(522, 504);
+            pnlCard.Size = new Size(522, 560);
             pnlCard.BackColor = Color.FromArgb(17, 24, 39); // Slate-900 / Dark Gray
             pnlCard.Paint += (s, e) => {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
@@ -830,7 +831,28 @@ namespace NexusInstaller
             txtNome.Location = new Point(20, curY);
             txtNome.Size = new Size(480, 26);
             pnlCard.Controls.Add(txtNome);
-            curY += 40;
+            curY += 38;
+
+            // 2b. Campo Usuário Responsável da Estação
+            Label lblUserTag = new Label();
+            lblUserTag.Text = "USUÁRIO PRINCIPAL / RESPONSÁVEL (ex: João Silva, Recepção, Diretoria):";
+            lblUserTag.Font = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+            lblUserTag.ForeColor = Color.FromArgb(203, 213, 225);
+            lblUserTag.Location = new Point(20, curY);
+            lblUserTag.AutoSize = true;
+            pnlCard.Controls.Add(lblUserTag);
+            curY += 22;
+
+            txtUsuario = new TextBox();
+            txtUsuario.Text = Environment.UserName;
+            txtUsuario.Font = new Font("Segoe UI", 10.5f, FontStyle.Regular);
+            txtUsuario.BackColor = Color.FromArgb(15, 23, 42);
+            txtUsuario.ForeColor = Color.White;
+            txtUsuario.BorderStyle = BorderStyle.FixedSingle;
+            txtUsuario.Location = new Point(20, curY);
+            txtUsuario.Size = new Size(480, 26);
+            pnlCard.Controls.Add(txtUsuario);
+            curY += 38;
 
             // 3. Campo Setor / Departamento (SEM HASHTAGS)
             Label lblSetorTag = new Label();
@@ -1001,7 +1023,7 @@ namespace NexusInstaller
             lblStatus.Text = "● Pronto para instalar e configurar a estação de trabalho.";
             lblStatus.Font = new Font("Segoe UI", 8.5f, FontStyle.Italic);
             lblStatus.ForeColor = Color.FromArgb(148, 163, 184);
-            lblStatus.Location = new Point(24, 530);
+            lblStatus.Location = new Point(24, 586);
             lblStatus.Size = new Size(522, 20);
             pnlInput.Controls.Add(lblStatus);
 
@@ -1014,7 +1036,7 @@ namespace NexusInstaller
             btnInstalar.FlatStyle = FlatStyle.Flat;
             btnInstalar.FlatAppearance.BorderSize = 0;
             btnInstalar.Cursor = Cursors.Hand;
-            btnInstalar.Location = new Point(24, 556);
+            btnInstalar.Location = new Point(24, 612);
             btnInstalar.Size = new Size(365, 46);
             btnInstalar.Click += BtnInstalar_Click;
             pnlInput.Controls.Add(btnInstalar);
@@ -1028,7 +1050,7 @@ namespace NexusInstaller
             btnDesinstalarExistente.FlatStyle = FlatStyle.Flat;
             btnDesinstalarExistente.FlatAppearance.BorderColor = Color.FromArgb(127, 29, 29);
             btnDesinstalarExistente.Cursor = Cursors.Hand;
-            btnDesinstalarExistente.Location = new Point(397, 556);
+            btnDesinstalarExistente.Location = new Point(397, 612);
             btnDesinstalarExistente.Size = new Size(149, 46);
             btnDesinstalarExistente.Click += (s, e) => {
                 Program.ExecutarDesinstalacao(false);
@@ -1147,6 +1169,8 @@ namespace NexusInstaller
 
             string nomeAtivo = txtNome.Text.Trim();
             if (string.IsNullOrEmpty(nomeAtivo)) nomeAtivo = Environment.MachineName;
+
+            string usuarioAtivo = (txtUsuario != null && !string.IsNullOrEmpty(txtUsuario.Text.Trim())) ? txtUsuario.Text.Trim() : Environment.UserName;
 
             // Limpa qualquer hashtag caso o usuário digite manualmente
             string tagAtivo = cbTag.Text.Trim().Replace("#", "").Trim();
@@ -1369,6 +1393,7 @@ namespace NexusInstaller
 
                 File.WriteAllText(Path.Combine(targetDir, "empresa.txt"), empresaAtivo, Encoding.UTF8);
                 File.WriteAllText(Path.Combine(targetDir, "machine_name.txt"), nomeAtivo, Encoding.UTF8);
+                File.WriteAllText(Path.Combine(targetDir, "custom_user.txt"), usuarioAtivo, Encoding.UTF8);
                 File.WriteAllText(Path.Combine(targetDir, "machine_tag.txt"), tagAtivo, Encoding.UTF8);
                 File.WriteAllText(Path.Combine(targetDir, "is_server.txt"), isServidorStr, Encoding.UTF8);
                 File.WriteAllText(tokenPath, machineToken, Encoding.UTF8);
@@ -1379,7 +1404,7 @@ namespace NexusInstaller
                     string bDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
                     if (!bDir.Equals(@"C:\Nexus-Agent", StringComparison.OrdinalIgnoreCase) && !bDir.Equals(@"C:\FSC-Agent", StringComparison.OrdinalIgnoreCase))
                     {
-                        string[] stray = new string[] { "empresa.txt", "machine_name.txt", "machine_tag.txt", "is_server.txt", "agent_token.txt", "server_ip.txt", "setores.json", "empresas.json", "chamados.json" };
+                        string[] stray = new string[] { "empresa.txt", "machine_name.txt", "custom_user.txt", "machine_tag.txt", "is_server.txt", "agent_token.txt", "server_ip.txt", "setores.json", "empresas.json", "chamados.json" };
                         foreach (string sf in stray)
                         {
                             try { string sp = Path.Combine(bDir, sf); if (File.Exists(sp)) File.Delete(sp); } catch { }
@@ -1551,7 +1576,7 @@ namespace NexusInstaller
 
                 // 10. Exibe Tela de Sucesso
                 lblEmpresaResult.Text = "🏢 Empresa: " + empresaAtivo;
-                lblNomeResult.Text = (isServidor ? "🖥️ Servidor Monitorado: " : "💻 Ativo Cadastrado: ") + nomeAtivo + " (" + tagAtivo + ")";
+                lblNomeResult.Text = (isServidor ? "🖥️ Servidor Monitorado: " : "💻 Ativo Cadastrado: ") + nomeAtivo + " (" + tagAtivo + ") • Usuário: " + usuarioAtivo;
                 lblIpResult.Text = "🌐 Endereço de Conexão: http://" + localIp + ":8090";
 
                 pnlInput.Visible = false;

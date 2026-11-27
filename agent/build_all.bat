@@ -1,7 +1,7 @@
 @echo off
 taskkill /f /im NexusRemoteAgent.exe >nul 2>&1
 taskkill /f /im FSCRemoteAgent.exe >nul 2>&1
-timeout /t 1 /nobreak >nul
+ping 127.0.0.1 -n 2 >nul
 
 set CSC=C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe
 
