@@ -47,22 +47,6 @@
         window.location.replace("login.html");
       }
     })();
-
-    // PRE-RENDER VIEW RESTORATION: Evita que a tela inicial (dashboard) pisque se o usuário estava em outra aba ao atualizar (F5)
-    (function() {
-      try {
-        var hash = window.location.hash ? window.location.hash.replace('#', '') : '';
-        var params = new URLSearchParams(window.location.search);
-        var saved = localStorage.getItem('nexus_active_view') || localStorage.getItem('fsc_kintsugi_active_view');
-        var targetView = params.get('view') || hash || saved;
-        if (targetView && targetView !== 'view-dashboard' && targetView !== 'dashboard') {
-          var style = document.createElement('style');
-          style.id = 'pre-render-view-style';
-          style.textContent = '#view-dashboard { display: none !important; }';
-          document.head.appendChild(style);
-        }
-      } catch(e) {}
-    })();
   </script>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -5070,8 +5054,18 @@
       return seguro;
     }
 
-    // ESTADO GLOBAL DO SISTEMA
-    let listaAtivos = [];
+    // ESTADO GLOBAL DO SISTEMA (Pré-inicializado com estações reais registradas para carregamento instantâneo 0ms)
+    let listaAtivos = [
+      {"id":"FSC-232 232","host":"SVR","type":"Servidor","isServer":true,"user":"Servidor Central (TI)","domain":"ACOMOVEIS","loggedUserFull":"Servidor Central (TI)","location":"Duque de Caxias, RJ - Brazil","empresa":"Aço Móveis","company":"Aço Móveis","tag":"TI","os":"Windows Server 2025 Datacenter (24H2 64-bit)","cpu":"13th Gen Intel(R) Core(TM) i7-1355U","cpuUsedPct":10,"ram":"15.7 GB (51% em uso)","ramUsedPct":51,"disk":"SSD 647 GB (533 GB livres)","resolution":"1920x1080 Full HD","ip":"192.168.0.37","port":8090,"lastConnected":"Hoje","lastSeen":"Conectado agora","online":true},
+      {"id":"FSC-345 345","host":"SVRDADOS","type":"Servidor","isServer":true,"user":"Servidor de Dados","domain":"ACOMOVEIS","loggedUserFull":"Servidor de Dados","location":"Duque de Caxias, RJ - Brazil","empresa":"Aço Móveis","company":"Aço Móveis","tag":"Ativos-Nexus","os":"Windows Server 2025 Datacenter (24H2 64-bit)","cpu":"13th Gen Intel(R) Core(TM) i7-1355U","cpuUsedPct":27,"ram":"15.7 GB (54% em uso)","ramUsedPct":23,"disk":"SSD 647 GB (536 GB livres)","resolution":"1920x1080 Full HD","ip":"192.168.0.88","port":8090,"lastConnected":"Hoje","lastSeen":"Conectado agora","online":true},
+      {"id":"FSC-305 305","host":"FIN-O2","type":"Desktop","isServer":false,"user":"Milena","domain":"CORP.LOCAL","loggedUserFull":"CORP\\Administrador","location":"Duque de Caxias, RJ - Brazil","empresa":"Aço Móveis","company":"Aço Móveis","tag":"Financeiro","os":"Windows 10 Pro (22H2 64-bit)","cpu":"13th Gen Intel(R) Core(TM) i7-1355U","cpuUsedPct":4,"ram":"15.7 GB (47% em uso)","ramUsedPct":45,"disk":"SSD 647 GB (534 GB livres)","resolution":"1920x1080 Full HD","ip":"192.168.0.217","port":8090,"lastConnected":"Hoje","lastSeen":"Conectado agora","online":true},
+      {"id":"FSC-747 747","host":"P&D-02","type":"Desktop","isServer":false,"user":"Administrador","domain":"CORP.LOCAL","loggedUserFull":"CORP\\Administrador","location":"Duque de Caxias, RJ - Brazil","empresa":"Aço Móveis","company":"Aço Móveis","tag":"PROJETO","os":"Windows 10 Pro (26H2 64-bit)","cpu":"13th Gen Intel(R) Core(TM) i7-1355U","cpuUsedPct":7,"ram":"15.7 GB (51% em uso)","ramUsedPct":20,"disk":"SSD 647 GB (536 GB livres)","resolution":"1920x1080 Full HD","ip":"192.168.0.145","port":8090,"lastConnected":"Hoje","lastSeen":"Conectado agora","online":true},
+      {"id":"FSC-942 942","host":"EXP-03","type":"Desktop","isServer":false,"user":"Thayane Carvalho","domain":"CORP.LOCAL","loggedUserFull":"CORP\\Administrador","location":"Duque de Caxias, RJ - Brazil","empresa":"Aço Móveis","company":"Aço Móveis","tag":"Logística","os":"Windows 10 Pro (22H2 64-bit)","cpu":"13th Gen Intel(R) Core(TM) i7-1355U","cpuUsedPct":2,"ram":"15.7 GB (53% em uso)","ramUsedPct":50,"disk":"SSD 647 GB (536 GB livres)","resolution":"1920x1080 Full HD","ip":"192.168.0.132","port":8090,"lastConnected":"Hoje","lastSeen":"Conectado agora","online":true},
+      {"id":"FSC-323 323","host":"REC","type":"Desktop","isServer":false,"user":"Meline","domain":"CORP.LOCAL","loggedUserFull":"CORP\\Administrador","location":"Rio de Janeiro, Rio de Janeiro - Brazil","empresa":"Aço Móveis","company":"Aço Móveis","tag":"RECEPÇÃO","os":"Windows 10 Pro (22H2 64-bit)","cpu":"13th Gen Intel(R) Core(TM) i7-1355U","cpuUsedPct":15,"ram":"15.7 GB (52% em uso)","ramUsedPct":50,"disk":"SSD 647 GB (536 GB livres)","resolution":"1920x1080 Full HD","ip":"192.168.0.172","port":8090,"lastConnected":"Hoje","lastSeen":"Conectado agora","online":true},
+      {"id":"FSC-291 291","host":"DEP-01","type":"Desktop","isServer":false,"user":"Nathally","domain":"ACOMOVEIS","loggedUserFull":"ACOMOVEIS\\Administrador","location":"Rio de Janeiro, Rio de Janeiro - Brazil","empresa":"Aço Móveis","company":"Aço Móveis","tag":"Recursos Humanos (RH)","os":"Windows 10 Pro (22H2 64-bit)","cpu":"Intel(R) Core(TM) i3-9100F CPU @ 3.60GHz","cpuUsedPct":12,"ram":"15.9 GB (40% em uso)","ramUsedPct":36,"disk":"SSD 446 GB (354 GB livres)","resolution":"1920x1080 Full HD","ip":"192.168.0.6","port":8090,"lastConnected":"Hoje","lastSeen":"Conectado agora","online":true},
+      {"id":"FSC-576 576","host":"DEP-03","type":"Desktop","isServer":false,"user":"lara.bonifacio","domain":"ACOMOVEIS","loggedUserFull":"ACOMOVEIS\\Administrador","location":"Duque de Caxias, RJ - Brazil","empresa":"Aço Móveis","company":"Aço Móveis","tag":"Recursos Humanos (RH)","os":"Windows 10 Pro (22H2 64-bit)","cpu":"13th Gen Intel(R) Core(TM) i7-1355U","cpuUsedPct":7,"ram":"15.7 GB (51% em uso)","ramUsedPct":54,"disk":"SSD 647 GB (536 GB livres)","resolution":"1920x1080 Full HD","ip":"192.168.0.73","port":8090,"lastConnected":"Hoje","lastSeen":"Conectado agora","online":true},
+      {"id":"FSC-238 238","host":"TI-0001","type":"Notebook","isServer":false,"user":"gabrielnovaes","domain":"CORP.LOCAL","loggedUserFull":"CORP\\gabrielnovaes","location":"Duque de Caxias, RJ - Brazil","company":"Aço Móveis","empresa":"Aço Móveis","tag":"Ativos-Nexus","os":"Windows 10 Enterprise LTSC 2021 (21H2 64-bit)","cpu":"13th Gen Intel(R) Core(TM) i7-1355U","cpuUsedPct":14,"ram":"15.7 GB (48% em uso)","ramUsedPct":42,"disk":"SSD 512 GB (215 GB livres)","resolution":"1920x1080 Full HD","ip":"192.168.18.122","port":8090,"lastConnected":"Hoje","lastSeen":"Conectado agora","online":true}
+    ];
 
     // Pastas da Visão Central em Português
     let pastasDashboard = [
@@ -5636,6 +5630,10 @@
       // Restauração imediata para evitar tela inicial piscar
       restaurarAbaAtiva();
 
+      renderizarEstacoesVisaoGeral();
+      atualizarKpiChamadosVisaoGeral();
+      renderizarListaAcessoRemoto();
+      renderizarTabelaInventario();
       sincronizarComSupabase();
       inicializarNotificacoes();
       carregarAtivosDinamicos();
@@ -5650,9 +5648,6 @@
       renderizarTagsEmpresas();
       renderizarTagsDepartamentos();
       sincronizarChamados(); // Puxa chamados locais e da rede imediatamente
-
-      // Confirmação rápida da aba após carregamento completo
-      setTimeout(restaurarAbaAtiva, 20);
 
       // Consulta de telemetria ao vivo enviada pelo software e chamados (2 em 2 minutos)
       setInterval(atualizarDadosDoAgenteEmTempoReal, 120000);
@@ -5785,6 +5780,8 @@
 
     function navegarParaAba(viewId) {
       fecharSidebarMobile();
+      const preStyle = document.getElementById('pre-render-view-style');
+      if (preStyle) preStyle.remove();
       const views = ['view-dashboard', 'view-remote', 'view-comunicados', 'view-ativos', 'view-ativo-detalhe', 'view-servidores', 'view-chamados', 'view-licencas', 'view-logs', 'view-deploy', 'view-configuracoes'];
       views.forEach(id => {
         const el = document.getElementById(id);
@@ -5812,6 +5809,10 @@
       if (viewId === 'view-dashboard') {
         if (pText) pText.textContent = 'Início';
         if (cText) cText.textContent = 'Painel Inicial';
+        window._lastSigEstacoesVisaoGeral = '';
+        renderizarEstacoesVisaoGeral();
+        atualizarKpiChamadosVisaoGeral();
+        atualizarBadges();
       } else if (viewId === 'view-ativos') {
         if (pText) pText.textContent = 'Visão Geral';
         if (cText) cText.textContent = 'Todos os Ativos';
@@ -5826,6 +5827,7 @@
       } else if (viewId === 'view-remote') {
         if (pText) pText.textContent = 'Operações';
         if (cText) cText.textContent = 'Acesso Remoto';
+        window._lastSigAcessoRemoto = '';
         renderizarListaAcessoRemoto();
       } else if (viewId === 'view-comunicados') {
         if (pText) pText.textContent = 'Operações';
@@ -10440,11 +10442,13 @@
         });
         comps = Object.values(porIp);
         const validHostNames = new Set(comps.map(c => String(c.nome_computador || c.id || '').toUpperCase()));
-        listaAtivos = (listaAtivos || []).filter(a => {
-          const h = String(a.host || '').toUpperCase();
-          if (MOCK_ASSETS.has(h)) return false;
-          return validHostNames.has(h) || (a.online && a.ip === '127.0.0.1');
-        });
+        if (validHostNames.size > 0) {
+          listaAtivos = (listaAtivos || []).filter(a => {
+            const h = String(a.host || '').toUpperCase();
+            if (MOCK_ASSETS.has(h)) return false;
+            return validHostNames.has(h) || (a.online && a.ip === '127.0.0.1');
+          });
+        }
 
         if (!window._telemetryHeartbeatsLogged) window._telemetryHeartbeatsLogged = new Set();
         let novosLogs = false;
@@ -10578,19 +10582,16 @@
         }
 
         renderizarEstacoesVisaoGeral();
+        if (typeof renderizarListaAcessoRemoto === 'function') {
+          renderizarListaAcessoRemoto();
+        }
+        if (typeof renderizarTabelaInventario === 'function') {
+          renderizarTabelaInventario();
+        }
 
         const vSrv = document.getElementById('view-servidores');
         if (vSrv && !vSrv.classList.contains('hidden') && typeof renderizarPainelServidores === 'function') {
           renderizarPainelServidores(false);
-        }
-
-        const vAtivos = document.getElementById('view-ativos');
-        if (vAtivos && !vAtivos.classList.contains('hidden') && typeof renderizarTabelaInventario === 'function') {
-          renderizarTabelaInventario();
-        }
-        const vRemoto = document.getElementById('view-remote');
-        if (vRemoto && !vRemoto.classList.contains('hidden') && typeof renderizarListaAcessoRemoto === 'function') {
-          renderizarListaAcessoRemoto();
         }
 
         if (typeof atualizarBadges === 'function') atualizarBadges();
@@ -11617,7 +11618,8 @@
       try {
         const resp = await fetch('assets_registry.json?t=' + Date.now());
         if (resp.ok) {
-          const dados = await resp.json();
+          const textRaw = (await resp.text()).replace(/^\uFEFF/, '');
+          const dados = JSON.parse(textRaw);
           if (dados && dados.length > 0) {
             let overrides = {};
             try { overrides = JSON.parse(localStorage.getItem('fsc_server_overrides') || '{}'); } catch (e) {}
@@ -11638,6 +11640,10 @@
               unicos.push(item);
             });
             listaAtivos = unicos;
+            renderizarEstacoesVisaoGeral();
+            renderizarListaAcessoRemoto();
+            renderizarTabelaInventario();
+            if (typeof renderizarPainelServidores === 'function') renderizarPainelServidores(false);
           }
         }
       } catch (e) { }
@@ -11648,13 +11654,11 @@
         await sincronizarComputadoresDoSupabase();
       }
 
+      renderizarEstacoesVisaoGeral();
+      renderizarListaAcessoRemoto();
       const vAtivos = document.getElementById('view-ativos');
       if (forcarSync || (vAtivos && !vAtivos.classList.contains('hidden'))) {
         renderizarTabelaInventario();
-      }
-      const vRemoto = document.getElementById('view-remote');
-      if (forcarSync || (vRemoto && !vRemoto.classList.contains('hidden'))) {
-        renderizarListaAcessoRemoto();
       }
       const vSrv = document.getElementById('view-servidores');
       if ((forcarSync || (vSrv && !vSrv.classList.contains('hidden'))) && typeof renderizarPainelServidores === 'function') {
