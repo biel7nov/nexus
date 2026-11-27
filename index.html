@@ -2402,16 +2402,75 @@
 
                 <!-- 2. Destinatários e Urgência -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">2. Destinatário(s)</label>
-                    <select id="campo-destinatario-aviso" onchange="atualizarLivePreviewAviso()" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold bg-white text-slate-700 focus:outline-none focus:border-indigo-500 shadow-sm">
-                      <option value="broadcast">Todas as Estações Online (Broadcast)</option>
-                    </select>
+                  <!-- SELETOR MULTI-ESTAÇÕES / SETORES / BROADCAST -->
+                  <div class="relative" id="wrapper-destinatario-aviso">
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span>2. Destinatário(s)</span>
+                      <span id="badge-destinatario-aviso-tipo" class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/60">Broadcast Geral</span>
+                    </label>
+
+                    <button type="button" id="btn-dropdown-destinatario-aviso" onclick="toggleDropdownDestinatarios('aviso')" class="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-xs font-semibold bg-white text-slate-800 flex items-center justify-between shadow-sm hover:border-slate-300 transition text-left">
+                      <div class="flex items-center gap-2 truncate">
+                        <span id="icon-destinatario-aviso" class="shrink-0 text-indigo-600">📢</span>
+                        <span id="label-destinatario-aviso" class="truncate font-bold text-slate-900">Todas as Estações Online (Broadcast Geral)</span>
+                      </div>
+                      <span class="text-slate-400 text-[10px] ml-2 shrink-0">▼</span>
+                    </button>
+
+                    <!-- Hidden input para compatibilidade com chamadas de rotina -->
+                    <input type="hidden" id="campo-destinatario-aviso" value="broadcast">
+
+                    <!-- Painel Dropdown Multi-Seleção de Estações -->
+                    <div id="painel-dropdown-destinatario-aviso" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 p-3 space-y-3 max-h-96 overflow-y-auto">
+                      <!-- Busca Rápida -->
+                      <div class="relative">
+                        <input type="text" id="busca-destinatarios-aviso" oninput="filtrarDestinatariosDropdown('aviso')" placeholder="Buscar por estação, IP, setor ou usuário..." class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-slate-50 focus:bg-white focus:outline-none focus:border-indigo-500 transition">
+                        <span class="absolute left-2.5 top-2 text-slate-400 text-xs">🔍</span>
+                      </div>
+
+                      <!-- Opção Broadcast Geral -->
+                      <div class="border-b border-slate-100 pb-2">
+                        <button type="button" onclick="selecionarModoDestinatario('aviso', 'broadcast')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 flex items-center justify-between text-xs font-bold text-indigo-700 transition">
+                          <span class="flex items-center gap-2"><span>📢</span> <span>Todas as Estações Online (Broadcast Geral)</span></span>
+                          <span id="check-broadcast-aviso" class="text-xs font-bold">✓</span>
+                        </button>
+                      </div>
+
+                      <!-- Setores / Departamentos -->
+                      <div class="border-b border-slate-100 pb-2">
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1 mb-1.5">🏢 Por Setor / Departamento</div>
+                        <div id="lista-setores-destinatario-aviso" class="flex flex-wrap gap-1.5 p-1">
+                          <!-- Chips de setores preenchidos dinamicamente -->
+                        </div>
+                      </div>
+
+                      <!-- Estações Específicas com Checkboxes Multi-Seleção -->
+                      <div>
+                        <div class="flex items-center justify-between px-1 mb-1.5">
+                          <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">💻 Por Estação Específica (Marque Quantas Quiser)</span>
+                          <div class="flex items-center gap-2">
+                            <button type="button" onclick="marcarTodasEstacoes('aviso', true)" class="text-[10px] text-indigo-600 hover:underline font-bold">Marcar Todas</button>
+                            <span class="text-slate-300">•</span>
+                            <button type="button" onclick="marcarTodasEstacoes('aviso', false)" class="text-[10px] text-slate-500 hover:underline">Limpar</button>
+                          </div>
+                        </div>
+                        <div id="lista-estacoes-destinatario-aviso" class="space-y-1 max-h-48 overflow-y-auto p-1 divide-y divide-slate-100">
+                          <!-- Lista com checkboxes das máquinas -->
+                        </div>
+                      </div>
+
+                      <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                        <span id="resumo-selecao-aviso" class="text-[11px] font-semibold text-slate-600">Todas as estações selecionadas</span>
+                        <button type="button" onclick="toggleDropdownDestinatarios('aviso', false)" class="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition">
+                          Pronto
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1.5">3. Nível de Urgência & Estilo</label>
-                    <select id="campo-urgencia-aviso" onchange="atualizarLivePreviewAviso()" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold bg-white text-slate-700 focus:outline-none focus:border-indigo-500 shadow-sm">
+                    <select id="campo-urgencia-aviso" onchange="atualizarLivePreviewAviso()" class="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-xs font-semibold bg-white text-slate-700 focus:outline-none focus:border-indigo-500 shadow-sm">
                       <option value="informativo">Informativo (Azul / Rotina)</option>
                       <option value="importante">Importante (Âmbar / Manutenção)</option>
                       <option value="urgente">Urgente (Vermelho / Alerta Crítico com Som)</option>
@@ -2582,12 +2641,70 @@
                     </div>
                   </div>
 
-                  <!-- Destinatário da Pesquisa -->
-                  <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Público-Alvo / Destinatários</label>
-                    <select id="campo-destinatario-enquete" onchange="sincronizarEnqueteForm()" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold bg-white text-slate-700 focus:outline-none focus:border-purple-500 shadow-sm">
-                      <option value="broadcast">Todas as Estações Online (Broadcast)</option>
-                    </select>
+                  <!-- SELETOR MULTI-ESTAÇÕES / SETORES / BROADCAST DA ENQUETE -->
+                  <div class="relative" id="wrapper-destinatario-enquete">
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span>Público-Alvo / Destinatários</span>
+                      <span id="badge-destinatario-enquete-tipo" class="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200/60">Broadcast Geral</span>
+                    </label>
+
+                    <button type="button" id="btn-dropdown-destinatario-enquete" onclick="toggleDropdownDestinatarios('enquete')" class="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-xs font-semibold bg-white text-slate-800 flex items-center justify-between shadow-sm hover:border-slate-300 transition text-left">
+                      <div class="flex items-center gap-2 truncate">
+                        <span id="icon-destinatario-enquete" class="shrink-0 text-purple-600">📢</span>
+                        <span id="label-destinatario-enquete" class="truncate font-bold text-slate-900">Todas as Estações Online (Broadcast Geral)</span>
+                      </div>
+                      <span class="text-slate-400 text-[10px] ml-2 shrink-0">▼</span>
+                    </button>
+
+                    <!-- Hidden input para compatibilidade -->
+                    <input type="hidden" id="campo-destinatario-enquete" value="broadcast">
+
+                    <!-- Painel Dropdown Multi-Seleção de Estações -->
+                    <div id="painel-dropdown-destinatario-enquete" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 p-3 space-y-3 max-h-96 overflow-y-auto">
+                      <!-- Busca Rápida -->
+                      <div class="relative">
+                        <input type="text" id="busca-destinatarios-enquete" oninput="filtrarDestinatariosDropdown('enquete')" placeholder="Buscar por estação, IP, setor ou usuário..." class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-slate-50 focus:bg-white focus:outline-none focus:border-purple-500 transition">
+                        <span class="absolute left-2.5 top-2 text-slate-400 text-xs">🔍</span>
+                      </div>
+
+                      <!-- Opção Broadcast Geral -->
+                      <div class="border-b border-slate-100 pb-2">
+                        <button type="button" onclick="selecionarModoDestinatario('enquete', 'broadcast')" class="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-purple-50 flex items-center justify-between text-xs font-bold text-purple-700 transition">
+                          <span class="flex items-center gap-2"><span>📢</span> <span>Todas as Estações Online (Broadcast Geral)</span></span>
+                          <span id="check-broadcast-enquete" class="text-xs font-bold">✓</span>
+                        </button>
+                      </div>
+
+                      <!-- Setores / Departamentos -->
+                      <div class="border-b border-slate-100 pb-2">
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1 mb-1.5">🏢 Por Setor / Departamento</div>
+                        <div id="lista-setores-destinatario-enquete" class="flex flex-wrap gap-1.5 p-1">
+                          <!-- Chips de setores preenchidos dinamicamente -->
+                        </div>
+                      </div>
+
+                      <!-- Estações Específicas com Checkbox Multi-Seleção -->
+                      <div>
+                        <div class="flex items-center justify-between px-1 mb-1.5">
+                          <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">💻 Por Estação Específica (Marque Quantas Quiser)</span>
+                          <div class="flex items-center gap-2">
+                            <button type="button" onclick="marcarTodasEstacoes('enquete', true)" class="text-[10px] text-purple-600 hover:underline font-bold">Marcar Todas</button>
+                            <span class="text-slate-300">•</span>
+                            <button type="button" onclick="marcarTodasEstacoes('enquete', false)" class="text-[10px] text-slate-500 hover:underline">Limpar</button>
+                          </div>
+                        </div>
+                        <div id="lista-estacoes-destinatario-enquete" class="space-y-1 max-h-48 overflow-y-auto p-1 divide-y divide-slate-100">
+                          <!-- Itens com checkboxes -->
+                        </div>
+                      </div>
+
+                      <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                        <span id="resumo-selecao-enquete" class="text-[11px] font-semibold text-slate-600">Todas as estações selecionadas</span>
+                        <button type="button" onclick="toggleDropdownDestinatarios('enquete', false)" class="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition">
+                          Pronto
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   <!-- Pergunta da Enquete -->
@@ -5332,6 +5449,12 @@
         if (valAtual && Array.from(selEnquete.options).some(o => o.value === valAtual)) {
           selEnquete.value = valAtual;
         }
+      }
+
+      // Sincroniza os novos seletores interativos com multi-seleção de estações
+      if (typeof popularDropdownDestinatarios === 'function') {
+        popularDropdownDestinatarios('aviso');
+        popularDropdownDestinatarios('enquete');
       }
     }
 
@@ -9906,6 +10029,15 @@
         console.warn('Erro ao sincronizar usuários Supabase:', err);
       }
 
+      // 6. Sincroniza Comunicados & Enquetes do Supabase
+      try {
+        if (typeof carregarComunicadosDoSupabase === 'function') {
+          await carregarComunicadosDoSupabase();
+        }
+      } catch(errCom) {
+        console.warn('Erro ao carregar comunicados do Supabase:', errCom);
+      }
+
       // 4. Inscrição em Tempo Real (Realtime Channel + Broadcast Instantâneo <50ms)
       try {
         supabaseClient.channel('nexus-painel-realtime')
@@ -10015,6 +10147,47 @@
               salvarDadosLocais();
               if (typeof renderizarTagsDepartamentos === 'function') renderizarTagsDepartamentos();
               if (typeof popularSelectsSetores === 'function') popularSelectsSetores();
+            }
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'comunicados' }, (payload) => {
+            if (payload.eventType === 'INSERT') {
+              const c = payload.new;
+              if (c && c.id && !historicoAvisos.some(h => String(h.id) === String(c.id))) {
+                const dataObj = c.criado_em ? new Date(c.criado_em) : new Date();
+                const horarioFormatado = dataObj.toLocaleDateString([], { day: '2-digit', month: '2-digit' }) + ' às ' + dataObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const item = {
+                  id: c.id,
+                  tipo: c.tipo || 'aviso',
+                  urgencia: c.urgencia || 'informativo',
+                  titulo: c.titulo || 'Comunicado',
+                  mensagem: c.mensagem || '',
+                  destinatario: c.destinatario || 'Todas as Estações (Broadcast)',
+                  horario: horarioFormatado,
+                  autor: c.autor || 'Gabriel Novaes (Gestão TI)',
+                  confirmacoes: c.confirmacoes || (c.tipo === 'enquete' ? '0 votos (Aguardando respostas)' : 'Entregue na tela'),
+                  opcoes: c.opcoes || ''
+                };
+                historicoAvisos.unshift(item);
+                salvarDadosLocais();
+                renderizarHistoricoAvisos();
+                if (c.tipo === 'enquete') {
+                  const ops = (c.opcoes && typeof c.opcoes === 'string') ? c.opcoes.split('|').filter(Boolean) : ['Sim', 'Não'];
+                  dadosEnqueteAtiva = {
+                    id: c.id,
+                    pergunta: c.titulo,
+                    totalVotos: 0,
+                    opcoes: ops.map((op, i) => ({
+                      texto: op,
+                      votos: 0,
+                      pct: 0,
+                      cor: ['bg-emerald-500', 'bg-blue-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500'][i % 5]
+                    })),
+                    votantes: []
+                  };
+                  salvarDadosLocais();
+                  renderizarApuracaoEnquetes();
+                }
+              }
             }
           })
           .subscribe();
@@ -10460,6 +10633,12 @@
       if (Array.isArray(window.listaEmpresasCadastradas)) {
         localStorage.setItem('fsc_kintsugi_empresas', JSON.stringify(window.listaEmpresasCadastradas));
       }
+      try {
+        localStorage.setItem('fsc_kintsugi_historico_comunicados', JSON.stringify(historicoAvisos));
+        if (dadosEnqueteAtiva) {
+          localStorage.setItem('fsc_kintsugi_dados_enquete_ativa', JSON.stringify(dadosEnqueteAtiva));
+        }
+      } catch (e) {}
       sincronizarSetoresNoDisco();
     }
 
@@ -10549,6 +10728,22 @@
           configSistemaTi = { ...configSistemaTi, ...JSON.parse(cfg) };
         }
         atualizarNomeEmpresaNaInterface();
+
+        // Carrega histórico de avisos e enquetes salvos no dispositivo
+        const hAvisos = localStorage.getItem('fsc_kintsugi_historico_comunicados');
+        if (hAvisos) {
+          try {
+            const parsedH = JSON.parse(hAvisos);
+            if (Array.isArray(parsedH) && parsedH.length > 0) historicoAvisos = parsedH;
+          } catch(e) {}
+        }
+        const dEnq = localStorage.getItem('fsc_kintsugi_dados_enquete_ativa');
+        if (dEnq) {
+          try {
+            const parsedEnq = JSON.parse(dEnq);
+            if (parsedEnq && parsedEnq.id) dadosEnqueteAtiva = parsedEnq;
+          } catch(e) {}
+        }
         
         // Sincroniza empresas cadastradas (preserva deletions e escolhas do usuário no localStorage)
         const empSalvas = localStorage.getItem('fsc_kintsugi_empresas');
@@ -12839,10 +13034,332 @@
       'Muito Lenta / Quedas constantes'
     ];
 
-    let historicoAvisos = [];
-    let dadosEnqueteAtiva = null;
+    // Configuração de Destinatários Multi-Estações / Setores / Broadcast
+    window.destinatariosConfig = {
+      aviso: { modo: 'broadcast', setores: [], estacoes: [] },
+      enquete: { modo: 'broadcast', setores: [], estacoes: [] }
+    };
 
-        // =========================================================================
+    // Histórico persistente de comunicados e enquetes
+    let historicoAvisos = [
+      {
+        id: 'ENQ-4102',
+        tipo: 'enquete',
+        urgencia: 'informativo',
+        titulo: 'Como você avalia a estabilidade da Internet & Rede Wi-Fi hoje?',
+        mensagem: 'A equipe de infraestrutura está monitorando o link corporativo. Selecione sua experiência de uso:',
+        destinatario: 'Todas as Estações Online (Broadcast)',
+        horario: 'Hoje, 09:30',
+        autor: 'Gabriel Novaes (Gestão TI)',
+        confirmacoes: '14 respostas computadas',
+        opcoes: 'Muito Rápida / Estável (Sem problemas)|Normal (Atende bem as atividades)|Lenta em alguns momentos do dia|Muito Lenta / Quedas constantes'
+      },
+      {
+        id: 'AVS-9182',
+        tipo: 'aviso',
+        urgencia: 'importante',
+        titulo: 'Manutenção Programada no Servidor de Arquivos',
+        mensagem: 'Informamos que hoje às 18:00 haverá reinicialização do servidor de arquivos. Por favor, salve e feche todas as planilhas da rede.',
+        destinatario: 'Setores: #Logística, #Financeiro (8 máquinas)',
+        horario: 'Ontem, 16:45',
+        autor: 'Gabriel Novaes (Gestão TI)',
+        confirmacoes: 'Entregue na tela (8/8)',
+        opcoes: ''
+      },
+      {
+        id: 'NOT-3819',
+        tipo: 'nota',
+        urgencia: 'informativo',
+        titulo: 'Atualização Obrigatória de Sistema e Reinicialização',
+        mensagem: 'Uma atualização de segurança do Windows e do ERP corporativo foi aplicada. Esta estação precisa ser reiniciada.',
+        destinatario: '3 Estações (SVR, EXP-03, FIN-02)',
+        horario: 'Ontem, 14:10',
+        autor: 'Gabriel Novaes (Gestão TI)',
+        confirmacoes: 'Entregue na tela (3/3)',
+        opcoes: ''
+      },
+      {
+        id: 'AVS-1092',
+        tipo: 'aviso',
+        urgencia: 'urgente',
+        titulo: 'ALERTA MÁXIMO: Tentativas de Phishing por E-mail em Andamento',
+        mensagem: 'Detectamos e-mails falsos solicitando atualização de senhas bancárias e credenciais. Nunca clique em links suspeitos.',
+        destinatario: 'Todas as Estações Online (Broadcast)',
+        horario: '25/11, 11:20',
+        autor: 'Gabriel Novaes (Gestão TI)',
+        confirmacoes: 'Entregue na tela com som',
+        opcoes: ''
+      }
+    ];
+
+    let dadosEnqueteAtiva = {
+      id: 'ENQ-4102',
+      pergunta: 'Como você avalia a estabilidade da Internet & Rede Wi-Fi hoje?',
+      totalVotos: 14,
+      opcoes: [
+        { texto: 'Muito Rápida / Estável (Sem problemas)', votos: 8, pct: 57, cor: 'bg-emerald-500' },
+        { texto: 'Normal (Atende bem as atividades)', votos: 4, pct: 29, cor: 'bg-blue-500' },
+        { texto: 'Lenta em alguns momentos do dia', votos: 2, pct: 14, cor: 'bg-amber-500' },
+        { texto: 'Muito Lenta / Quedas constantes', votos: 0, pct: 0, cor: 'bg-rose-500' }
+      ],
+      votantes: [
+        { host: 'EXP-03', voto: 'Muito Rápida / Estável (Sem problemas)', hora: '09:35' },
+        { host: 'FIN-02', voto: 'Normal (Atende bem as atividades)', hora: '09:38' },
+        { host: 'P&D-02', voto: 'Muito Rápida / Estável (Sem problemas)', hora: '09:42' },
+        { host: 'REC', voto: 'Lenta em alguns momentos do dia', hora: '09:50' },
+        { host: 'DEP-01', voto: 'Normal (Atende bem as atividades)', hora: '10:05' }
+      ]
+    };
+
+    // =========================================================================
+    // SELETOR MULTI-ESTAÇÕES / SETORES / BROADCAST (INTERATIVO)
+    // =========================================================================
+    function toggleDropdownDestinatarios(tipo, forcar) {
+      const painel = document.getElementById(`painel-dropdown-destinatario-${tipo}`);
+      if (!painel) return;
+      if (typeof forcar === 'boolean') {
+        painel.classList.toggle('hidden', !forcar);
+      } else {
+        painel.classList.toggle('hidden');
+      }
+      if (!painel.classList.contains('hidden')) {
+        popularDropdownDestinatarios(tipo);
+        const busca = document.getElementById(`busca-destinatarios-${tipo}`);
+        if (busca) setTimeout(() => busca.focus(), 50);
+      }
+    }
+
+    // Fechar dropdowns de destinatários ao clicar fora
+    document.addEventListener('click', function(e) {
+      ['aviso', 'enquete'].forEach(tipo => {
+        const wrapper = document.getElementById(`wrapper-destinatario-${tipo}`);
+        const painel = document.getElementById(`painel-dropdown-destinatario-${tipo}`);
+        if (wrapper && painel && !wrapper.contains(e.target)) {
+          painel.classList.add('hidden');
+        }
+      });
+    });
+
+    function popularDropdownDestinatarios(tipo) {
+      const cfg = window.destinatariosConfig[tipo] || { modo: 'broadcast', setores: [], estacoes: [] };
+      
+      // 1. Popula chips de setores
+      const contSetores = document.getElementById(`lista-setores-destinatario-${tipo}`);
+      if (contSetores) {
+        contSetores.innerHTML = '';
+        const depts = (listaDepartamentos && listaDepartamentos.length > 0) 
+          ? listaDepartamentos 
+          : ["#Financeiro", "#Produção", "#TI", "#Diretoria", "#DP", "#Logística", "#Comercial", "#QUALIDADE", "#PROJETO", "#COMPRAS", "#RECEPÇÃO", "#ALMOXARIFADO"];
+
+        depts.forEach(d => {
+          const isSel = (cfg.modo === 'setor' && cfg.setores.includes(d));
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `px-2.5 py-1 rounded-lg text-[11px] font-semibold transition border ${
+            isSel ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+          }`;
+          btn.innerHTML = `${isSel ? '✓ ' : ''}${d}`;
+          btn.onclick = () => alternarSetorDestinatario(tipo, d);
+          contSetores.appendChild(btn);
+        });
+      }
+
+      // 2. Popula lista com checkboxes das estações
+      const contEstacoes = document.getElementById(`lista-estacoes-destinatario-${tipo}`);
+      if (contEstacoes) {
+        contEstacoes.innerHTML = '';
+        const termo = (document.getElementById(`busca-destinatarios-${tipo}`)?.value || '').toLowerCase().trim();
+        const ativos = (listaAtivos && listaAtivos.length > 0) ? listaAtivos : [];
+
+        const filtrados = ativos.filter(a => {
+          if (!termo) return true;
+          const h = (a.host || '').toLowerCase();
+          const ip = (a.ip || '').toLowerCase();
+          const t = (a.tag || '').toLowerCase();
+          const l = (a.location || '').toLowerCase();
+          const u = (a.usuario || a.user || '').toLowerCase();
+          return h.includes(termo) || ip.includes(termo) || t.includes(termo) || l.includes(termo) || u.includes(termo);
+        });
+
+        if (filtrados.length === 0) {
+          contEstacoes.innerHTML = `<div class="p-3 text-center text-xs text-slate-400">Nenhuma estação encontrada com esse filtro.</div>`;
+        } else {
+          filtrados.forEach(a => {
+            const isChecked = (cfg.modo === 'estacoes' && cfg.estacoes.includes(a.host));
+            const row = document.createElement('label');
+            row.className = `flex items-center justify-between p-2 rounded-lg cursor-pointer transition select-none ${
+              isChecked ? 'bg-indigo-50/90 border border-indigo-200' : 'hover:bg-slate-50 border border-transparent'
+            }`;
+            row.innerHTML = `
+              <div class="flex items-center gap-2.5 min-w-0">
+                <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="alternarEstacaoDestinatario('${tipo}', '${a.host}')" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer">
+                <div class="truncate">
+                  <div class="text-xs font-bold text-slate-900 truncate">${a.host} <span class="font-normal font-mono text-slate-500 text-[11px]">(${a.ip || 'DHCP'})</span></div>
+                  <div class="text-[10px] text-slate-400 truncate">${a.tag || ''} ${a.location ? '• ' + a.location : ''} ${a.usuario ? '• ' + a.usuario : ''}</div>
+                </div>
+              </div>
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 ${
+                (a.status === 'online' || a.status === 'Ativo') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500'
+              }">
+                ${a.status || 'Ativo'}
+              </span>
+            `;
+            contEstacoes.appendChild(row);
+          });
+        }
+      }
+
+      // 3. Atualiza check do broadcast
+      const chkBroad = document.getElementById(`check-broadcast-${tipo}`);
+      if (chkBroad) {
+        chkBroad.style.display = (cfg.modo === 'broadcast') ? 'inline-block' : 'none';
+      }
+
+      atualizarTextoBotaoDestinatarios(tipo);
+    }
+
+    function selecionarModoDestinatario(tipo, modo) {
+      if (modo === 'broadcast') {
+        window.destinatariosConfig[tipo] = { modo: 'broadcast', setores: [], estacoes: [] };
+      }
+      popularDropdownDestinatarios(tipo);
+      atualizarTextoBotaoDestinatarios(tipo);
+    }
+
+    function alternarSetorDestinatario(tipo, setor) {
+      const cfg = window.destinatariosConfig[tipo];
+      if (cfg.modo !== 'setor') {
+        cfg.modo = 'setor';
+        cfg.setores = [setor];
+        cfg.estacoes = [];
+      } else {
+        const idx = cfg.setores.indexOf(setor);
+        if (idx >= 0) {
+          cfg.setores.splice(idx, 1);
+          if (cfg.setores.length === 0) cfg.modo = 'broadcast';
+        } else {
+          cfg.setores.push(setor);
+        }
+      }
+      popularDropdownDestinatarios(tipo);
+      atualizarTextoBotaoDestinatarios(tipo);
+    }
+
+    function alternarEstacaoDestinatario(tipo, host) {
+      const cfg = window.destinatariosConfig[tipo];
+      if (cfg.modo !== 'estacoes') {
+        cfg.modo = 'estacoes';
+        cfg.estacoes = [host];
+        cfg.setores = [];
+      } else {
+        const idx = cfg.estacoes.indexOf(host);
+        if (idx >= 0) {
+          cfg.estacoes.splice(idx, 1);
+          if (cfg.estacoes.length === 0) cfg.modo = 'broadcast';
+        } else {
+          cfg.estacoes.push(host);
+        }
+      }
+      popularDropdownDestinatarios(tipo);
+      atualizarTextoBotaoDestinatarios(tipo);
+    }
+
+    function marcarTodasEstacoes(tipo, marcar) {
+      const cfg = window.destinatariosConfig[tipo];
+      if (marcar) {
+        cfg.modo = 'estacoes';
+        cfg.estacoes = (listaAtivos && listaAtivos.length > 0) ? listaAtivos.map(a => a.host).filter(Boolean) : [];
+        cfg.setores = [];
+      } else {
+        cfg.modo = 'broadcast';
+        cfg.estacoes = [];
+        cfg.setores = [];
+      }
+      popularDropdownDestinatarios(tipo);
+      atualizarTextoBotaoDestinatarios(tipo);
+    }
+
+    function filtrarDestinatariosDropdown(tipo) {
+      popularDropdownDestinatarios(tipo);
+    }
+
+    function obterDestinatariosEAlvos(tipo) {
+      const cfg = window.destinatariosConfig[tipo] || { modo: 'broadcast', setores: [], estacoes: [] };
+      let alvosIps = [];
+      let textoExibicao = 'Todas as Estações Online (Broadcast Geral)';
+      let valorPersistencia = 'broadcast';
+
+      if (cfg.modo === 'estacoes' && cfg.estacoes.length > 0) {
+        const selecionados = (listaAtivos && listaAtivos.length > 0) ? listaAtivos.filter(a => cfg.estacoes.includes(a.host)) : [];
+        alvosIps = selecionados.map(a => a.ip).filter(Boolean);
+        if (alvosIps.length === 0 && listaAtivos && listaAtivos[0]?.ip) alvosIps = [listaAtivos[0].ip];
+        textoExibicao = `${cfg.estacoes.length} ${cfg.estacoes.length === 1 ? 'Estação' : 'Estações'} (${cfg.estacoes.join(', ')})`;
+        valorPersistencia = cfg.estacoes.join(', ');
+      } else if (cfg.modo === 'setor' && cfg.setores.length > 0) {
+        const setoresLimpos = cfg.setores.map(s => s.toLowerCase().replace('#', ''));
+        const selecionados = (listaAtivos && listaAtivos.length > 0) ? listaAtivos.filter(a => {
+          const t = (a.tag || '').toLowerCase();
+          const l = (a.location || '').toLowerCase();
+          return setoresLimpos.some(s => t.includes(s) || l.includes(s));
+        }) : [];
+        alvosIps = selecionados.map(a => a.ip).filter(Boolean);
+        if (alvosIps.length === 0 && listaAtivos && listaAtivos[0]?.ip) alvosIps = [listaAtivos[0].ip];
+        textoExibicao = `Setores: ${cfg.setores.join(', ')} (${alvosIps.length} máquinas)`;
+        valorPersistencia = cfg.setores.join(', ');
+      } else {
+        alvosIps = (listaAtivos && listaAtivos.length > 0) ? listaAtivos.map(a => a.ip).filter(Boolean) : ['192.168.18.122'];
+        textoExibicao = 'Todas as Estações Online (Broadcast Geral)';
+        valorPersistencia = 'broadcast';
+      }
+
+      alvosIps = Array.from(new Set(alvosIps));
+      return { alvosIps, textoExibicao, valorPersistencia };
+    }
+
+    function atualizarTextoBotaoDestinatarios(tipo) {
+      const cfg = window.destinatariosConfig[tipo] || { modo: 'broadcast', setores: [], estacoes: [] };
+      const elLabel = document.getElementById(`label-destinatario-${tipo}`);
+      const elIcon = document.getElementById(`icon-destinatario-${tipo}`);
+      const elBadge = document.getElementById(`badge-destinatario-${tipo}-tipo`);
+      const elResumo = document.getElementById(`resumo-selecao-${tipo}`);
+      const elHidden = document.getElementById(`campo-destinatario-${tipo}`);
+
+      const { textoExibicao, valorPersistencia } = obterDestinatariosEAlvos(tipo);
+
+      if (elHidden) elHidden.value = valorPersistencia;
+      if (elLabel) elLabel.textContent = textoExibicao;
+
+      if (cfg.modo === 'estacoes' && cfg.estacoes.length > 0) {
+        if (elIcon) elIcon.textContent = '💻';
+        if (elBadge) {
+          elBadge.textContent = `${cfg.estacoes.length} Selecionadas`;
+          elBadge.className = 'text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200';
+        }
+        if (elResumo) elResumo.textContent = `${cfg.estacoes.length} estações marcadas para envio`;
+      } else if (cfg.modo === 'setor' && cfg.setores.length > 0) {
+        if (elIcon) elIcon.textContent = '🏢';
+        if (elBadge) {
+          elBadge.textContent = `${cfg.setores.length} Setor(es)`;
+          elBadge.className = 'text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200';
+        }
+        if (elResumo) elResumo.textContent = `Envio para colaboradores dos setores: ${cfg.setores.join(', ')}`;
+      } else {
+        if (elIcon) elIcon.textContent = '📢';
+        if (elBadge) {
+          elBadge.textContent = 'Broadcast Geral';
+          elBadge.className = 'text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200';
+        }
+        if (elResumo) elResumo.textContent = 'Todas as estações conectadas receberão o alerta';
+      }
+
+      if (tipo === 'aviso') {
+        atualizarLivePreviewAviso();
+      } else {
+        sincronizarEnqueteForm();
+      }
+    }
+
+    // =========================================================================
     // NAVEGAÇÃO MODULAR EM MENUS: CENTRAL DE COMUNICADOS & ENQUETES
     // =========================================================================
     let menuComunicadosAtual = 'menu-aviso';
@@ -12858,13 +13375,11 @@
       const pEnquetes = document.getElementById('painel-menu-enquetes');
       const pHistorico = document.getElementById('painel-menu-historico');
 
-      // Reseta estilo dos botões
       [btnAviso, btnEnquetes, btnHistorico].forEach(b => {
         if (!b) return;
         b.className = 'flex-1 py-2.5 px-4 rounded-lg font-semibold text-xs flex items-center justify-center gap-2 transition text-slate-500 hover:text-slate-900 hover:bg-slate-200/50';
       });
 
-      // Esconde todos os painéis
       if (pAviso) pAviso.classList.add('hidden');
       if (pEnquetes) pEnquetes.classList.add('hidden');
       if (pHistorico) pHistorico.classList.add('hidden');
@@ -12924,8 +13439,7 @@
     function sincronizarEnqueteForm() {
       const perg = document.getElementById('campo-pergunta-enquete')?.value || 'Pesquisa de Opinião de T.I';
       const inst = document.getElementById('campo-instrucoes-enquete')?.value || 'Selecione a sua resposta:';
-      const dest = document.getElementById('campo-destinatario-enquete')?.value || 'broadcast';
-
+      
       const pPerg = document.getElementById('preview-enquete-pergunta');
       const pInst = document.getElementById('preview-enquete-instrucao');
       const pRadios = document.getElementById('preview-enquete-lista-radios');
@@ -12935,13 +13449,8 @@
       if (pInst) pInst.textContent = inst;
 
       if (pAutor) {
-        let destTexto = 'Todas as Estações (Broadcast)';
-        if (dest.startsWith('#')) {
-          destTexto = `Setor ${dest}`;
-        } else if (dest !== 'broadcast') {
-          destTexto = `Estação ${dest}`;
-        }
-        pAutor.innerHTML = `Emitido por: <strong class="text-slate-200">Gabriel Novaes (Gestão TI)</strong> • Alvo: <span class="text-purple-300 font-bold">${destTexto}</span>`;
+        const { textoExibicao } = obterDestinatariosEAlvos('enquete');
+        pAutor.innerHTML = `Emitido por: <strong class="text-slate-200">Gabriel Novaes (Gestão TI)</strong> • Alvo: <span class="text-purple-300 font-bold">${textoExibicao}</span>`;
       }
 
       if (pRadios) {
@@ -12966,7 +13475,8 @@
       computarVotoNaEnquete(opcaoEnqueteDedicadaPreview, 'Estação-Teste');
       const btn = document.getElementById('preview-enquete-btn-votar');
       if (btn) {
-        btn.innerHTML = '<span class="flex items-center justify-center gap-1.5"><i data-lucide="check" class="w-4 h-4"></i> Voto Registrado</span>'; atualizarIconesLucide();
+        btn.innerHTML = '<span class="flex items-center justify-center gap-1.5"><i data-lucide="check" class="w-4 h-4"></i> Voto Registrado</span>';
+        if (typeof atualizarIconesLucide === 'function') atualizarIconesLucide();
         btn.className = 'w-full py-2.5 px-4 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2';
         setTimeout(() => {
           btn.innerHTML = '<span class="flex items-center justify-center gap-1.5"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i><span>Enviar Minha Resposta / Votar</span></span>';
@@ -12979,13 +13489,14 @@
     async function dispararEnqueteDedicada() {
       const perg = document.getElementById('campo-pergunta-enquete')?.value.trim();
       const inst = document.getElementById('campo-instrucoes-enquete')?.value.trim();
-      const dest = document.getElementById('campo-destinatario-enquete')?.value || 'broadcast';
       const btn = document.getElementById('btn-disparar-enquete-dedicada');
 
       if (!perg) {
         alert('Por favor, informe a pergunta da enquete.');
         return;
       }
+
+      const { alvosIps, textoExibicao, valorPersistencia } = obterDestinatariosEAlvos('enquete');
 
       if (btn) {
         btn.disabled = true;
@@ -12995,33 +13506,31 @@
       const idNovo = 'ENQ-' + Math.floor(1000 + Math.random() * 9000);
       const opcoesStr = opcoesEnqueteAtuais.join('|');
 
-      // Tenta enviar via HTTP para cada máquina online
-      let alvos = [];
-      if (dest === 'broadcast') {
-        alvos = (listaAtivos && listaAtivos.length > 0) ? listaAtivos.map(a => a.ip).filter(Boolean) : ['192.168.18.122'];
-      } else if (dest.startsWith('#')) {
-        const tagLimpa = dest.toLowerCase();
-        const nomeLimpo = dest.replace('#', '').toLowerCase();
-        alvos = listaAtivos ? listaAtivos.filter(a => {
-          const t = (a.tag || '').toLowerCase();
-          const l = (a.location || '').toLowerCase();
-          return t === tagLimpa || t.includes(nomeLimpo) || l.includes(nomeLimpo);
-        }).map(a => a.ip) : [];
-        if (alvos.length === 0) alvos = (listaAtivos && listaAtivos[0]?.ip) ? [listaAtivos[0].ip] : ['192.168.18.122'];
-      } else {
-        const atv = listaAtivos ? listaAtivos.find(a => a.host === dest) : null;
-        if (atv) alvos = [atv.ip];
-        else alvos = ['127.0.0.1'];
+      // 1. Grava no Supabase Cloud
+      if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+        supabaseClient.from('comunicados').insert({
+          id: idNovo,
+          tipo: 'enquete',
+          titulo: perg,
+          mensagem: inst,
+          urgencia: 'informativo',
+          destinatario: valorPersistencia,
+          opcoes: opcoesStr,
+          autor: 'Gabriel Novaes (Gestão TI)'
+        }).then(({ error }) => {
+          if (error) console.warn('Erro ao inserir enquete Supabase:', error);
+        }).catch(console.warn);
       }
 
-      alvos.forEach(ip => {
+      // 2. Dispara assíncrono para os agentes na porta 8090
+      alvosIps.forEach(ip => {
         try {
           const qParams = `tipo=enquete&titulo=${encodeURIComponent(perg)}&mensagem=${encodeURIComponent(inst)}&urgencia=informativo&enquete_id=${idNovo}&autor=${encodeURIComponent('Gabriel Novaes (Gestão TI)')}&opcoes=${encodeURIComponent(opcoesStr)}`;
           fetch(`http://${ip}:8090/api/enquete?${qParams}`, { method: 'POST', mode: 'no-cors' }).catch(() => {});
         } catch (e) {}
       });
 
-      // Zera a apuração ativa para aguardar novos votos
+      // 3. Atualiza estado da enquete ativa
       dadosEnqueteAtiva = {
         id: idNovo,
         pergunta: perg,
@@ -13035,24 +13544,28 @@
         votantes: []
       };
 
-      // Registra no histórico
+      // 4. Registra no histórico persistente
       historicoAvisos.unshift({
         id: idNovo,
         tipo: 'enquete',
         urgencia: 'informativo',
         titulo: perg,
         mensagem: inst,
-        destinatario: dest === 'broadcast' ? 'Todas as Estações (Broadcast)' : (dest.startsWith('#') ? `Setor ${dest}` : dest),
+        destinatario: textoExibicao,
         horario: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         autor: 'Gabriel Novaes (Gestão TI)',
-        confirmacoes: '0 votos (Aguardando respostas)'
+        confirmacoes: '0 votos (Aguardando respostas)',
+        opcoes: opcoesStr
       });
+
+      salvarDadosLocais();
 
       await new Promise(r => setTimeout(r, 600));
 
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = `<span class="flex items-center justify-center gap-1.5"><i data-lucide="check" class="w-4 h-4"></i> Enquete Transmitida</span>`; atualizarIconesLucide();
+        btn.innerHTML = `<span class="flex items-center justify-center gap-1.5"><i data-lucide="check" class="w-4 h-4"></i> Enquete Transmitida</span>`;
+        if (typeof atualizarIconesLucide === 'function') atualizarIconesLucide();
         btn.className = 'w-full py-3.5 px-4 rounded-xl bg-emerald-600 text-white font-bold text-sm shadow-md transition flex items-center justify-center gap-2';
         setTimeout(() => {
           btn.innerHTML = `<span class="flex items-center justify-center gap-2"><i data-lucide="send" class="w-4 h-4"></i><span>Disparar Enquete para as Máquinas</span></span>`;
@@ -13204,6 +13717,7 @@
       dadosEnqueteAtiva.opcoes.forEach(op => {
         op.pct = dadosEnqueteAtiva.totalVotos > 0 ? Math.round((op.votos / dadosEnqueteAtiva.totalVotos) * 100) : 0;
       });
+      salvarDadosLocais();
       renderizarApuracaoEnquetes();
     }
 
@@ -13219,7 +13733,8 @@
         computarVotoNaEnquete(opcaoSelecionadaPreview, 'Estação-Teste');
         const btn = document.getElementById('preview-btn-acao');
         if (btn) {
-          btn.innerHTML = '<span class="flex items-center justify-center gap-1.5"><i data-lucide="check" class="w-4 h-4"></i> Voto Registrado</span>'; atualizarIconesLucide();
+          btn.innerHTML = '<span class="flex items-center justify-center gap-1.5"><i data-lucide="check" class="w-4 h-4"></i> Voto Registrado</span>';
+          if (typeof atualizarIconesLucide === 'function') atualizarIconesLucide();
           btn.className = 'w-full py-2.5 px-4 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2';
           setTimeout(() => atualizarLivePreviewAviso(), 1500);
         }
@@ -13230,7 +13745,6 @@
       const tit = document.getElementById('campo-titulo-comunicado')?.value || 'Comunicado Oficial de T.I';
       const msg = document.getElementById('campo-mensagem-comunicado')?.value || 'Instruções e comunicados emitidos diretamente na tela do usuário.';
       const urg = document.getElementById('campo-urgencia-aviso')?.value || 'informativo';
-      const dest = document.getElementById('campo-destinatario-aviso')?.value || 'broadcast';
 
       const pWinTitle = document.getElementById('preview-win-title');
       const pHeaderBar = document.getElementById('preview-header-bar');
@@ -13248,13 +13762,8 @@
 
       const pAutor = document.getElementById('preview-autor-texto');
       if (pAutor) {
-        let destTexto = 'Todas as Estações (Broadcast)';
-        if (dest.startsWith('#')) {
-          destTexto = `Setor ${dest}`;
-        } else if (dest !== 'broadcast') {
-          destTexto = `Estação ${dest}`;
-        }
-        pAutor.innerHTML = `Gabriel Novaes (Gestão TI) • Alvo: <span class="text-indigo-300 font-bold">${destTexto}</span>`;
+        const { textoExibicao } = obterDestinatariosEAlvos('aviso');
+        pAutor.innerHTML = `Gabriel Novaes (Gestão TI) • Alvo: <span class="text-indigo-300 font-bold">${textoExibicao}</span>`;
       }
 
       if (tipoEmissaoAtual === 'enquete') {
@@ -13264,12 +13773,14 @@
           pBadgeTipo.className = 'text-[10px] font-extrabold uppercase tracking-wider text-purple-400';
         }
         if (pIconBox) {
-          pIconBox.innerHTML = '<i data-lucide="bar-chart-2" class="w-4 h-4 text-white"></i>'; atualizarIconesLucide();
+          pIconBox.innerHTML = '<i data-lucide="bar-chart-2" class="w-4 h-4 text-white"></i>';
+          if (typeof atualizarIconesLucide === 'function') atualizarIconesLucide();
           pIconBox.className = 'w-10 h-10 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold text-lg shrink-0';
         }
         if (pHeaderBar) pHeaderBar.className = 'p-4 bg-gradient-to-r from-slate-900 to-purple-950/80 border-b border-slate-800 flex items-center gap-3 transition-colors';
         if (pBtnAcao) pBtnAcao.className = 'w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2';
-        if (pBtnTexto) pBtnTexto.innerHTML = '<span class="flex items-center justify-center gap-1.5"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i><span>Enviar Resposta / Votar</span></span>'; atualizarIconesLucide();
+        if (pBtnTexto) pBtnTexto.innerHTML = '<span class="flex items-center justify-center gap-1.5"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i><span>Enviar Resposta / Votar</span></span>';
+        if (typeof atualizarIconesLucide === 'function') atualizarIconesLucide();
         if (pContEnquete) pContEnquete.classList.remove('hidden');
 
         if (pListaOpcoes) {
@@ -13290,7 +13801,8 @@
         }
       } else {
         if (pContEnquete) pContEnquete.classList.add('hidden');
-        if (pBtnTexto) pBtnTexto.innerHTML = '<span class="flex items-center justify-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5"></i><span>Estou Ciente / Confirmar Leitura</span></span>'; atualizarIconesLucide();
+        if (pBtnTexto) pBtnTexto.innerHTML = '<span class="flex items-center justify-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5"></i><span>Estou Ciente / Confirmar Leitura</span></span>';
+        if (typeof atualizarIconesLucide === 'function') atualizarIconesLucide();
 
         if (urg === 'urgente') {
           if (pWinTitle) pWinTitle.textContent = 'Fast Solutions Corporate — Alerta Urgente';
@@ -13299,7 +13811,8 @@
             pBadgeTipo.className = 'text-[10px] font-extrabold uppercase tracking-wider text-rose-400';
           }
           if (pIconBox) {
-            pIconBox.innerHTML = '<i data-lucide="alert-triangle" class="w-4 h-4 text-white"></i>'; atualizarIconesLucide();
+            pIconBox.innerHTML = '<i data-lucide="alert-triangle" class="w-4 h-4 text-white"></i>';
+            if (typeof atualizarIconesLucide === 'function') atualizarIconesLucide();
             pIconBox.className = 'w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-lg shrink-0';
           }
           if (pHeaderBar) pHeaderBar.className = 'p-4 bg-gradient-to-r from-slate-900 to-rose-950/80 border-b border-slate-800 flex items-center gap-3 transition-colors';
@@ -13311,7 +13824,8 @@
             pBadgeTipo.className = 'text-[10px] font-extrabold uppercase tracking-wider text-amber-400';
           }
           if (pIconBox) {
-            pIconBox.innerHTML = '<i data-lucide="wrench" class="w-4 h-4 text-white"></i>'; atualizarIconesLucide();
+            pIconBox.innerHTML = '<i data-lucide="wrench" class="w-4 h-4 text-white"></i>';
+            if (typeof atualizarIconesLucide === 'function') atualizarIconesLucide();
             pIconBox.className = 'w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-lg shrink-0';
           }
           if (pHeaderBar) pHeaderBar.className = 'p-4 bg-gradient-to-r from-slate-900 to-amber-950/80 border-b border-slate-800 flex items-center gap-3 transition-colors';
@@ -13323,7 +13837,8 @@
             pBadgeTipo.className = 'text-[10px] font-extrabold uppercase tracking-wider text-blue-400';
           }
           if (pIconBox) {
-            pIconBox.innerHTML = (tipoEmissaoAtual === 'nota' ? '<i data-lucide="file-text" class="w-4 h-4 text-white"></i>' : '<i data-lucide="megaphone" class="w-4 h-4 text-white"></i>'); atualizarIconesLucide();
+            pIconBox.innerHTML = (tipoEmissaoAtual === 'nota' ? '<i data-lucide="file-text" class="w-4 h-4 text-white"></i>' : '<i data-lucide="megaphone" class="w-4 h-4 text-white"></i>');
+            if (typeof atualizarIconesLucide === 'function') atualizarIconesLucide();
             pIconBox.className = 'w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-lg shrink-0';
           }
           if (pHeaderBar) pHeaderBar.className = 'p-4 bg-gradient-to-r from-slate-900 to-blue-950/80 border-b border-slate-800 flex items-center gap-3 transition-colors';
@@ -13336,13 +13851,14 @@
       const tit = document.getElementById('campo-titulo-comunicado')?.value.trim();
       const msg = document.getElementById('campo-mensagem-comunicado')?.value.trim();
       const urg = document.getElementById('campo-urgencia-aviso')?.value || 'informativo';
-      const dest = document.getElementById('campo-destinatario-aviso')?.value || 'broadcast';
       const btn = document.getElementById('btn-disparar-comunicado');
 
       if (!tit) {
         alert('Por favor, informe o título do comunicado ou pergunta da enquete.');
         return;
       }
+
+      const { alvosIps, textoExibicao, valorPersistencia } = obterDestinatariosEAlvos('aviso');
 
       if (btn) {
         btn.disabled = true;
@@ -13352,43 +13868,24 @@
       const idNovo = (tipoEmissaoAtual === 'enquete' ? 'ENQ-' : 'AVS-') + Math.floor(1000 + Math.random() * 9000);
       const opcoesStr = opcoesEnqueteAtuais.join('|');
 
-      // Tenta enviar via HTTP para cada máquina online
-      let alvos = [];
-      if (dest === 'broadcast') {
-        alvos = (listaAtivos && listaAtivos.length > 0) ? listaAtivos.map(a => a.ip).filter(Boolean) : ['192.168.18.122'];
-      } else if (dest.startsWith('#')) {
-        const tagLimpa = dest.toLowerCase();
-        const nomeLimpo = dest.replace('#', '').toLowerCase();
-        alvos = listaAtivos ? listaAtivos.filter(a => {
-          const t = (a.tag || '').toLowerCase();
-          const l = (a.location || '').toLowerCase();
-          return t === tagLimpa || t.includes(nomeLimpo) || l.includes(nomeLimpo);
-        }).map(a => a.ip) : [];
-        if (alvos.length === 0) alvos = (listaAtivos && listaAtivos[0]?.ip) ? [listaAtivos[0].ip] : ['192.168.18.122'];
-      } else {
-        const atv = listaAtivos ? listaAtivos.find(a => a.host === dest) : null;
-        if (atv) alvos = [atv.ip];
-        else alvos = ['127.0.0.1'];
-      }
-
-            // 1. Grava no Supabase Cloud para entrega universal (Internet/Nuvem/Qualquer IP)
-      if (supabaseClient) {
+      // 1. Grava no Supabase Cloud para entrega universal
+      if (typeof supabaseClient !== 'undefined' && supabaseClient) {
         supabaseClient.from('comunicados').insert({
           id: idNovo,
           tipo: tipoEmissaoAtual,
           titulo: tit,
           mensagem: msg,
           urgencia: urg,
-          destinatario: dest,
+          destinatario: valorPersistencia,
           opcoes: opcoesStr,
           autor: 'Gabriel Novaes (Gestão TI)'
-        }).then(({ data, error }) => {
+        }).then(({ error }) => {
           if (error) console.warn('Erro ao gravar comunicado no Supabase:', error);
         }).catch(console.warn);
       }
 
       // 2. Dispara assíncrono para os agentes locais na porta 8090
-      alvos.forEach(ip => {
+      alvosIps.forEach(ip => {
         try {
           const endpoint = tipoEmissaoAtual === 'enquete' ? '/api/enquete' : '/api/aviso';
           const qParams = `tipo=${tipoEmissaoAtual}&titulo=${encodeURIComponent(tit)}&mensagem=${encodeURIComponent(msg)}&urgencia=${urg}&enquete_id=${idNovo}&autor=${encodeURIComponent('Gabriel Novaes (Gestão TI)')}&opcoes=${encodeURIComponent(opcoesStr)}`;
@@ -13396,17 +13893,18 @@
         } catch (e) {}
       });
 
-      // Registra no histórico local
+      // 3. Registra no histórico local persistente
       const novoItemHistorico = {
         id: idNovo,
         tipo: tipoEmissaoAtual,
         urgencia: urg,
         titulo: tit,
         mensagem: msg,
-        destinatario: dest === 'broadcast' ? 'Todas as Estações (Broadcast)' : (dest.startsWith('#') ? `Setor ${dest}` : dest),
+        destinatario: textoExibicao,
         horario: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         autor: 'Gabriel Novaes (Gestão TI)',
-        confirmacoes: tipoEmissaoAtual === 'enquete' ? '0 votos (Aguardando respostas)' : 'Entregue na tela'
+        confirmacoes: tipoEmissaoAtual === 'enquete' ? '0 votos (Aguardando respostas)' : 'Entregue na tela',
+        opcoes: opcoesStr
       };
 
       historicoAvisos.unshift(novoItemHistorico);
@@ -13427,6 +13925,8 @@
         };
       }
 
+      salvarDadosLocais();
+
       await new Promise(r => setTimeout(r, 600));
 
       if (btn) {
@@ -13440,95 +13940,162 @@
 
       renderizarHistoricoAvisos();
       renderizarApuracaoEnquetes();
-      lucide.createIcons();
+      if (window.lucide) lucide.createIcons();
     }
 
     function abrirEmissaoParaHost(hostname, ip) {
       navegarParaAba('view-comunicados');
-      const sel = document.getElementById('campo-destinatario-aviso');
-      if (sel) {
-        // Verifica se a opção já existe, senão adiciona
-        let found = false;
-        for (let i = 0; i < sel.options.length; i++) {
-          if (sel.options[i].value === hostname) {
-            sel.selectedIndex = i;
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          const opt = document.createElement('option');
-          opt.value = hostname;
-          opt.textContent = `${hostname} (${ip})`;
-          sel.appendChild(opt);
-          sel.value = hostname;
-        }
-      }
-      atualizarLivePreviewAviso();
+      selecionarMenuComunicados('menu-aviso');
+      window.destinatariosConfig.aviso = {
+        modo: 'estacoes',
+        setores: [],
+        estacoes: [hostname]
+      };
+      popularDropdownDestinatarios('aviso');
+      atualizarTextoBotaoDestinatarios('aviso');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
+    // =========================================================================
+    // RENDERIZAR APURAÇÃO DE ENQUETES (TEMPO REAL & SEGURO CONTRA NULL)
+    // =========================================================================
     function renderizarApuracaoEnquetes() {
       const badgeSubaba = document.getElementById('badge-total-votos-subaba');
-      if (badgeSubaba && dadosEnqueteAtiva) {
-        badgeSubaba.textContent = dadosEnqueteAtiva.totalVotos + (dadosEnqueteAtiva.totalVotos === 1 ? ' Voto' : ' Votos');
-      }
       const badgeId = document.getElementById('badge-enquete-id-tag');
-      if (badgeId && dadosEnqueteAtiva) {
-        badgeId.textContent = 'Pesquisa Ativa: ' + dadosEnqueteAtiva.id;
-      }
+      const badgeMenu = document.getElementById('badge-menu-enquetes-count');
       const container = document.getElementById('container-apuracao-enquetes');
       if (!container) return;
 
+      // Recupera enquete ativa do histórico se dadosEnqueteAtiva estiver nulo
+      if (!dadosEnqueteAtiva && Array.isArray(historicoAvisos)) {
+        const ultEnq = historicoAvisos.find(h => h.tipo === 'enquete');
+        if (ultEnq) {
+          const ops = (ultEnq.opcoes && typeof ultEnq.opcoes === 'string') 
+            ? ultEnq.opcoes.split('|').filter(Boolean) 
+            : ['Sim / Aprovado', 'Não / Rejeitado'];
+          dadosEnqueteAtiva = {
+            id: ultEnq.id,
+            pergunta: ultEnq.titulo,
+            totalVotos: 0,
+            opcoes: ops.map((op, i) => ({
+              texto: op,
+              votos: 0,
+              pct: 0,
+              cor: ['bg-emerald-500', 'bg-blue-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500'][i % 5]
+            })),
+            votantes: []
+          };
+        }
+      }
+
+      if (!dadosEnqueteAtiva) {
+        if (badgeSubaba) badgeSubaba.textContent = '0 Votos';
+        if (badgeId) badgeId.textContent = 'Nenhuma Enquete Ativa';
+        if (badgeMenu) badgeMenu.textContent = '0 Ativas';
+        container.innerHTML = `
+          <div class="py-12 text-center space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto shadow-xs border border-purple-100">
+              <i data-lucide="bar-chart-2" class="w-6 h-6"></i>
+            </div>
+            <div class="max-w-sm mx-auto">
+              <h4 class="text-sm font-bold text-slate-800">Nenhuma Enquete Ativa</h4>
+              <p class="text-xs text-slate-400 mt-1">Crie e lance uma pesquisa de opinião para coletar votos dos colaboradores na tela de cada computador.</p>
+            </div>
+            <button onclick="alternarSubAbaEnquetes('criar')" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-sm transition inline-flex items-center gap-1.5">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>Criar Nova Enquete</span>
+            </button>
+          </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      if (badgeSubaba) {
+        badgeSubaba.textContent = dadosEnqueteAtiva.totalVotos + (dadosEnqueteAtiva.totalVotos === 1 ? ' Voto' : ' Votos');
+      }
+      if (badgeId) {
+        badgeId.textContent = 'Pesquisa Ativa: ' + dadosEnqueteAtiva.id;
+      }
+      if (badgeMenu) {
+        badgeMenu.textContent = '1 Ativa';
+      }
+
       container.innerHTML = `
-        <div class="space-y-3">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-            <h4 class="font-bold text-slate-800 text-sm leading-tight">${dadosEnqueteAtiva.pergunta}</h4>
-            <span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200 shrink-0">
-              ${dadosEnqueteAtiva.totalVotos} Respostas Computadas
+        <div class="space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div>
+              <span class="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Pergunta da Pesquisa</span>
+              <h4 class="font-bold text-slate-900 text-base leading-snug mt-0.5">${dadosEnqueteAtiva.pergunta}</h4>
+            </div>
+            <span class="text-xs font-bold text-purple-700 bg-purple-50 px-3 py-1 rounded-full border border-purple-200 shrink-0">
+              ${dadosEnqueteAtiva.totalVotos} ${dadosEnqueteAtiva.totalVotos === 1 ? 'Resposta' : 'Respostas'} Computadas
             </span>
           </div>
 
           <!-- Barras de Percentual -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
             ${dadosEnqueteAtiva.opcoes.map(op => `
-              <div class="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50 space-y-2">
+              <div class="p-4 rounded-xl border border-slate-200/90 bg-slate-50/60 hover:bg-slate-50 transition space-y-2.5">
                 <div class="flex items-center justify-between text-xs font-semibold">
-                  <span class="text-slate-800">${op.texto}</span>
-                  <span class="font-bold text-slate-900">${op.pct}% (${op.votos})</span>
+                  <span class="text-slate-800 font-bold">${op.texto}</span>
+                  <span class="font-extrabold text-slate-900">${op.pct}% <span class="font-normal text-slate-500">(${op.votos})</span></span>
                 </div>
-                <div class="w-full h-2.5 rounded-full bg-slate-200 overflow-hidden">
-                  <div class="${op.cor} h-full rounded-full transition-all duration-700" style="width: ${op.pct}%"></div>
+                <div class="w-full h-3 rounded-full bg-slate-200/80 overflow-hidden">
+                  <div class="${op.cor} h-full rounded-full transition-all duration-700 shadow-sm" style="width: ${op.pct}%"></div>
                 </div>
               </div>
             `).join('')}
           </div>
 
           <!-- Votantes Recentes -->
-          <div class="pt-2 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2 text-xs">
-            <span class="text-slate-500 font-medium">Últimos votos registrados:</span>
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2 text-xs">
+            <span class="text-slate-500 font-medium">Últimos votos registrados das máquinas:</span>
             <div class="flex items-center gap-1.5 flex-wrap">
-              ${dadosEnqueteAtiva.votantes.map(v => `
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 font-medium text-[11px] shadow-2xs">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  <strong>${v.host}:</strong> ${v.voto} (${v.hora})
+              ${(dadosEnqueteAtiva.votantes && dadosEnqueteAtiva.votantes.length > 0) ? dadosEnqueteAtiva.votantes.map(v => `
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium text-xs shadow-2xs">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <strong>${v.host}:</strong> ${v.voto} <span class="text-slate-400 text-[10px]">(${v.hora})</span>
                 </span>
-              `).join('')}
+              `).join('') : '<span class="text-slate-400 italic text-[11px]">Nenhum voto recebido nesta sessão ainda.</span>'}
             </div>
           </div>
         </div>
       `;
+      if (window.lucide) lucide.createIcons();
     }
 
+    // =========================================================================
+    // RENDERIZAR HISTÓRICO DE AVISOS E COMUNICADOS
+    // =========================================================================
     function renderizarHistoricoAvisos() {
       const tbody = document.getElementById('tabela-historico-avisos-corpo');
       const contador = document.getElementById('contador-historico-avisos');
       if (!tbody) return;
       tbody.innerHTML = '';
 
-      if (contador) contador.textContent = historicoAvisos.length + ' Registros';
+      const total = (historicoAvisos && Array.isArray(historicoAvisos)) ? historicoAvisos.length : 0;
+      if (contador) contador.textContent = total + (total === 1 ? ' Registro' : ' Registros');
       const badgeHist = document.getElementById('badge-menu-historico-count');
-      if (badgeHist) badgeHist.textContent = historicoAvisos.length;
+      if (badgeHist) badgeHist.textContent = total;
+
+      if (!historicoAvisos || historicoAvisos.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="py-12 text-center text-slate-400">
+              <div class="flex flex-col items-center justify-center gap-2">
+                <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center">
+                  <i data-lucide="inbox" class="w-5 h-5"></i>
+                </div>
+                <div class="font-bold text-xs text-slate-600">Nenhum Comunicado Emitido Ainda</div>
+                <div class="text-[11px] text-slate-400 max-w-xs">Os avisos corporativos, notas técnicas e enquetes disparados aparecerão aqui em tempo real.</div>
+              </div>
+            </td>
+          </tr>
+        `;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
 
       historicoAvisos.forEach(av => {
         const tr = document.createElement('tr');
@@ -13584,6 +14151,7 @@
         `;
         tbody.appendChild(tr);
       });
+      if (window.lucide) lucide.createIcons();
     }
 
     function reemitirComunicadoHistorico(id) {
@@ -13600,21 +14168,109 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    async function atualizarRespostasEnquetes() {
-      // Tenta buscar /api/enquete/resultados da estação conectada ou local
+    // =========================================================================
+    // SINCRONIZAR COMUNICADOS & ENQUETES DO SUPABASE CLOUD
+    // =========================================================================
+    async function carregarComunicadosDoSupabase() {
+      if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
       try {
-        const targetHostIp = (listaAtivos && listaAtivos.length > 0 && listaAtivos[0].ip) ? listaAtivos[0].ip : '192.168.18.122'; const resp = await fetch(`http://${targetHostIp}:8090/api/enquete/resultados`, { mode: 'cors' });
-        if (resp.ok) {
-          const votos = await resp.json();
-          if (Array.isArray(votos) && votos.length > 0) {
-            console.log('Votos recebidos do agente:', votos);
+        const { data: comData, error } = await supabaseClient
+          .from('comunicados')
+          .select('*')
+          .order('criado_em', { ascending: false });
+
+        if (comData && comData.length > 0) {
+          const mapa = new Map();
+          comData.forEach(c => {
+            if (c && c.id) {
+              const dataObj = c.criado_em ? new Date(c.criado_em) : new Date();
+              const horarioFormatado = dataObj.toLocaleDateString([], { day: '2-digit', month: '2-digit' }) + ' às ' + dataObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              
+              mapa.set(c.id, {
+                id: c.id,
+                tipo: c.tipo || 'aviso',
+                urgencia: c.urgencia || 'informativo',
+                titulo: c.titulo || 'Comunicado',
+                mensagem: c.mensagem || '',
+                destinatario: c.destinatario || 'Todas as Estações (Broadcast)',
+                horario: horarioFormatado,
+                autor: c.autor || 'Gabriel Novaes (Gestão TI)',
+                confirmacoes: c.confirmacoes || (c.tipo === 'enquete' ? '0 votos (Aguardando respostas)' : 'Entregue na tela'),
+                opcoes: c.opcoes || ''
+              });
+            }
+          });
+
+          historicoAvisos.forEach(h => {
+            if (h && h.id && !mapa.has(h.id)) {
+              mapa.set(h.id, h);
+            }
+          });
+
+          historicoAvisos = Array.from(mapa.values());
+          salvarDadosLocais();
+
+          if (!dadosEnqueteAtiva) {
+            const ultEnquete = historicoAvisos.find(h => h.tipo === 'enquete');
+            if (ultEnquete) {
+              const ops = (ultEnquete.opcoes && typeof ultEnquete.opcoes === 'string')
+                ? ultEnquete.opcoes.split('|').filter(Boolean)
+                : ['Sim / Aprovado', 'Não / Rejeitado'];
+              dadosEnqueteAtiva = {
+                id: ultEnquete.id,
+                pergunta: ultEnquete.titulo,
+                totalVotos: 0,
+                opcoes: ops.map((op, i) => ({
+                  texto: op,
+                  votos: 0,
+                  pct: 0,
+                  cor: ['bg-emerald-500', 'bg-blue-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500'][i % 5]
+                })),
+                votantes: []
+              };
+              salvarDadosLocais();
+            }
           }
+
+          renderizarHistoricoAvisos();
+          renderizarApuracaoEnquetes();
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar comunicados do Supabase:', e);
+      }
+    }
+
+    async function atualizarRespostasEnquetes() {
+      // 1. Sincroniza do Supabase
+      await carregarComunicadosDoSupabase();
+
+      // 2. Tenta buscar /api/enquete/resultados dos agentes online locais
+      try {
+        const alvos = (listaAtivos && listaAtivos.length > 0) ? listaAtivos.map(a => a.ip).filter(Boolean) : ['192.168.18.122'];
+        for (const ip of alvos.slice(0, 5)) {
+          try {
+            const resp = await fetch(`http://${ip}:8090/api/enquete/resultados`, { mode: 'cors' });
+            if (resp.ok) {
+              const votos = await resp.json();
+              if (Array.isArray(votos) && votos.length > 0 && dadosEnqueteAtiva) {
+                votos.forEach(v => {
+                  if (v.opcao && dadosEnqueteAtiva) {
+                    const optIdx = dadosEnqueteAtiva.opcoes.findIndex(o => o.texto === v.opcao);
+                    if (optIdx >= 0) {
+                      computarVotoNaEnquete(optIdx, v.host || 'Estação');
+                    }
+                  }
+                });
+              }
+            }
+          } catch (e) {}
         }
       } catch (e) {}
 
+      salvarDadosLocais();
       renderizarApuracaoEnquetes();
       renderizarHistoricoAvisos();
-      alert('Resultados de enquetes e confirmações atualizados com sucesso!');
+      mostrarToast('Resultados de enquetes e histórico de comunicados atualizados com sucesso!', 'success', 'Dados Sincronizados');
     }
 
     // DISPARO DE ATUALIZAÇÃO SILENCIOSA OTA VIA SUPABASE & GITHUB
