@@ -3873,20 +3873,18 @@ namespace NexusRemoteAgent
 
                 if (!string.IsNullOrEmpty(shortcut))
                 {
-                    if (shortcut == "TSCON")
+                    if (shortcut == "TSCON" || shortcut == "DESBLOQUEAR" || shortcut == "UNLOCK")
                     {
                         try
                         {
-                            // Apenas reconecta console se requisitado explicitamente e sem interferir em sessões RDP
-                            ProcessStartInfo psiTscon = new ProcessStartInfo("cmd.exe", "/c for /f \"tokens=3\" %i in ('qwinsta ^| findstr /i \"administrador\"') do tscon %i /dest:console");
+                            // Reconecta qualquer sessão de usuário ativa ou desconectada para o console físico para ativar a renderização de vídeo
+                            ProcessStartInfo psiTscon = new ProcessStartInfo("powershell.exe", "-ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -Command \"$s = (Get-Process -Name explorer -ErrorAction SilentlyContinue | Select-Object -ExpandProperty SessionId -Unique | Where-Object { $_ -gt 0 }); if (!$s) { $s = (quser 2>$null | Select-String '(\\d+)\\s+(?:Ativo|Active|Disc|Disco)' | ForEach-Object { $_.Matches.Groups[1].Value }) }; foreach ($id in $s) { tscon $id /dest:console }\"");
                             psiTscon.CreateNoWindow = true;
                             psiTscon.UseShellExecute = false;
                             Process.Start(psiTscon);
                         }
                         catch { }
-                    }
-                    else if (shortcut == "CTRL_ALT_DEL" || shortcut == "DESBLOQUEAR" || shortcut == "UNLOCK")
-                    {
+
                         try
                         {
                             // Pressiona espaco e enter para dispensar a tela de protecao/bloqueio do Windows de forma segura

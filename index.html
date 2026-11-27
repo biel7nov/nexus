@@ -3241,8 +3241,8 @@
         </section>
 
         <!-- Modal: Definir Máquina como Servidor / Gerenciar Servidores Monitorados -->
-        <div id="modal-gerenciar-servidores" onclick="if(event.target===this) fecharModalGerenciarServidores()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div class="bg-[#0d0f14] rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-white/[0.08] space-y-4">
+        <div id="modal-gerenciar-servidores" onclick="if(backdropClicadoSeguro(event, this)) fecharModalGerenciarServidores()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div onclick="event.stopPropagation()" class="bg-[#0d0f14] rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-white/[0.08] space-y-4">
             <div class="flex items-center justify-between pb-3 border-b border-white/[0.06]">
               <div class="flex items-center gap-2.5">
                 <div class="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center font-bold">
@@ -3750,8 +3750,8 @@
   <!-- ========================================================================= -->
 
     <!-- Modal: Governança de Logs, Telemetria & Conformidade Legal (LGPD / Marco Civil) -->
-  <div id="modal-politica-logs" onclick="if(event.target===this) fecharModalPoliticaLogs()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 space-y-5">
+  <div id="modal-politica-logs" onclick="if(backdropClicadoSeguro(event, this)) fecharModalPoliticaLogs()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+    <div onclick="event.stopPropagation()" class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 space-y-5">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div class="flex items-center gap-2.5">
           <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs">
@@ -3884,8 +3884,8 @@
   </div>
 
   <!-- Modal: Editar Usuário / Responsável do Ativo -->
-  <div id="modal-editar-usuario-ativo" onclick="if(event.target===this) fecharModalEditarUsuarioAtivo()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200/90 space-y-4">
+  <div id="modal-editar-usuario-ativo" onclick="if(backdropClicadoSeguro(event, this)) fecharModalEditarUsuarioAtivo()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div onclick="event.stopPropagation()" class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200/90 space-y-4">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div class="flex items-center gap-2.5">
           <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm">
@@ -3924,8 +3924,8 @@
   </div>
 
 <!-- Modal: Diagnóstico de Portas & Firewall (Acesso Remoto Seguro) -->
-  <div id="modal-diagnostico-portas" onclick="if(event.target===this) fecharModalDiagnosticoPortas()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+  <div id="modal-diagnostico-portas" onclick="if(backdropClicadoSeguro(event, this)) fecharModalDiagnosticoPortas()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+    <div onclick="event.stopPropagation()" class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div class="flex items-center gap-2.5">
           <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm">
@@ -3979,8 +3979,8 @@
   </div>
 
   <!-- Modal: Criar ou Editar Coluna / Aba Kanban (Exclusivo Administrador) -->
-  <div id="modal-gerenciar-coluna-kanban" onclick="if(event.target===this) fecharModalColunaKanban()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-    <div class="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200/90 space-y-4">
+  <div id="modal-gerenciar-coluna-kanban" onclick="if(backdropClicadoSeguro(event, this)) fecharModalColunaKanban()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+    <div onclick="event.stopPropagation()" class="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200/90 space-y-4">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
@@ -4052,8 +4052,8 @@
   </div>
 
   <!-- Modal: Novo Chamado (Spotlight Theme & Glass Card) -->
-  <div id="modal-novo-chamado" onclick="if(event.target===this) fecharModalNovoChamado()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto spotlight-backdrop">
-    <div class="spotlight-card rounded-2xl sm:rounded-3xl p-5 sm:p-7 max-w-xl w-full text-slate-100 space-y-4 relative my-auto shadow-2xl">
+  <div id="modal-novo-chamado" onclick="if(backdropClicadoSeguro(event, this)) fecharModalNovoChamado()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto spotlight-backdrop">
+    <div onclick="event.stopPropagation()" class="spotlight-card rounded-2xl sm:rounded-3xl p-5 sm:p-7 max-w-xl w-full text-slate-100 space-y-4 relative my-auto shadow-2xl">
       <!-- Top Brand Header with Company Info -->
       <div class="flex items-center justify-between pb-3.5 border-b border-white/10">
         <div class="flex items-center gap-3">
@@ -4189,8 +4189,8 @@
   </div>
 
   <!-- Modal: Nova Licença / Edição SAM (Com Valor e Pagamento) -->
-  <div id="modal-nova-licenca" onclick="if(event.target===this) fecharModalNovaLicenca()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-slate-100 space-y-4">
+  <div id="modal-nova-licenca" onclick="if(backdropClicadoSeguro(event, this)) fecharModalNovaLicenca()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+    <div onclick="event.stopPropagation()" class="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-slate-100 space-y-4">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div>
           <h3 class="text-base font-bold text-slate-900" id="titulo-modal-licenca">Cadastrar Licença de Software (GLPI SAM)</h3>
@@ -4312,8 +4312,8 @@
   </div>
 
   <!-- Modal: Acesso Remoto Rápido -->
-  <div id="modal-acesso-rapido" onclick="if(event.target===this) fecharModalAcessoRapido()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-    <div class="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl border border-slate-100 space-y-4">
+  <div id="modal-acesso-rapido" onclick="if(backdropClicadoSeguro(event, this)) fecharModalAcessoRapido()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+    <div onclick="event.stopPropagation()" class="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl border border-slate-100 space-y-4">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <h3 class="text-base font-bold text-slate-900">Conexão Remota Instantânea</h3>
         <button onclick="fecharModalAcessoRapido()" class="p-1 rounded-lg text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-4 h-4"></i></button>
@@ -4343,8 +4343,8 @@
   </div>
 
   <!-- Modal: Configurações Interativas do Sistema -->
-  <div id="modal-configuracoes" onclick="if(event.target===this) fecharModalConfiguracoes()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-    <div class="bg-white rounded-xl p-6 max-w-lg w-full shadow-2xl border border-slate-100 space-y-5">
+  <div id="modal-configuracoes" onclick="if(backdropClicadoSeguro(event, this)) fecharModalConfiguracoes()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+    <div onclick="event.stopPropagation()" class="bg-white rounded-xl p-6 max-w-lg w-full shadow-2xl border border-slate-100 space-y-5">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div class="flex items-center gap-2.5">
           <div class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
@@ -4408,8 +4408,8 @@
   <!-- ========================================================================= -->
   <!-- DRAWER LATERAL DIREITO: DETALHES DO CHAMADO, ATRIBUIÇÃO & PARECER TÉCNICO -->
   <!-- ========================================================================= -->
-  <div id="modal-detalhes-chamado" onclick="if(event.target===this) fecharModalDetalhesChamado()" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-300 overflow-hidden">
-    <div id="drawer-painel-chamado" class="fixed inset-y-0 right-0 w-full max-w-xl sm:max-w-2xl bg-white shadow-2xl border-l border-slate-200/90 flex flex-col h-full transform transition-transform duration-300 ease-out translate-x-full">
+  <div id="modal-detalhes-chamado" onclick="if(backdropClicadoSeguro(event, this)) fecharModalDetalhesChamado()" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-300 overflow-hidden">
+    <div id="drawer-painel-chamado" onclick="event.stopPropagation()" class="fixed inset-y-0 right-0 w-full max-w-xl sm:max-w-2xl bg-white shadow-2xl border-l border-slate-200/90 flex flex-col h-full transform transition-transform duration-300 ease-out translate-x-full">
       
       <!-- Topo Fixo do Drawer: Protocolo, Status e Fechar -->
       <div class="p-5 sm:p-6 pb-4 border-b border-slate-100 flex items-start justify-between shrink-0 bg-white">
@@ -4708,8 +4708,8 @@
   <!-- ========================================================================= -->
   <!-- MODAL: CADASTRO / EDIÇÃO DE USUÁRIO DA EQUIPE DE TI -->
   <!-- ========================================================================= -->
-  <div id="modal-novo-usuario" onclick="if(event.target===this) fecharModalNovoUsuario()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-    <div class="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl border border-slate-100 space-y-4">
+  <div id="modal-novo-usuario" onclick="if(backdropClicadoSeguro(event, this)) fecharModalNovoUsuario()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+    <div onclick="event.stopPropagation()" class="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl border border-slate-100 space-y-4">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div class="flex items-center gap-2.5">
           <div class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
@@ -4724,6 +4724,7 @@
       </div>
 
       <input type="hidden" id="usr-edit-index" value="-1">
+      <input type="hidden" id="usr-orig-email" value="">
 
       <div class="space-y-3 text-xs">
         <div>
@@ -4835,8 +4836,8 @@
   <!-- ========================================================================= -->
   <!-- MODAL: RENOMEAR / EDITAR SETOR DA EMPRESA                                 -->
   <!-- ========================================================================= -->
-  <div id="modal-editar-setor" onclick="if(event.target===this) fecharModalEditarSetor()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-    <div class="bg-white rounded-xl p-5 max-w-sm w-full shadow-2xl border border-slate-200 space-y-4">
+  <div id="modal-editar-setor" onclick="if(backdropClicadoSeguro(event, this)) fecharModalEditarSetor()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+    <div onclick="event.stopPropagation()" class="bg-white rounded-xl p-5 max-w-sm w-full shadow-2xl border border-slate-200 space-y-4">
       <div class="flex items-center justify-between pb-2 border-b border-slate-100">
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
@@ -4864,8 +4865,8 @@
 
 
     <!-- MODAL: RENOMEAR EMPRESA CLIENTE -->
-  <div id="modal-editar-empresa" onclick="if(event.target===this) fecharModalEditarEmpresa()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-    <div class="bg-white dark:bg-[#11131a] rounded-xl p-5 max-w-sm w-full shadow-2xl border border-slate-200 dark:border-white/[0.08] space-y-4">
+  <div id="modal-editar-empresa" onclick="if(backdropClicadoSeguro(event, this)) fecharModalEditarEmpresa()" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+    <div onclick="event.stopPropagation()" class="bg-white dark:bg-[#11131a] rounded-xl p-5 max-w-sm w-full shadow-2xl border border-slate-200 dark:border-white/[0.08] space-y-4">
       <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-white/[0.06]">
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
@@ -4923,6 +4924,19 @@
   <!-- JAVASCRIPT: LÓGICA DE NEGÓCIO, PASTAS 3D, CONEXÃO E PERSISTÊNCIA -->
   <!-- ========================================================================= -->
   <script>
+    // PREVENÇÃO UNIVERSAL DE FECHAMENTO ACIDENTAL DE MODAIS (ARRASTE / SELEÇÃO DE TEXTO)
+    let _globalModalMouseDownTarget = null;
+    document.addEventListener('mousedown', (e) => {
+      _globalModalMouseDownTarget = e.target;
+    }, true);
+
+    function backdropClicadoSeguro(event, backdropElement) {
+      // O modal só deve fechar se o clique iniciou (mousedown) E terminou (click) diretamente no fundo escuro
+      const seguro = (event.target === backdropElement && _globalModalMouseDownTarget === backdropElement);
+      _globalModalMouseDownTarget = null;
+      return seguro;
+    }
+
     // ESTADO GLOBAL DO SISTEMA
     let listaAtivos = [];
 
@@ -9868,17 +9882,23 @@
       try {
         const { data: usrData, error: usrErr } = await supabaseClient.from('usuarios').select('*');
         if (usrData && usrData.length > 0) {
-          listaUsuariosTi = usrData.map(u => ({
-            nome: u.nome,
-            email: u.email,
-            cargo: u.cargo,
-            telefone: u.telefone,
-            permissao: u.permissao,
-            status: u.status,
-            senha: u.senha,
-            empresaPermitida: u.empresa_permitida || 'todas',
-            permissoes: u.permissoes || {}
-          }));
+          const mapa = new Map();
+          usrData.forEach(u => {
+            if (u && u.email) {
+              mapa.set(u.email.toLowerCase(), {
+                nome: u.nome,
+                email: u.email,
+                cargo: u.cargo,
+                telefone: u.telefone,
+                permissao: u.permissao,
+                status: u.status,
+                senha: u.senha,
+                empresaPermitida: u.empresa_permitida || 'todas',
+                permissoes: u.permissoes || {}
+              });
+            }
+          });
+          listaUsuariosTi = Array.from(mapa.values());
           salvarDadosLocais();
           if (typeof renderizarUsuariosTi === 'function') renderizarUsuariosTi();
         }
@@ -9967,17 +9987,23 @@
           .on('postgres_changes', { event: '*', schema: 'public', table: 'usuarios' }, async () => {
             const { data } = await supabaseClient.from('usuarios').select('*');
             if (data && data.length > 0) {
-              listaUsuariosTi = data.map(u => ({
-                nome: u.nome,
-                email: u.email,
-                cargo: u.cargo,
-                telefone: u.telefone,
-                permissao: u.permissao,
-                status: u.status,
-                senha: u.senha,
-                empresaPermitida: u.empresa_permitida || 'todas',
-                permissoes: u.permissoes || {}
-              }));
+              const mapa = new Map();
+              data.forEach(u => {
+                if (u && u.email) {
+                  mapa.set(u.email.toLowerCase(), {
+                    nome: u.nome,
+                    email: u.email,
+                    cargo: u.cargo,
+                    telefone: u.telefone,
+                    permissao: u.permissao,
+                    status: u.status,
+                    senha: u.senha,
+                    empresaPermitida: u.empresa_permitida || 'todas',
+                    permissoes: u.permissoes || {}
+                  });
+                }
+              });
+              listaUsuariosTi = Array.from(mapa.values());
               salvarDadosLocais();
               if (typeof renderizarUsuariosTi === 'function') renderizarUsuariosTi();
             }
@@ -11781,6 +11807,7 @@
       const hint = document.getElementById('usr-senha-hint');
       const inputSenha = document.getElementById('usr-senha');
       const selEmpresa = document.getElementById('usr-empresa-permitida');
+      const elOrig = document.getElementById('usr-orig-email');
 
       if (inputSenha) {
         inputSenha.type = 'password';
@@ -11790,6 +11817,7 @@
 
       if (idx >= 0 && listaUsuariosTi[idx]) {
         const u = listaUsuariosTi[idx];
+        if (elOrig) elOrig.value = u.email || '';
         if (tit) tit.textContent = 'Editar Usuário / Técnico de TI';
         document.getElementById('usr-nome').value = u.nome || '';
         document.getElementById('usr-email').value = u.email || '';
@@ -11812,6 +11840,7 @@
         setCheck('usr-perm-supervisionar-chamados', typeof p.supervisionarChamados === 'boolean' ? p.supervisionarChamados : (isAdmin || (u.permissao || '').includes('Gerente')));
         setCheck('usr-perm-visualizar-bi', typeof p.visualizarBi === 'boolean' ? p.visualizarBi : true);
       } else {
+        if (elOrig) elOrig.value = '';
         if (tit) tit.textContent = 'Novo Usuário / Técnico de TI';
         document.getElementById('usr-nome').value = '';
         document.getElementById('usr-email').value = '';
@@ -11835,9 +11864,11 @@
     function fecharModalNovoUsuario() {
       const modal = document.getElementById('modal-novo-usuario');
       if (modal) modal.classList.add('hidden');
+      const elOrig = document.getElementById('usr-orig-email');
+      if (elOrig) elOrig.value = '';
     }
 
-    function salvarUsuarioTi() {
+    async function salvarUsuarioTi() {
       const nome = document.getElementById('usr-nome').value.trim();
       const email = document.getElementById('usr-email').value.trim();
       const cargo = document.getElementById('usr-cargo').value.trim();
@@ -11847,6 +11878,9 @@
       const selEmpresa = document.getElementById('usr-empresa-permitida');
       const empresaPermitida = selEmpresa ? selEmpresa.value : 'todas';
       const editIdx = parseInt(document.getElementById('usr-edit-index').value);
+      const elOrig = document.getElementById('usr-orig-email');
+      const origEmail = elOrig ? elOrig.value.trim() : '';
+      const emailAlterado = Boolean(origEmail && origEmail.toLowerCase() !== email.toLowerCase());
 
       if (!nome) {
         alert('Por favor, informe o nome completo do técnico.');
@@ -11893,26 +11927,61 @@
         adicionarLog('127.0.0.1', 'Console TI', 'Usuário Atualizado', `${nome} (${permissao} - ${empresaPermitida}) modificado na equipe`, 'text-blue-600 font-semibold');
         mostrarToast(`Técnico ${nome} atualizado com sucesso!`, 'success', 'Usuário Atualizado');
       } else {
-        listaUsuariosTi.push(usuarioDados);
+        const existIdx = listaUsuariosTi.findIndex(u => u && u.email && u.email.toLowerCase() === email.toLowerCase());
+        if (existIdx >= 0) {
+          listaUsuariosTi[existIdx] = usuarioDados;
+        } else {
+          listaUsuariosTi.push(usuarioDados);
+        }
         adicionarLog('127.0.0.1', 'Console TI', 'Novo Usuário', `${nome} (${permissao} - ${empresaPermitida}) adicionado à equipe`, 'text-emerald-600 font-bold');
         mostrarToast(`Novo técnico ${nome} adicionado à equipe!`, 'success', 'Usuário Cadastrado');
       }
 
-      if (supabaseClient) {
-        supabaseClient.from('usuarios').upsert({
-          nome: nome,
-          email: email,
-          cargo: cargo,
-          telefone: telefone,
-          permissao: permissao,
-          status: status,
-          senha: senha,
-          empresa_permitida: empresaPermitida,
-          permissoes: permissoes
-        }, { onConflict: 'email' }).then(({ data, error }) => {
-          if (error) console.warn('Erro Supabase upsert usuario:', error);
-        }).catch(console.warn);
+      // Se o e-mail foi alterado, remove o registro antigo com o e-mail anterior
+      if (emailAlterado) {
+        listaUsuariosTi = listaUsuariosTi.filter(u => !u.email || u.email.toLowerCase() !== origEmail.toLowerCase());
       }
+      // Deduplicação estrita na lista em memória por e-mail minúsculo
+      const mapaUsuarios = new Map();
+      listaUsuariosTi.forEach(u => { if (u && u.email) mapaUsuarios.set(u.email.toLowerCase(), u); });
+      listaUsuariosTi = Array.from(mapaUsuarios.values());
+
+      if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+        try {
+          if (emailAlterado) {
+            await supabaseClient.from('usuarios').delete().eq('email', origEmail);
+          }
+          await supabaseClient.from('usuarios').upsert({
+            nome: nome,
+            email: email,
+            cargo: cargo,
+            telefone: telefone,
+            permissao: permissao,
+            status: status,
+            senha: senha,
+            empresa_permitida: empresaPermitida,
+            permissoes: permissoes
+          }, { onConflict: 'email' });
+        } catch (errSupabase) {
+          console.warn('Erro ao sincronizar usuário no Supabase:', errSupabase);
+        }
+      }
+
+      // Se o usuário logado atualmente for o que foi alterado, atualiza o cache da sessão
+      try {
+        const sessaoStr = localStorage.getItem('fsc_usuario_logado') || sessionStorage.getItem('fsc_usuario_logado');
+        if (sessaoStr) {
+          const sessao = JSON.parse(sessaoStr);
+          if (sessao && (sessao.email === origEmail || sessao.email === email)) {
+            sessao.email = email;
+            sessao.nome = nome;
+            sessao.cargo = cargo;
+            sessao.permissao = permissao;
+            if (localStorage.getItem('fsc_usuario_logado')) localStorage.setItem('fsc_usuario_logado', JSON.stringify(sessao));
+            if (sessionStorage.getItem('fsc_usuario_logado')) sessionStorage.setItem('fsc_usuario_logado', JSON.stringify(sessao));
+          }
+        }
+      } catch (e) {}
 
       salvarDadosLocais();
       renderizarUsuariosTi();
