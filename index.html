@@ -7,6 +7,47 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>NexusTI • Gestão de TI & Acesso Remoto</title>
+  <script>
+    // PRE-RENDER AUTH GUARD: Impede qualquer exibição ou flash do painel antes da validação de autenticação
+    (function() {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('guest') === '1' || params.get('demo') === '1') return;
+
+        var s = localStorage.getItem("fsc_auth_session") || sessionStorage.getItem("fsc_auth_session");
+        if (!s) {
+          document.documentElement.style.display = 'none';
+          window.location.replace("login.html");
+          return;
+        }
+
+        var auth = JSON.parse(s);
+        var now = Date.now();
+        var maxInactivity = 2 * 60 * 60 * 1000; // 2 horas de inatividade
+        var maxSession = 12 * 60 * 60 * 1000;   // 12 horas de sessão máxima
+        var last = auth.ultimoAcesso || (auth.loginEm ? new Date(auth.loginEm).getTime() : 0);
+        var created = auth.loginTimestamp || (auth.loginEm ? new Date(auth.loginEm).getTime() : 0);
+
+        if (!last || (now - last > maxInactivity) || (created && now - created > maxSession)) {
+          localStorage.removeItem("fsc_auth_session");
+          sessionStorage.removeItem("fsc_auth_session");
+          document.documentElement.style.display = 'none';
+          window.location.replace("login.html?expired=1");
+          return;
+        }
+
+        auth.ultimoAcesso = now;
+        if (localStorage.getItem("fsc_auth_session")) {
+          localStorage.setItem("fsc_auth_session", JSON.stringify(auth));
+        } else {
+          sessionStorage.setItem("fsc_auth_session", JSON.stringify(auth));
+        }
+      } catch (e) {
+        document.documentElement.style.display = 'none';
+        window.location.replace("login.html");
+      }
+    })();
+  </script>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google Fonts: Inter -->
@@ -5255,7 +5296,7 @@
       }
     }
 
-    // Validação de autenticação corporativa ativa
+    // Validação de autenticação corporativa ativa com expiração por inatividade
     function verificarSessaoAtiva() {
       const params = new URLSearchParams(window.location.search);
       if (params.get('guest') === '1' || params.get('demo') === '1') {
@@ -5263,11 +5304,72 @@
       }
       const sessionStr = localStorage.getItem("fsc_auth_session") || sessionStorage.getItem("fsc_auth_session");
       if (!sessionStr) {
-        window.location.href = "login.html";
+        window.location.replace("login.html");
+        return false;
+      }
+      try {
+        const auth = JSON.parse(sessionStr);
+        const now = Date.now();
+        const maxInactivity = 2 * 60 * 60 * 1000; // 2 horas
+        const maxSession = 12 * 60 * 60 * 1000;
+        const last = auth.ultimoAcesso || (auth.loginEm ? new Date(auth.loginEm).getTime() : 0);
+        const created = auth.loginTimestamp || (auth.loginEm ? new Date(auth.loginEm).getTime() : 0);
+
+        if (!last || (now - last > maxInactivity) || (created && now - created > maxSession)) {
+          localStorage.removeItem("fsc_auth_session");
+          sessionStorage.removeItem("fsc_auth_session");
+          window.location.replace("login.html?expired=1");
+          return false;
+        }
+      } catch(e) {
+        localStorage.removeItem("fsc_auth_session");
+        sessionStorage.removeItem("fsc_auth_session");
+        window.location.replace("login.html");
         return false;
       }
       return true;
     }
+
+    // Registro de atividade do usuário para evitar desconexão enquanto opera
+    let _ultimoRegistroAtividade = Date.now();
+    function registrarAtividadeOperador() {
+      const now = Date.now();
+      if (now - _ultimoRegistroAtividade > 60000) { // A cada 1 minuto
+        _ultimoRegistroAtividade = now;
+        const sessionStr = localStorage.getItem("fsc_auth_session") || sessionStorage.getItem("fsc_auth_session");
+        if (sessionStr) {
+          try {
+            const auth = JSON.parse(sessionStr);
+            auth.ultimoAcesso = now;
+            if (localStorage.getItem("fsc_auth_session")) {
+              localStorage.setItem("fsc_auth_session", JSON.stringify(auth));
+            } else {
+              sessionStorage.setItem("fsc_auth_session", JSON.stringify(auth));
+            }
+          } catch(e) {}
+        }
+      }
+    }
+    window.addEventListener('mousemove', registrarAtividadeOperador, { passive: true });
+    window.addEventListener('keydown', registrarAtividadeOperador, { passive: true });
+    window.addEventListener('click', registrarAtividadeOperador, { passive: true });
+
+    // Watchdog periódico de inatividade para abas abertas em background
+    setInterval(() => {
+      const sessionStr = localStorage.getItem("fsc_auth_session") || sessionStorage.getItem("fsc_auth_session");
+      if (!sessionStr) return;
+      try {
+        const auth = JSON.parse(sessionStr);
+        const now = Date.now();
+        const maxInactivity = 2 * 60 * 60 * 1000;
+        const last = auth.ultimoAcesso || (auth.loginEm ? new Date(auth.loginEm).getTime() : 0);
+        if (!last || (now - last > maxInactivity)) {
+          localStorage.removeItem("fsc_auth_session");
+          sessionStorage.removeItem("fsc_auth_session");
+          window.location.replace("login.html?expired=1");
+        }
+      } catch(e) {}
+    }, 60000);
 
     // INICIALIZAÇÃO
     document.addEventListener('DOMContentLoaded', () => {
@@ -5526,13 +5628,6 @@
 
     function voltarNivel() {
       navegarParaAba('view-dashboard');
-    }
-
-    function _placeholder_voltar() {
-      navegarParaAba('view-dashboard');
-      pastasDashboard.forEach(p => p.active = false);
-      pastasDashboard[1].active = true;
-      selecionarPasta(pastasDashboard[1].id);
     }
 
     // =========================================================================

@@ -4,6 +4,44 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nexus Master Admin — Gestão de Licenças & Tenants</title>
+  <script>
+    (function() {
+      try {
+        var s = localStorage.getItem("fsc_auth_session") || sessionStorage.getItem("fsc_auth_session");
+        if (!s) {
+          document.documentElement.style.display = 'none';
+          window.location.replace("login.html");
+          return;
+        }
+        var auth = JSON.parse(s);
+        var now = Date.now();
+        var maxInactivity = 2 * 60 * 60 * 1000;
+        var last = auth.ultimoAcesso || (auth.loginEm ? new Date(auth.loginEm).getTime() : 0);
+        if (!last || (now - last > maxInactivity)) {
+          localStorage.removeItem("fsc_auth_session");
+          sessionStorage.removeItem("fsc_auth_session");
+          document.documentElement.style.display = 'none';
+          window.location.replace("login.html?expired=1");
+          return;
+        }
+        var p = (auth.permissao || '').toLowerCase();
+        var n = (auth.nivel || '').toLowerCase();
+        if (!p.includes('admin') && !n.includes('admin') && !n.includes('superadmin')) {
+          window.location.replace("index.html");
+          return;
+        }
+        auth.ultimoAcesso = now;
+        if (localStorage.getItem("fsc_auth_session")) {
+          localStorage.setItem("fsc_auth_session", JSON.stringify(auth));
+        } else {
+          sessionStorage.setItem("fsc_auth_session", JSON.stringify(auth));
+        }
+      } catch(e) {
+        document.documentElement.style.display = 'none';
+        window.location.replace("login.html");
+      }
+    })();
+  </script>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>

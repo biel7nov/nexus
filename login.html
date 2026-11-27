@@ -4,6 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - NexusTI</title>
+  <script>
+    (function() {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('expired') === '1' || params.get('logout') === '1') return;
+        var s = localStorage.getItem("fsc_auth_session") || sessionStorage.getItem("fsc_auth_session");
+        if (s) {
+          var auth = JSON.parse(s);
+          var now = Date.now();
+          var maxInactivity = 2 * 60 * 60 * 1000;
+          var last = auth.ultimoAcesso || (auth.loginEm ? new Date(auth.loginEm).getTime() : 0);
+          if (last && (now - last < maxInactivity)) {
+            window.location.replace("index.html");
+          }
+        }
+      } catch(e) {}
+    })();
+  </script>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -231,9 +249,9 @@
             type="text" 
             id="usernameInput" 
             required 
-            placeholder="User Name" 
+            placeholder="User Name ou E-mail corporativo" 
             autocomplete="username"
-            value="gabriel@empresa.com"
+            value=""
             class="glass-input w-full rounded-2xl px-5 pr-12 py-3.5 text-sm font-medium placeholder-slate-400/80"
           >
           <div class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none">
@@ -247,9 +265,9 @@
             type="password" 
             id="passwordInput" 
             required 
-            placeholder="Password" 
+            placeholder="Senha" 
             autocomplete="current-password"
-            value="admin1234"
+            value=""
             class="glass-input w-full rounded-2xl px-5 pr-12 py-3.5 text-sm font-medium placeholder-slate-400/80"
           >
           <button 
@@ -269,10 +287,9 @@
             <input 
               type="checkbox" 
               id="rememberMe" 
-              checked
               class="w-4 h-4 rounded border-white/20 bg-white/10 text-blue-500 focus:ring-0 focus:ring-offset-0 cursor-pointer accent-blue-500"
             >
-            <span class="text-slate-300 group-hover:text-white transition-colors">Remember me</span>
+            <span class="text-slate-300 group-hover:text-white transition-colors">Manter conectado</span>
           </label>
 
           <button 
@@ -290,23 +307,13 @@
           id="btnLogin"
           class="glass-btn-login w-full rounded-2xl py-3.5 text-sm sm:text-base font-semibold tracking-wide flex items-center justify-center gap-2 mt-2"
         >
-          <span id="btnText">Login</span>
+          <span id="btnText">Acessar Painel</span>
           <i id="btnSpinner" data-lucide="loader-2" class="w-4 h-4 animate-spin hidden"></i>
         </button>
 
-        <!-- Atalho Rápido para Demonstração (Facilidade para Testes TI) -->
         <div class="pt-3 flex flex-col items-center gap-2 border-t border-white/10 mt-5">
-          <button 
-            type="button" 
-            onclick="preencherDadosDemo()" 
-            class="text-[11px] font-medium text-slate-400 hover:text-white py-1 px-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center gap-1.5"
-          >
-            <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
-            <span>Preencher Demonstração (Admin TI)</span>
-          </button>
-          
           <div class="text-[10px] text-slate-500 font-mono tracking-tight">
-            NexusTI Enterprise • Conexão Segura
+            NexusTI Enterprise • Conexão Segura e Criptografada
           </div>
         </div>
 
@@ -688,14 +695,12 @@
         } catch(e) {}
       }
       garantirContaAdmin();
-      const session = localStorage.getItem("fsc_auth_session") || sessionStorage.getItem("fsc_auth_session");
-      if (session) {
-        try {
-          const authData = JSON.parse(session);
-          if (authData.usuario && document.getElementById("usernameInput")) {
-            document.getElementById("usernameInput").value = authData.usuario;
-          }
-        } catch (e) {}
+      
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('expired') === '1') {
+        setTimeout(() => {
+          mostrarToast("Sua sessão expirou por tempo de inatividade. Por favor, autentique-se novamente.", "alerta", "Sessão Expirada");
+        }, 300);
       }
     });
 
@@ -713,14 +718,6 @@
         if (btn) btn.innerHTML = '<i data-lucide="eye-off" class="w-5 h-5"></i>';
       }
       if (window.lucide && lucide.createIcons) lucide.createIcons();
-    }
-
-    // Preencher dados rápidos para demonstração
-    function preencherDadosDemo() {
-      document.getElementById("usernameInput").value = "gabriel@empresa.com";
-      document.getElementById("passwordInput").value = "admin1234";
-      document.getElementById("rememberMe").checked = true;
-      mostrarToast("Credenciais preenchidas para demonstração!", "sucesso", "Acesso Rápido");
     }
 
     // Realizar Login validando dinamicamente contra a equipe cadastrada em Configurações
@@ -822,12 +819,15 @@
 
       setTimeout(() => {
         // Gravar sessão com os dados reais do usuário encontrado
-                const authPayload = {
+        const nowTs = Date.now();
+        const authPayload = {
           usuario: userFound.nome,
           email: userFound.email,
           cargo: userFound.cargo || "Técnico de TI",
           permissao: userFound.permissao || "Suporte",
           loginEm: new Date().toISOString(),
+          loginTimestamp: nowTs,
+          ultimoAcesso: nowTs,
           nivel: (userFound.permissao === "Administrador" || userFound.permissao === "Administrador da Empresa") ? "SuperAdmin" : userFound.permissao,
           empresaPermitida: userFound.empresaPermitida || "todas",
           permissoes: userFound.permissoes || {
